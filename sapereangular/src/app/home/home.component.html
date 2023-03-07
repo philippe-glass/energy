@@ -1,0 +1,26 @@
+<app-header></app-header>
+<div class="content">
+    <form (ngSubmit)="addQuery()">
+        <div class="form-group">
+            <label>Name:<input class="form-text" name="name" [(ngModel)]="name"></label><br />
+            <small id="name" className="form-text text-muted">Query name (example : query1)</small>
+        </div>
+        <div class="form-group">
+            <label>Property:<input class="form-text" name="property" [(ngModel)]="property"></label><br />
+        </div>
+        <div class="form-group">
+            <label>Value:<input class="form-text" name="value" [(ngModel)]="value"></label><br />
+        </div>
+        <div class="form-group">
+            <label>Waiting:<input class="form-text" name="waiting" [(ngModel)]="waiting"></label><br />
+        </div>
+        <button class="btn btn-success" type="submit">Add new Query</button>
+    </form>
+
+    <br />
+    <div className="alert alert-primary" role="alert">
+        Result: {{result}}<br />
+        <button class="btn btn-lg btn-outline-success" (click)="positiveReward()" type="submit">+</button>
+        <button class="btn btn-lg btn-outline-danger" (click)="negativeReward()" type="submit">-</button>
+    </div>
+</div>

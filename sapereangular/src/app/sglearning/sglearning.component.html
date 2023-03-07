@@ -1,0 +1,626 @@
+<app-header></app-header>
+
+<div class="content ">
+<h2>Learning </h2>
+
+<button id='btGetStatistics'  size="20"  (click)="changeDisplay('span_StatisticsPredictions');">Get statistic of predictions</button>
+<br><br>
+<span id="span_StatisticsPredictions" class="display_none">
+    <form (ngSubmit)="getStatistics()">
+        <fieldset>
+            <legend> Get statistics of predictions </legend>
+            <table>
+                <tr>
+                    <td class="label"><label for="location">Location : </label></td>
+                    <td colspan="3">
+                        <select [(ngModel)]="statisticsRequest.location"  name="location"     >
+                            <option *ngFor="let location of listLocations" [value]="location.value">{{location.label}}</option>
+                        </select>
+                    </td>
+                </tr>
+                <tr>
+                    <td class="label"><label for="minComputeDay"  > Compute day from : </label></td>
+                    <td><input size="8" type="text"  name="minComputeDay"  [(ngModel)]="statisticsRequest.minComputeDay"></td>
+                    <td class="label"><label for="maxComputeDay"  > To : </label></td>
+                    <td><input size="8" type="text"  name="maxComputeDay"  [(ngModel)]="statisticsRequest.maxComputeDay"></td>
+                    <td class="label"><label for="minTargetHour"  > Min hour (0-23) :</label></td>
+                    <td><input size="5" type="text" name="minTargetHour"  [(ngModel)]="statisticsRequest.minTargetHour"></td>
+                    <td class="label"><label for="maxTargetHour"  > Max hour (0-23) :</label></td>
+                    <td><input size="5" type="text" name="maxTargetHour"  [(ngModel)]="statisticsRequest.maxTargetHour"></td>
+                    <td class="label"><label for="useCorrections"  >use corrections : </label></td>
+                    <td>
+                        <select  name="useCorrectionsFilter" [(ngModel)]="statisticsRequest.useCorrectionsFilter"  >
+                            <option  [value]=""> </option>
+                            <option *ngFor="let choice of listYesNo" [value]="choice.value">{{choice.label}}</option>
+                        </select>
+                    </td>
+                    <td class="label"><label for="variableName">variable : </label></td>
+                    <td>
+                        <select [(ngModel)]="statisticsRequest.variableName"  name="variableName">
+                            <option  [value]=""> </option>
+                            <option *ngFor="let variable of all_variables" [value]="variable">{{variable}}</option>
+                        </select>
+                    </td>
+                    <!--
+                    <td><label for="horizonInMinutes"  > </label>horizon (min) :</td>
+                    <td><input size="5" type="text" name="horizonInMinutes"  [(ngModel)]="statisticsRequest.horizonInMinutes"></td>
+                     -->
+                </tr>
+                <tr>
+                    <!--
+                    <td class="label"><label for="mergeHorizons">merge horizons ?: </label></td>
+                    <td>
+                        <input type="checkbox" [(ngModel)]="statisticsRequest.mergeHorizons" name="mergeHorizons">
+                    </td>
+                    <td class="label"><label for="mergeUseCorrections">merge use corrections ?: </label></td>
+                    <td>
+                        <input type="checkbox" [(ngModel)]="statisticsRequest.mergeUseCorrections" name="mergeUseCorrections">
+                    </td>
+                    -->
+                    <td class="label"><label for="fieldsToMerge">Merge fields: </label></td>
+                    <td>
+                        <select [(ngModel)]="statisticsRequest.fieldsToMerge"  name="fieldsToMerge" multiple="true">
+                            <option  [value]=""> </option>
+                            <option *ngFor="let field of statisticsRequest.mergableFields" [value]="field.value">{{field.label}}</option>
+                        </select>
+                    </td>
+                </tr>
+            </table>
+            <button class="btn btn-success" type="submit">Submit</button>
+        </fieldset>
+        <br>
+    </form>
+    <ng-container *ngIf="this.listStatisitcs.length > 0">
+        <!-- <button id='btDisplayTimeSeps'  size="20" (click)="changeDisplay('ngc_time_steps');">Time steps :</button> -->
+        <br>
+        <br>
+        <b>Pediction statistics : </b>
+        <br>
+        <table>
+            <tr>
+                <td class='trans_matrix  matrix_hearder end_col_bloc' [attr.colspan]="6">Features</td>
+                <td class='trans_matrix  matrix_hearder' [attr.colspan]="0+this.stateNb" ><b>Prediction mean</b></td>
+                <td class='trans_matrix  matrix_hearder begin_col_bloc end_col_bloc' [attr.colspan]="5">Result</td>
+                <td class='trans_matrix  matrix_hearder end_col_bloc' [attr.colspan]="2">Entropie</td>
+                <td class='trans_matrix  matrix_hearder' [attr.colspan]="0+this.stateNb" ><b>State distribution</b></td>
+            </tr>
+            <tr>
+                <td class='trans_matrix  matrix_hearder'>Variable</td>
+                <td class='trans_matrix  matrix_hearder'>Compute date</td>
+                <td class='trans_matrix  matrix_hearder'>Targe date</td>
+                <td class='trans_matrix  matrix_hearder'>Time slot</td>
+                <td class='trans_matrix  matrix_hearder'>Horizon (min)</td>
+                <td class='trans_matrix  matrix_hearder end_col_bloc'>Use of corrections</td>
+                <td *ngFor="let state of this.listStates;" scope="row" class='statistics_hearder' ><b>{{state.name}}</b></td>
+                <td class='trans_matrix  matrix_hearder begin_col_bloc'>Nb of predictions</td>
+                <td class='trans_matrix  matrix_hearder '>Success Rate</td>
+                <td class='trans_matrix  matrix_hearder '>Nb of self-adjustments</td>
+                <td class='trans_matrix  matrix_hearder'>Vector differential</td>
+                <td class='trans_matrix  matrix_hearder end_col_bloc'>Reliability %</td>
+                <td class='trans_matrix  matrix_hearder'>Shannon entropie</td>
+                <td class='trans_matrix  matrix_hearder end_col_bloc'>Gini Index</td>
+                <td *ngFor="let state of this.listStates;" scope="row" class='statistics_hearder' ><b>{{state.name}}</b></td>
+            </tr>
+            <tr *ngFor="let statistic of this.listStatisitcs" scope="row" class='states  states_hearder' >
+                <td class='trans_matrix {{getClassLineResult(statistic)}} '>{{statistic.variable}}</td>
+                <td class='trans_matrix {{getClassLineResult(statistic)}}'>
+                    {{formatDate(statistic['computeDay'])}}
+                </td>
+                <td class='trans_matrix {{getClassLineResult(statistic)}}'>
+                    {{formatDate(statistic['timeSlot']['beginDate'])}}
+                </td>
+                <td class='trans_matrix {{getClassLineResult(statistic)}}'>
+                    {{formatTime(statistic['timeSlot']['beginDate'])}} -
+                    {{formatTime(statistic['timeSlot']['endDate'])}}
+                </td>
+                <td class='trans_matrix {{getClassLineResult(statistic)}}'>
+                    {{(statistic['horizons'])}}
+                </td>
+                <td class='trans_matrix end_col_bloc {{getClassLineResult(statistic)}}'>
+                    <span *ngFor="let useOfCorrectionsItem of statistic['useOfCorrections']" let idx=index;>
+                        {{(index > 0)?',':''}}{{useOfCorrectionsItem?'yes':'no'}}
+                    </span>
+                </td>
+                <td *ngFor="let value of statistic['arrayMeansOfProba']; let idx=index;" scope="row" class='trans_matrix {{getClassProba(value, -1,-1)}} {{getClassLineResult(statistic)}}' >
+                    <b>{{value > 0 ? fnum2(100*value) + " %" : ""}}</b>
+                </td>
+                <td class='trans_matrix begin_col_bloc  {{getClassLineResult(statistic)}}'>
+                    {{fnum0(statistic['nbOfPredictions'])}}
+                </td>
+                <td class='trans_matrix  {{geClassSucessRate(statistic["sucessRate"])}} {{getClassLineResult(statistic)}}' >
+                    {{fnum2(100*statistic['sucessRate'])}} %
+                </td>
+                <td class='trans_matrix {{getClassLineResult(statistic)}}'>
+                    {{fnum0(statistic['nbOfCorrections'])}}
+                </td>
+                <td class='trans_matrix   {{getClassLineResult(statistic)}}'>
+                    <ng-container *ngIf='statistic["differential"]  != null'>
+                        {{fnum3(statistic['differential'], true)}}
+                    </ng-container>
+                </td>
+                <td class='trans_matrix end_col_bloc {{geClassSucessRate(statistic["differentialComplementary"])}}   {{getClassLineResult(statistic)}} '>
+                    <ng-container *ngIf='statistic["differentialComplementary"]  != null'>
+                        {{fnum3(100*statistic['differentialComplementary'])}} %
+                    </ng-container>
+                </td>
+                <td class='trans_matrix {{ (statistic["statesStatistic"] == null)?"" :  geClassEntropie(statistic["statesStatistic"])}} {{getClassLineResult(statistic)}}'>
+                    <ng-container *ngIf='statistic["statesStatistic"]  != null'>
+                        {{fnum3(statistic['statesStatistic']['shannonEntropie'], true)}}
+                    </ng-container>
+                </td>
+                <td class='trans_matrix {{ (statistic["statesStatistic"] == null)?"" :  geClassEntropie(statistic)["statesStatistic"]}} end_col_bloc {{getClassLineResult(statistic)}}'>
+                    <ng-container *ngIf='statistic["statesStatistic"]  != null'>
+                        {{fnum3(statistic['statesStatistic']['giniIndex'], true)}}
+                    </ng-container>
+                </td>
+                <ng-container *ngIf='statistic["statesStatistic"]  == null'>
+                    <td *ngFor="let state of this.listStates;" scope="row" class='trans_matrix  rate_very_poor {{getClassLineResult(statistic)}}' >NO_S_STATS</td>
+                </ng-container>
+                <ng-container *ngIf='statistic["statesStatistic"]  != null'>
+                    <td *ngFor="let value of statistic['statesStatistic']['arrayStateDistribution']; let idx=index;" scope="row" class='trans_matrix {{getClassProba(value, -1,-1)}} {{getClassLineResult(statistic)}}' >
+                        <b>{{value > 0 ? fnum2(100*value) + " %" : ""}}</b>
+                    </td>
+                </ng-container>
+            </tr>
+            <tr  class='states  states_hearder' >
+                <td class='statistics_hearder'>Total</td>
+                <td class='statistics_hearder '>{{fnum0(this.totalStatistics['nb'])}} </td>
+                <td class='statistics_hearder '></td>
+                <td class='statistics_hearder '></td>
+                <td class='statistics_hearder '></td>
+                <td class='statistics_hearder end_col_bloc'></td>
+                <td *ngFor="let value of this.totalStatistics['arrayMeansOfProba']; let idx=index;" scope="row" class='statistics_hearder ' >
+                    <b>{{value > 0 ? fnum2(100*value) + " %" : ""}}</b>
+                </td>
+                <td class='statistics_hearder begin_col_bloc'><b>{{fnum0(this.totalStatistics['nbOfPredictions'], true)}}</b></td>
+                <td class='statistics_hearder '><b>{{fnum2(100*this.totalStatistics['sucessRate'], true)}} %</b></td>
+                <td class='statistics_hearder '></td>
+                <td class='statistics_hearder '><b>{{fnum3(this.totalStatistics['differential'], true)}}</b></td>
+                <td class='statistics_hearder end_col_bloc'><b>{{fnum3(100*(1-this.totalStatistics['differential']), true)}} %</b></td>
+                <td class='statistics_hearder '><b>{{fnum3(this.totalStatistics['shannonEntropie'], true)}}</b></td>
+                <td class='statistics_hearder end_col_bloc'><b>{{fnum3(this.totalStatistics['giniIndex'], true)}}</b></td>
+                <td class='statistics_hearder ' [attr.colspan]="0+this.stateNb"> </td>
+            </tr>
+        </table>
+        <br/>
+    </ng-container>
+    <ng-container *ngIf="this.listErrors.length > 0">
+        <div *ngFor="let error of this.listErrors" class='txt_warning_high' scope="row">
+            <b>ERROR : {{error}}</b>
+        </div>
+    </ng-container>
+</span>
+
+
+ <button id='btDisplaySinglePrediction'  size="20"  (click)="changeDisplay('span_SinglePrediction');">Replay a single prediction</button>
+ <br>
+ <span id="span_SinglePrediction" class="display_none">
+        <form (ngSubmit)="getPrediction()">
+            <fieldset>
+                <legend>Replay a single prediction</legend>
+                <table>
+                    <tr>
+                        <td><label for="initDay"  > Initial time : </label></td>
+                        <td><input size="8" type="text"  name="initDay"  [(ngModel)]="singlePredictionRequest.initDay"></td>
+                        <td><label for="initTime"  > </label></td>
+                        <td><input size="5" type="text" name="initTime"  [(ngModel)]="singlePredictionRequest.initTime"></td>
+                        <td><label for="targetDay">Target time : </label></td>
+                        <td><input size="8" type="text" name="targetDay"  [(ngModel)]="singlePredictionRequest.targetDay"></td>
+                        <td><label for="targetTime"> </label></td>
+                        <td><input size="5" type="text" name="targetTime"  [(ngModel)]="singlePredictionRequest.targetTime"></td>
+                        <td><label for="location">Location : </label></td>
+                        <td>
+                            <select [(ngModel)]="singlePredictionRequest.location"  name="location"     >
+                                <option *ngFor="let location of listLocations" [value]="location.value">{{location.label}}</option>
+                            </select>
+                        </td>
+                        <td>  &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+                            <button class="btn btn-success" type="submit">Submit</button>
+                        </td>
+                    </tr>
+                </table>
+            </fieldset>
+        </form>
+
+        <ng-container *ngIf="this.prediction.hasOwnProperty('mapLastResults')">
+            <button id='btDisplayTimeSeps'  size="20" (click)="changeDisplay('ngc_time_steps');">Time steps :</button>
+            <br>
+            <span class='display_none' id='ngc_time_steps' >
+                <ng-containter  *ngFor="let step of this.prediction['listSteps'] ">
+                <br> . {{formatTimeSlot(step)}}
+                </ng-containter>
+            </span>
+            <br>
+            <b>Prediction result : </b>
+            <br>
+            <table>
+                <tr>
+                    <td></td>
+                    <td class='trans_matrix  matrix_hearder' [attr.colspan]="2">Initial state </td>
+                    <td class='trans_matrix  matrix_hearder' [attr.colspan]="0+this.stateNb"  ><b>Target state probabilities</b></td>
+                    <td class='trans_matrix  matrix_hearder' [attr.colspan]="3">Target state </td>
+                </tr>
+                <tr>
+                    <td></td>
+                    <td class='trans_matrix  matrix_hearder'>Value</td>
+                    <td class='trans_matrix  matrix_hearder'>State</td>
+                    <td *ngFor="let state of this.listStates;" scope="row" class='trans_matrix  matrix_hearder' ><b>{{state.name}}</b></td>
+                    <td class='trans_matrix  matrix_hearder'>Random</td>
+                    <td class='trans_matrix  matrix_hearder'>Most likely</td>
+                    <td class='trans_matrix  matrix_hearder'>Actual</td>
+                </tr>
+                <tr *ngFor="let predictionResult of this.prediction['mapLastResults'] | keyvalue ; let varIdx=index;" scope="row" class='states  states_hearder' >
+                    <td class='states  states_hearder'><b>{{predictionResult.key}}</b></td>
+                    <td class='trans_matrix  '>
+                        {{fnum2(this.prediction['initialValues'][predictionResult.key])}}
+                    </td>
+                    <td class='trans_matrix  '>
+                        S{{this.prediction['initialStates'][predictionResult.key]['id']}}
+                    </td>
+                    <td *ngFor="let value of predictionResult.value['stateProbabilities']; let idx=index;" scope="row" class='trans_matrix {{getClassProba(value, -1,-1)}}' >
+                        <b>{{fnum3(value)}}</b>
+                    </td>
+                    <td class='trans_matrix  '>
+                        {{predictionResult.value['radomTargetState']['name']}}
+                    </td>
+                    <td class='trans_matrix  {{geClassMostLikelyState(predictionResult.value)}} '>
+                        {{predictionResult.value['mostLikelyState']['name']}}
+                    </td>
+                    <td class='trans_matrix  '>
+                        <ng-container *ngIf="predictionResult.value['actualTargetState'] != null">
+                            {{predictionResult.value['actualTargetState']['name']}}
+                        </ng-container>
+                    </td>
+                </tr>
+            </table>
+        </ng-container>
+        <ng-container *ngIf="this.prediction.hasOwnProperty('errors')">
+            <br/>
+            <div *ngFor="let error of this.prediction['errors']" class='txt_warning_high' scope="row">
+                <b>ERROR : {{error}}</b>
+            </div>
+        </ng-container>
+    </span>
+<br>
+
+
+
+
+
+
+<!-- massive predictions -->
+<!-- request formular -->
+<button id='btDisplayMassivePrediction'  size="20"  (click)="changeDisplay('span_MassivePredictions');">Replay a series of predictions</button>
+    <span id="span_MassivePredictions" class="display_none">
+        <form (ngSubmit)="getMassivePredictions()">
+            <fieldset>
+                <legend>Replay a series of predictions</legend>
+                <table>
+                    <tr>
+                        <td><label for="targetDay"  > Target day : </label></td>
+                        <td>
+                            <!--
+                            <input size="8" type="text"  name="targetDay"  [(ngModel)]="massivePredictionRequest.targetDay">
+                            -->
+                            <select [(ngModel)]="massivePredictionRequest.targetDay"  name="targetDay"     >
+                                <option *ngFor="let stateDate of listStateDates" [value]="stateDate.value">{{stateDate.label}}</option>
+                            </select>
+                        </td>
+                        <td><label for="targetHour"  > </label>Target hour (0-23) :</td>
+                        <td><input size="5" type="text" name="targetHour"  [(ngModel)]="massivePredictionRequest.targetHour"></td>
+                        <td><label for="horizonInMinutes"  > </label>horizon (min) :</td>
+                        <td><input size="5" type="text" name="horizonInMinutes"  [(ngModel)]="massivePredictionRequest.horizonInMinutes"></td>
+                        <td><label for="prediction_location">Location : </label></td>
+                        <td>
+                            <select [(ngModel)]="massivePredictionRequest.location"  name="location"     >
+                                <option *ngFor="let location of listLocations" [value]="location.value">{{location.label}}</option>
+                            </select>
+                        </td>
+                        <td><label for="variableName">variable : </label></td>
+                        <td>
+                            <select [(ngModel)]="massivePredictionRequest.variableName"  name="variableName"     >
+                                <option *ngFor="let variable of all_variables" [value]="variable">{{variable}}</option>
+                            </select>
+                        </td>
+                        <td><label for="useCorrections">use corrections ?: </label></td>
+                        <td>
+                            <input type="checkbox" [(ngModel)]="massivePredictionRequest.useCorrections" name="useCorrections">
+                        </td>
+                        <td><label for="generateCorrections">generate corrections ?: </label></td>
+                        <td>
+                            <input type="checkbox" [(ngModel)]="massivePredictionRequest.generateCorrections" name="generateCorrections">
+                        </td>
+                        <td>  &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+                            <button class="btn btn-success" type="submit">Submit</button>
+                        </td>
+                    </tr>
+                </table>
+            </fieldset>
+        </form>
+
+        <!-- result display -->
+        <ng-container *ngIf="this.listPredictionItems.length > 0">
+            <br>
+            <table>
+                <tr>
+                    <td class='trans_matrix  matrix_hearder'>Time slot</td>
+                    <td class='trans_matrix  matrix_hearder'>Entropie</td>
+                </tr>
+                <tr  *ngFor="let entropieItem of this.entropieResult | keyvalue ; let varIdx=index;" scope="row" class='states  states_hearder'>
+                    <td class='trans_matrix'>{{entropieItem.key}} : </td>
+                    <td class='trans_matrix'>{{fnum2(entropieItem.value, true)}}</td>
+                </tr>
+            </table>
+            <br>
+            <b>Massive prediction result : </b>
+            <table>
+                <tr>
+                    <td></td>
+                    <td class='trans_matrix  matrix_hearder' [attr.colspan]="3">Initial state </td>
+                    <td class='trans_matrix  matrix_hearder' [attr.colspan]="0+this.stateNb"  ><b>Target state probabilities</b></td>
+                    <td class='trans_matrix  matrix_hearder' [attr.colspan]="4">Target state </td>
+                    <td class='trans_matrix  matrix_hearder' [attr.colspan]="2+(this.displayDistanceVector?1:0)*this.stateNb">Differential </td>
+                    <td class='trans_matrix  matrix_hearder' [attr.colspan]="2+this.stateNb">States statistics</td>
+                </tr>
+                <tr>
+                    <td class='trans_matrix  matrix_hearder'>Variable</td>
+                    <td class='trans_matrix  matrix_hearder'>Date</td>
+                    <td class='trans_matrix  matrix_hearder'>Value</td>
+                    <td class='trans_matrix  matrix_hearder'>State</td>
+                    <td *ngFor="let state of this.listStates;" scope="row" class='trans_matrix  matrix_hearder' ><b>{{state.name}}</b></td>
+                    <td class='trans_matrix  matrix_hearder'>Date</td>
+                    <!--<td class='trans_matrix  matrix_hearder'>Random</td>-->
+                    <td class='trans_matrix  matrix_hearder'>Most likely</td>
+                    <td class='trans_matrix  matrix_hearder'>Actual</td>
+                    <td class='trans_matrix  matrix_hearder'>Value</td>
+                    <td class='trans_matrix  matrix_hearder'>
+                        <button id='btDistanceVector'  class="distance_vector" size="20"  (click)="this.displayDistanceVector = !this.displayDistanceVector;">Distance</button>
+                    </td>
+                    <td *ngFor="let state of this.listStates;" scope="row" class='trans_matrix  matrix_hearder {{getClassDisplayDistanceVector()}}' ><b>{{state.name}}</b></td>
+                    <td class='trans_matrix  matrix_hearder'>Reliability %</td>
+                    <td class='trans_matrix  matrix_hearder'>Shannon entropie</td>
+                    <td class='trans_matrix  matrix_hearder'>Gini index</td>
+                    <td *ngFor="let state of this.listStates;" scope="row" class='trans_matrix  matrix_hearder' ><b>{{state.name}}</b></td>
+                </tr>
+                <tr *ngFor="let predictionResult of this.listPredictionItems" scope="row" class='states  states_hearder' >
+                    <td class='trans_matrix  {{getClassLineResult(predictionResult)}}'><b>{{predictionResult['variable']}}</b></td>
+                    <td class='trans_matrix  {{getClassLineResult(predictionResult)}}'>
+                        {{formatOnlyTime(predictionResult['initialDate'])}}
+                    </td>
+                    <td class='trans_matrix  {{getClassLineResult(predictionResult)}}'>
+                        {{fnum2(predictionResult['initialValue'])}}
+                    </td>
+                    <td class='trans_matrix  {{getClassState(predictionResult["initialState"])}} {{getClassLineResult(predictionResult)}}'>
+                        {{predictionResult['initialState']['name']}}
+                    </td>
+                    <td *ngFor="let value of predictionResult['stateProbabilities']; let idx=index;" scope="row" class='trans_matrix {{getClassProba(value, -1,-1)}}  {{getClassLineResult(predictionResult)}}' >
+                        <b>{{fnum3(value)}}</b>
+                    </td>
+                    <td class='trans_matrix {{getClassLineResult(predictionResult)}} '>
+                        {{formatOnlyTime(predictionResult['targetDate'])}}
+                    </td>
+                    <!--
+                    <td class='trans_matrix  '>
+                        {{predictionResult['radomTargetState']['name']}}
+                    </td>
+                    -->
+                    <td class='trans_matrix {{geClassMostLikelyState(predictionResult)}}  {{getClassLineResult(predictionResult)}}'>
+                        {{predictionResult['mostLikelyState']['name']}}
+                    </td>
+                    <td class='trans_matrix {{getClassState(predictionResult["actualTargetState"])}}  {{getClassLineResult(predictionResult)}}'>
+                        <ng-container *ngIf="predictionResult['actualTargetState'] != null">
+                            {{predictionResult['actualTargetState']['name']}}
+                        </ng-container>
+                    </td>
+                    <td class='trans_matrix  {{getClassLineResult(predictionResult)}} {{getClassLineResult(predictionResult)}}'>
+                        <ng-container *ngIf="predictionResult['actualTargetState'] != null">
+                           {{fnum2(predictionResult['actualTargetValue'])}}
+                        </ng-container>
+                    </td>
+                    <td class='trans_matrix {{getClassLineResult(predictionResult)}} {{getClassLineResult(predictionResult)}} '>
+                        <b>{{fnum3(predictionResult['differential'])}}</b>
+                    </td>
+                    <td *ngFor="let differentialItem of predictionResult['vectorDifferential']; let idx=index;" scope="row" class='trans_matrix {{getClassProba(0.0, -1,-1)}}  {{getClassDisplayDistanceVector()}} {{getClassLineResult(predictionResult)}}' >
+                        <div class="{{getClassDifferentialItem(differentialItem)}}">
+                            {{fnum_minus_plus(differentialItem,3)}}
+                        </div>
+                    </td>
+                    <td class='trans_matrix {{getClassLineResult(predictionResult)}}   {{geClassSucessRate(predictionResult["differentialComplementary"])}} {{getClassLineResult(predictionResult)}} '>
+                        {{fnum2(100*(predictionResult['differentialComplementary']))}}{{predictionResult['differentialComplementary'] > 0?' %':''}}
+                    </td>
+                    <td class='trans_matrix {{getClassLineResult(predictionResult)}} {{getClassLineResult(predictionResult)}} '>
+                        <ng-container *ngIf="predictionResult['actualStatesStatistic'] != null">
+                            {{fnum3(predictionResult['actualStatesStatistic']['shannonEntropie'] , true)}}
+                         </ng-container>
+                    </td>
+                    <td class='trans_matrix {{getClassLineResult(predictionResult)}} {{getClassLineResult(predictionResult)}} '>
+                        <ng-container *ngIf="predictionResult['actualStatesStatistic'] != null">
+                            {{fnum3(predictionResult['actualStatesStatistic']['giniIndex'] , true)}}
+                        </ng-container>
+                    </td>
+                    <ng-container *ngIf='predictionResult["actualStatesStatistic"] == null'>
+                        <td *ngFor="let state of this.listStates;" scope="row" class='trans_matrix  rate_very_poor {{getClassLineResult(predictionResult)}}' ></td>
+                    </ng-container>
+                    <ng-container *ngIf="predictionResult['actualStatesStatistic'] != null">
+                        <td *ngFor="let value of predictionResult['actualStatesStatistic']['arrayStateDistribution']; let idx=index;" scope="row" class='trans_matrix {{getClassProba(value, -1,-1)}}  {{getClassLineResult(predictionResult)}} ' >
+                            <b>{{value > 0 ? fnum2(100*value) + " %" : ""}}</b>
+                        </td>
+                    </ng-container>
+                </tr>
+                <tr class='states statistics_hearder' >
+                    <td class=' statistics_hearder'><b>Total : {{this.listPredictionsTotal['nb_actualTargetState']}}</b></td>
+                    <td class=' statistics_hearder'></td>
+                    <td class=' statistics_hearder'></td>
+                    <td class=' statistics_hearder'></td>
+                    <td *ngFor="let stateProba of this.listPredictionsTotal['avgSateProbabilities'];" scope="row" class='states  statistics_hearder' ><b>{{fnum3(stateProba)}}</b></td>
+                    <td class=' statistics_hearder'>
+                    </td>
+                    <td class=' statistics_hearder'>
+                        <b>{{fnum2(100*this.listPredictionsTotal['rate_likely'])}} %</b>
+                    </td>
+                    <td class=' statistics_hearder'></td>
+                    <td class='statistics_hearder'></td>
+                    <td class='statistics_hearder'>{{fnum3(this.listPredictionsTotal['avgDifferentials'])}} </td>
+                    <td class='statistics_hearder' *ngFor="let state of this.listStates;" scope="row" class='trans_matrix  matrix_hearder {{getClassDisplayDistanceVector()}}' ></td>
+                    <td class='statistics_hearder'>{{fnum2(100*(1-this.listPredictionsTotal['avgDifferentials']))}} %</td>
+                </tr>
+            </table>
+        </ng-container>
+
+        <ng-container *ngIf="this.listErrors.length > 0">
+            <div *ngFor="let error of this.listErrors" class='txt_warning_high' scope="row">
+                <b>ERROR : {{error}}</b>
+            </div>
+        </ng-container>
+
+        <ng-container *ngIf="this.listCorrections.length > 0">
+            <br/>
+            <b>Generated self-corrections</b>
+            <table>
+                <tr class='states  states_hearder'>
+                    <td class='trans_matrix  matrix_hearder'>Time slot</td>
+                    <td class='trans_matrix  matrix_hearder'>Origin state</td>
+                    <td class='trans_matrix  matrix_hearder'>Over-valued state</td>
+                    <td class='trans_matrix  matrix_hearder'>Under-valued state</td>
+                    <td class='trans_matrix  matrix_hearder'>Excess</td>
+                    <td class='trans_matrix  matrix_hearder'>Cardinality</td>
+                    <td class='trans_matrix  matrix_hearder'>Number of adjustments</td>
+                </tr>
+                <tr *ngFor="let correction of this.listCorrections" scope="row" class='states  states_hearder' >
+                    <td class="trans_matrix">
+                        {{correction.transitionMatrixKey.timeWindow.startHour}} - {{correction.transitionMatrixKey.timeWindow.endHour}}
+                    </td>
+                    <td class="trans_matrix">{{correction.initialState.name}}</td>
+                    <td class="trans_matrix">{{correction.stateOver.name}}</td>
+                    <td class="trans_matrix">{{correction.stateUnder.name}}</td>
+                    <td class="trans_matrix">{{fnum3(correction.excess)}}</td>
+                    <td class="trans_matrix">{{correction.cardinality}}</td>
+                    <td class="trans_matrix">{{correction.correctionsNumber}}</td>
+                </tr>
+            </table>
+        </ng-container>
+    </span>
+
+<br/>
+
+Markov states :
+
+<table>
+    <tr>
+        <td *ngFor="let state of this.listStates;" scope="row" class='states  states_hearder' ><b>{{state.name}}</b></td>
+    </tr>
+    <tr>
+        <td *ngFor="let state of this.listStates;" scope="row" class='states  ' ><b>{{state.label}}</b></td>
+    </tr>
+</table>
+<br>
+
+
+<form (ngSubmit)="refreshMatrices()">
+    <fieldset>
+        <table>
+            <tr>
+                <td><label for="startHourMin">min start hour :</label></td>
+                <td><input size="3" type="text" id="startHourMin"  name="startHourMin"  [(ngModel)]="matrixFilter.startHourMin"></td>
+                <td><label for="startHourMax">max start hour :</label></td>
+                <td><input size="3" type="text"  id="startHourMax"  name="startHourMax"  [(ngModel)]="matrixFilter.startHourMax"></td>
+                <td><label for="Location">Location :</label></td>
+                <td>
+                    <select [(ngModel)]="matrixFilter.location"  name="Location"     >
+                        <option *ngFor="let location of listLocations" [value]="location.value">{{location.label}}</option>
+                    </select>
+                </td>
+                <td><label for="variableName">variable : </label></td>
+                <td>
+                    <select [(ngModel)]="matrixFilter.variableName"  name="variableName"     >
+                        <option  [value]=""> </option>
+                        <option *ngFor="let variable of all_variables" [value]="variable">{{variable}}</option>
+                    </select>
+                </td>
+                <td><label for="includeCorrections">include corrections? : </label></td>
+                <td>
+                    <input type="checkbox" [(ngModel)]="matrixFilter.includeCorrections" name="includeCorrections">
+                </td>
+                <td>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;  <button class="btn btn-success" type="submit">Refresh</button></td>
+            </tr>
+        </table>
+        <legend>All transition matrices</legend>
+    </fieldset>
+</form>
+
+
+<br>
+<table>
+    <!-- liness of time windows-->
+    <tr>
+        <td *ngFor="let timeWindow of this.listTimeWindows" [attr.colspan]="1+this.stateNb" scope="row" class='trans_matrix  matrix_hearder next_bloc next_bloc2' >
+            <b>Time window : {{timeWindow}}</b>
+        </td>
+    </tr>
+    <ng-container *ngFor="let variableName of this.variables" scope="row">
+        <!-- lines of states for each time window -->
+        <tr>
+            <ng-container *ngFor="let timeWindow of this.listTimeWindows"  >
+                <td  class='trans_matrix matrix_hearder next_bloc next_bloc2'><b>{{variableName}}</b></td>
+                <td *ngFor="let state of this.listStates;"   class='trans_matrix matrix_hearder next_bloc2'>
+                    <b>{{state.name}}</b>
+                </td>
+            </ng-container>
+        </tr>
+        <!-- lines of states for each result set  -->
+        <tr *ngFor="let state of this.listStates;let idxState = index;" >
+            <ng-container *ngFor="let timeWindow of this.listTimeWindows"  >
+                <td  class='trans_matrix matrix_hearder next_bloc'>
+                    <b>{{state.name}}</b>
+                    <!-- disaply the number of observations -->
+                    <span class='matrix_info_small'>({{displayAllObsMatrixRowSum(variableName, timeWindow, idxState)}}</span>
+                    <span class='matrix_info_small txt_correction'>{{displayAllCorrectionsMatrixRowSum(variableName, timeWindow, idxState)}}</span>
+                    <span class='matrix_info_small'>)</span>
+                </td>
+                <td *ngFor="let item of this.selectNormalizedMatrixRow2(variableName, timeWindow, idxState); let columnIdx = index;" scope="row" class='trans_matrix num  {{getClassNormalizedMatrixRow(variableName, timeWindow, idxState)}}  {{getClassProba(item, idxState, columnIdx)}}' >
+                    {{fnum3(item)}}
+                    <!-- disaply the number of observations -->
+                    <span *ngIf="item > 0" class='matrix_info_small'>({{displayAllObsMatrixCell(variableName, timeWindow, idxState, columnIdx)}}</span>
+                    <span *ngIf="item > 0" class='matrix_info_small txt_correction'>{{displayAllCorrectionsMatrixCell(variableName, timeWindow, idxState, columnIdx)}}</span>
+                    <span *ngIf="item > 0" class='matrix_info_small'>)</span>
+                </td>
+            </ng-container>
+        </tr>
+        <tr>
+            <td *ngFor="let timeWindow of this.listTimeWindows" [attr.colspan]="1+this.stateNb" scope="row" class='trans_matrix  next_bloc matrix_info' >
+                 id:{{this.getTransitionMatrixId(variableName, timeWindow)}}
+                 , {{this.getNbOfObservations(variableName, timeWindow)}} observations
+                 , {{this.getNbOfCorrections(variableName, timeWindow)}} corrections
+                 , {{this.getNbOfIterations(variableName, timeWindow)}} iterations
+            </td>
+        </tr>
+    </ng-container>
+</table>
+
+
+
+<!--
+<table>
+    <tr>
+        <td *ngFor="let timeWindow of this.listTimeWindows" scope="row" class=' main_table' >Time window : {{timeWindow}}</td>
+    </tr>
+    <tr>
+        <td *ngFor="let timeWindow of this.listTimeWindows" scope="row" class=' main_table ' >
+
+            <span *ngFor="let variableName of this.variables" scope="row">
+                <table class='table_trans_matrix'>
+                    <tr>
+                        <td class='trans_matrix matrix_hearder'><b>{{variableName}}</b></td>
+                        <td *ngFor="let row of this.mapNodeTransitionMatrices[timeWindow].statesList ;let rowIdx = index;" scope="row" class='trans_matrix  matrix_hearder' ><b>S{{rowIdx+1}}</b></td>
+                    </tr>
+                    <tr  *ngFor="let row of this.mapNodeTransitionMatrices[timeWindow].mapNormalizedMatrices[variableName].array ;let rowIdx = index;" scope="row">
+                        <td  class='trans_matrix matrix_hearder'>S{{rowIdx+1}}</td>
+                        <td *ngFor="let item of row" scope="row" class='trans_matrix num' >{{fnum3(item)}}</td>
+                    </tr>
+                </table>
+                <br/>
+            </span>
+        </td>
+    </tr>
+</table>
+-->

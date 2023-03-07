@@ -1,0 +1,38 @@
+<app-header></app-header>
+<div class="content">
+
+<table class="table table-hover">
+<thead>
+<tr>
+<th>LSA</th>
+<th>input</th>
+<th>output</th>
+</tr>
+</thead>
+<tbody>
+<tr *ngFor="let lsa of lsas" scope="row" (click)="onSelect(lsa)">
+<td>{{lsa.name}}</td>
+<td>{{lsa.input}}</td>
+<td>{{lsa.output}}</td>
+</tr>
+</tbody>
+</table>
+<br/>
+<br/>
+<span><h4 [hidden]="!show">{{selectedLsa}}</h4></span>
+<button class="btn btn-success" [hidden]="!show" (click)="diffuse()">Diffuse</button>
+<table class="table" [hidden]="!show" (click)="onclickQ()">
+        <thead>
+        <tr>
+        <th>State</th>
+        <th>Not react</th>
+        <th>React</th>
+        </tr>
+        </thead>
+        <tbody>
+        <tr *ngFor="let s of states;let i=index" scope="row">
+                <td>{{s}}</td>
+                <td *ngFor="let a of actions[i]">{{a}}</td>
+        </tr>
+        </tbody>
+</table>

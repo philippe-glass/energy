@@ -1,0 +1,105 @@
+<app-header></app-header>
+<div class="content">
+	<h2>About</h2>
+	<p>
+		Spatial services are a new generation of services. They exploits spatially distributed data, enable smart
+		environments, or exploit Internet
+		of Things (IoT) scenarios. This is a new category of decentralised services based on data propagation among
+		mobile devices. These services
+		are provided as the result of the collective interactions among multiple entities, involving processes and
+		calculations. It takes place across
+		several geographically distributed computational nodes. Moreover, research in the engineering of collective
+		adaptive systems provides advances
+		in the identification of bio-inspired self-organising mechanisms and their expression as design patterns.
+		Fine-grained analysis of these mechanisms,
+		when taken in isolation or combined with each other, and their sensitivity to parameters in relation with
+		non-functional properties is still lacking.
+		Dynamic composition of these mechanisms and providing reliable non-functional properties, through dynamic
+		adaptation of parameters, is not yet
+		considered in the literature. Spatial system services built on self-organising mechanisms are relevant in
+		specific application contexts, particularly
+		in open smart environment and for applications deployed over several nodes. Their performance de- pends on good
+		calibration and some of them can be in
+		competition for a specific application. The goal of this research project is to determine at run-time the most
+		appropriate mechanism. Services should
+		be well calibrated in dynamic situations to guarantee appropriate non-functional properties expressed as quality
+		of service (QoS). It also intends
+		to develop a model for on-the-fly creation of spatial services. These services are deployed over a geographic
+		area and providing requested
+		non-functional properties. In open smart environments, it is only at run-time that the need for a spatial
+		user-service arises and it is through
+		the collective interactions of existing spatial system services, sensors or other ”Things” that the requested
+		user-service is provided.
+	</p>
+	<h3>coordination model</h3><br />
+	<img src="assets/img/sapereRL.png" className="img-fluid" alt="Responsive image" />
+	<br />
+	<br />Our work derives from the <a href="">SAPERE model</a>, a coordination model for multi-agent pervasive systems
+	inspired by chemical reactions.
+	It is based on the following concepts:
+	<ul>
+		<li>Software Agents: active software entities represent-ing the interface between the tuple space and the
+			external world including any sort
+			of device (e.g. sen-sors), service and application.</li>
+		<li>Live Semantic Annotations (LSA): Tuples of dataand properties whose value can change with time(e.g.
+			temperature value injected by a sensor
+			is up-dated regularly).</li>
+		<li>Tuple space: shared space (i.e. coordination media) containing all the tuples in a node. There is one shared
+			space for each node (node
+			could be a rasp-berry pi, smartphone, etc).</li>
+		<li>Operations: list of operations that are executed by the system like injects a new LSA, updates a LSA’s
+			content or removes a LSA.</li>
+		<li>Eco-laws: chemical-based coordination rules, namely:</li>
+		<ul>
+			<li>Bonding (for linking an agent with a data that hereferred to, was waiting for, concerns it, etc. and
+				provided by another agent)</li>
+			<li> Decay or Evaporation(regularly decreasing the pertinence of data and ul-timately removing outdated
+				data)</li>
+			<li>Spreading (forpropagating LSAs to neighboring nodes).</li>
+		</ul>
+	</ul>
+	<h3>spontaneous self-composition service</h3>
+	A spontaneous service built on-demand and provided as the self-composition of various other services results from
+	the collective interactions of a
+	series of agents, each providing a portion of the final requested service. It arises from the self-composition of
+	the diverse services provided by
+	the agents at run-time. A Service request is first injected in the tuple space. The query is then analyzed by agents
+	which are sensitive to the
+	input properties. Coordination of the different agents, as well as the production of service composition on-the-fly
+	occurs through this indirect
+	retrieval and injection of property in the shared tuple space (some agents waiting for some properties provided by
+	other agents to start, continue
+	or finish their work). Such kinds of models are efficient in a dynamic open system (such as pervasive scenario),
+	where agents can communicate
+	asynchronously without having global knowledge about the system and its participants. Agents can join or leave the
+	system at any moment. They are
+	not known in advance as their provided services. This loose coupling among the agents is key for the on-demand
+	service composition.
+
+	<h3>Learning based coordination model</h3>
+	Our coordination model is enhanced by regulating the Bonding and Spreading eco-laws thanks to a multi-agent
+	reinforcement learning module.
+	Reinforcement learning (RL) algorithms are machine learning algorithms for decision making under uncertainty in
+	sequential decision problems.
+	The problems solved by RL are modeled among others through a Markov Decision Process (MDP).
+	Multi-Agent Reinforcement Learning (MARL) is an extension of the RL framework where multiple (in contrast with the
+	standard RL framework) agents work
+	in fully-cooperative, fully-competitive, or mixed manner. In our service self-composition problem, agents have to
+	cooperate (i.e., coordinate)
+	to yield the most suitable results. The proposed approach is a simple mixed MARL algorithm as the reward is not the
+	same for all the agents taking
+	part to the same single query. Indeed, in a non-stationary problem, such as the one tackled herein, convergence is
+	not guaranteed as an agent's
+	reward depends also on the action of other agents. Coordination of the different SAPERE agents occurs through an
+	indirect retrieval and injection of
+	LSAs updating property values in the shared tuple space. Each node provides few simple services and data regarding
+	its environment. Many different
+	results might occur through self-composition. Therefore, all agents are enhanced by a QLearning algorithm to learn
+	what is the best action to take
+	when a bonding is triggered. Thus, a reward operation has been integrated into the SAPERE kernel to spread user
+	feedback among agents in order to ensure
+	the appropriate cooperation (bonding or not to an incoming LSA, spreading or not a given LSA).
+	<br /><br />For more information: <a href="https://www.unige.ch/cui/cas/research/spatialservices/">Visit our
+		research group page</a>
+
+</div>

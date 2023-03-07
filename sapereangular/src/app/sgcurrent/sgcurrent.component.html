@@ -1,0 +1,314 @@
+<app-header></app-header>
+<div class="content ">
+
+    <div *ngFor="let error of nodeContent['errors']" class='txt_warning_high' scope="row">
+        ERROR : {{error}}
+    </div>
+
+    <div *ngFor="let warning of nodeContent['warnings']" class='txt_warning_medium' scope="row">
+    WARNING : {{warning}}
+    </div>
+
+    <form (ngSubmit)="applyFilter()">
+        <fieldset>
+            <button  size="20"  (click)="toogleDisplay('span_filter');">Filter</button>
+            <span id='span_filter' class="display_none">
+                <div id='group_filter' class="form-group ">
+                    <label>Consumer Category :
+                        <select multiple=true [(ngModel)]="filter_consumerDeviceCategories"  name="filter_consumerDeviceCategories" __ngOptions=" item of test"    >
+                            <option *ngFor="let category of listDeviceCategoryConsumer" [value]="category.value">{{category.label}}</option>
+                        </select>
+                    </label>
+                    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+                    <label>Producer Category :
+                        <select multiple=true [(ngModel)]="filter_producerDeviceCategories"  name="filter_producerDeviceCategories"    >
+                            <option *ngFor="let category of listDeviceCategoryProducer" [value]="category.value">{{category.label}}</option>
+                        </select>
+                    </label>
+                    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+                    <label>Hide expired :
+                        <select multiple=true [(ngModel)]="filter_hideExpiredAgents"  name="filter_hideExpiredAgents"    >
+                            <option *ngFor="let item of listYesNo" [value]="item.value">{{item.label}}</option>
+                        </select>
+                    </label>
+                    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+                    <button class="btn btn-success" type="submit">Reload</button>
+                </div>
+            </span>
+        </fieldset>
+    </form>
+
+
+
+<table class="table table-hover">
+    <thead>
+        <tr class='header_consumers'>
+            <th>Consumer</th>
+            <th>Priority</th>
+            <th>Begin</th>
+            <th>End</th>
+            <th>Tolerance</th>
+            <th>Device</th>
+            <th>Location</th>
+            <th>Sensor</th>
+            <th>Category</th>
+            <th>Needed(W)</th>
+            <th>Supplier(s)</th>
+            <th>Consumed(W)</th>
+            <th>Missing(W)</th>
+            <th>Offers</th>
+            <th>(Details)</th>
+            <th style="min-width:200px">Actions</th>
+        </tr>
+    </thead>
+<tbody>
+    <!-- Total of Consumers -->
+    <tr class="total_consumers">
+        <td class="total_block center">TOTAL</td>
+        <td class=""></td>
+        <td></td>
+        <td></td>
+        <td></td>
+        <td></td>
+        <td></td>
+        <td></td>
+        <td></td>
+        <td class='num'>{{(nodeContent.total) ? fnum2(nodeContent.total.requested) : ""}}</td>
+        <td class="num"></td>
+        <td class="num">{{(nodeContent.total) ? fnum2(nodeContent.total.consumed) : ""}}</td>
+        <td class="num txt_warning_high">{{(nodeContent.total) ? fnum2(nodeContent.total.missing) : ""}}</td>
+        <td class="num">{{(nodeContent.total) ? fnum2(nodeContent.total.receivedOffersTotal) : ""}}</td>
+        <td class="">
+            <ng-container *ngIf="nodeContent.total">
+                <ng-container *ngFor="let item of nodeContent.total.receivedOffersRepartition | keyvalue ; let idx=index;">
+                    <ng-containter *ngIf="idx % 5 ==4"><br></ng-containter>
+                    {{item.key}} <span class='txt_num'>({{fnum2(item.value)}})</span>
+                </ng-container>
+            </ng-container>
+        </td>
+        <td></td>
+    </tr>
+    <tr *ngFor="let consumer of nodeContent['consumers']"  class='{{getClassTRagent(consumer)}}'  scope="row">
+        <td class="{{getTxtClassConsumer(consumer) }}">{{consumer.agentName}}{{getAlertNotInSapce(consumer)}}</td>
+        <td class="{{(consumer.priorityLevel=='High' && !consumer.hasExpired)?'warning_medium':'' }}">{{consumer.priorityLevel}}</td>
+        <td>
+            <span id="txt_beginTime_{{consumer.agentName}}">{{consumer.beginDate| date:'HH:mm:ss'}}</span>
+            <input size="3" type="text"  class="form-text hide" id="beginTime_{{consumer.agentName}}"  name="beginTime_{{consumer.agentName}}"  [(ngModel)]="tab_beginTime[consumer.agentName]">
+            <input size="3" type="text"  class="form-text hide" id="duration_{{consumer.agentName}}"  name="duration_{{consumer.agentName}}"  [(ngModel)]="tab_duration[consumer.agentName]">
+        </td>
+        <td>
+            <span id="txt_endTime_{{consumer.agentName}}" class='{{getClassEndDate(consumer.endDate)}} '>{{disaplyTime(consumer.endDate)}}</span>
+            <input size="3" type="text"  class="form-text hide"  id="endTime_{{consumer.agentName}}"  name="endTime_{{consumer.agentName}}"  [(ngModel)]="tab_endTime[consumer.agentName]">
+        </td>
+        <td class='num'>
+            <span id="txt_delayToleranceRatio_{{consumer.agentName}}">{{fnum2(1*consumer.delayToleranceRatio)}}</span>
+            <input size="5" type="text"  class="form-text hide" id="delayToleranceRatio_{{consumer.agentName}}"  name="delayToleranceRatio_{{consumer.agentName}}"  [(ngModel)]="tab_delayToleranceRatio[consumer.agentName]">
+        </td>
+        <td>
+            <span id="txt_deviceName_{{consumer.agentName}}">{{consumer.deviceName}}</span>
+            <input size="5" type="text"  class="form-text hide" id="deviceName_{{consumer.agentName}}"  name="deviceName_{{consumer.agentName}}"  [(ngModel)]="tab_deviceName[consumer.agentName]">
+        </td>
+        <td>
+            <span id="txt_deviceLocation_{{consumer.agentName}}">{{consumer.deviceLocation}}</span>
+            <input size="5" type="text"  class="form-text hide" id="deviceLocation_{{consumer.agentName}}"  name="deviceLocation_{{consumer.agentName}}"  [(ngModel)]="tab_deviceLocation[consumer.agentName]">
+        </td>
+        <td>
+            <span id="txt_sensorNumber_{{consumer.agentName}}">{{consumer.sensorNumber}}</span>
+            <input size="5" type="text"  class="form-text hide" id="sensorNumber{{consumer.agentName}}"  name="sensorNumber_{{consumer.agentName}}"  [(ngModel)]="tab_sensorNumber[consumer.agentName]">
+        </td>
+        <td>
+            <span id="txt_deviceCategory_{{consumer.agentName}}">{{consumer.deviceCategory.label}}</span>
+            <input size="5" type="text"  class="form-text hide" id="deviceCategory_{{consumer.agentName}}"  name="deviceCategory_{{consumer.agentName}}"  [(ngModel)]="tab_deviceCategory[consumer.agentName]">
+        </td>
+        <td  class="num">
+            <span id="txt_power_{{consumer.agentName}}">{{fnum2(consumer.power)}}</span>
+            <span class='disabled_power'>{{fnum2(consumer.disabledPower)}}</span>
+            <input size="5" type="text"  class="form-text hide"  id="power_{{consumer.agentName}}"  name="power_{{consumer.agentName}}"  [(ngModel)]="tab_power[consumer.agentName]">
+        </td>
+        <td>
+            <ng-container *ngFor="let item of consumer.ongoingContractsRepartition | keyvalue; let idx=index;">
+                <ng-containter *ngIf="idx % 5 ==4"><br></ng-containter>
+                {{item.key}} <span class='txt_num'>({{fnum2(item.value.current)}})</span>
+            </ng-container>
+        </td>
+        <td class="num">{{fnum2(consumer.ongoingContractsTotal.current)}}</td>
+        <td class="num txt_warning_high {{getClassMissing(consumer, nodeContent.total.available)}}">{{fnum2(consumer.missingPower)}}</td>
+        <td class="num {{getOffersClass(consumer)}}">{{fnum2(consumer.offersTotal)}}</td>
+        <td class="{{getOffersClass(consumer)}}">
+            <ng-container *ngFor="let item of consumer.offersRepartition | keyvalue; let idx=index;">
+                <ng-containter *ngIf="idx % 5 ==4"><br></ng-containter>
+                {{item.key}} <span class='txt_num'>({{fnum2(item.value)}})</span>
+            </ng-container>
+        </td>
+        <td>
+            <div class='inline_button'>
+                <button id="restart_{{consumer.agentName}}"  class="{{consumer.hasExpired?'':'hide'}}"  (click)="modify_agent(consumer, 'restartAgent');">Restart</button>
+                <button id="modify_{{consumer.agentName}}"   class="{{consumer.hasExpired || consumer.isDisabled ?'hide':''}}"  (click)="modify_agent(consumer, 'modifyAgent');">Modify</button>
+                <button id="save_{{consumer.agentName}}"     class="hide"  (click)="save_agent(consumer);">Save</button>
+                <button id="stop_{{consumer.agentName}}"     class="{{(getAlertNotInSapce(consumer) == '') && (consumer.hasExpired || consumer.isDisabled) ?'hide':''}}"   (click)="stop_agent(consumer);">Stop</button>
+            </div>
+        </td>
+    </tr>
+    <tr class='header_producers'>
+        <th>Producer</th>
+        <th></th>
+        <th>Begin</th>
+        <th>End</th>
+        <th></th>
+        <th>Device</th>
+        <th>Location</th>
+        <th>Sensor</th>
+        <th>Category</th>
+        <th>Produced(W)</th>
+        <th>Client(s)</th>
+        <th>Provided(W)</th>
+        <th>Available(W)</th>
+        <th>Offers</th>
+        <th>(Details)</th>
+        <th></th>
+    </tr>
+    <!-- Total of Producers -->
+    <tr class="total_producers">
+        <td class="total_block center">TOTAL</td>
+        <td class=""></td>
+        <td></td>
+        <td></td>
+        <td></td>
+        <td></td>
+        <td></td>
+        <td></td>
+        <td></td>
+        <td class='num'>{{(nodeContent.total) ? fnum2(nodeContent.total.produced) : ""}}</td>
+        <td class="num"></td>
+        <td class="num">{{(nodeContent.total) ? fnum2(nodeContent.total.provided) : ""}}</td>
+        <td class="num">{{(nodeContent.total) ? fnum2(nodeContent.total.available) : ""}}</td>
+        <td class="num">{{(nodeContent.total) ? fnum2(nodeContent.total.sentOffersTotal) : ""}}</td>
+        <td class=" ">
+            <ng-container *ngIf="nodeContent.total">
+                <ng-container *ngFor="let item of nodeContent.total.sentOffersRepartition | keyvalue ; let idx=index;">
+                    <ng-containter *ngIf="idx % 5 ==4"><br></ng-containter>
+                    {{item.key}} <span class='txt_num'>({{fnum2(item.value)}})</span>
+                </ng-container>
+            </ng-container>
+        </td>
+        <td></td>
+    </tr>
+    <tr *ngFor="let producer of nodeContent['producers']" class='{{getClassTRagent(producer)}}'  scope="row">
+        <td>{{producer.agentName}}{{getAlertNotInSapce(producer)}}</td>
+        <td></td>
+        <td>
+            <span id="txt_beginTime_{{producer.agentName}}">{{producer.beginDate| date:'HH:mm:ss'}}</span>
+            <input size="5" type="text"  class="form-text hide" id="beginTime_{{producer.agentName}}"  name="beginTime_{{producer.agentName}}"  [(ngModel)]="tab_beginTime[producer.agentName]">
+        </td>
+        <td>
+            <span id="txt_endTime_{{producer.agentName}}"  class='{{getClassEndDate(producer.endDate)}} '>{{disaplyTime(producer.endDate)}}</span>
+            <input size="5" type="text"  class="form-text hide"  id="endTime_{{producer.agentName}}"  name="endTime_{{producer.agentName}}"  [(ngModel)]="tab_endTime[producer.agentName]">
+        </td>
+        <td></td>
+        <td>
+            <span id="txt_deviceName_{{producer.agentName}}">{{producer.deviceName}}</span>
+            <input size="5" type="text"  class="form-text hide" id="deviceName_{{producer.agentName}}"  name="deviceName_{{producer.agentName}}"  [(ngModel)]="tab_deviceName[producer.agentName]">
+        </td>
+        <td>
+            <span id="txt_deviceLocation_{{producer.agentName}}">{{producer.deviceLocation}}</span>
+            <input size="5" type="text"  class="form-text hide" id="deviceLocation_{{producer.agentName}}"  name="deviceLocation_{{producer.agentName}}"  [(ngModel)]="tab_deviceLocation[producer.agentName]">
+        </td>
+        <td>
+            <span id="txt_sensorNumber_{{producer.agentName}}">{{displayFirstChars(producer.sensorNumber,10)}}</span>
+            <input size="5" type="text"  class="form-text hide" id="sensorNumber{{producer.agentName}}"  name="sensorNumber_{{producer.agentName}}"  [(ngModel)]="tab_sensorNumber[producer.agentName]">
+        </td>
+        <td>
+            <span id="txt_deviceCategory_{{producer.agentName}}">{{producer.deviceCategory.label}}</span>
+            <input size="5" type="text"  class="form-text hide" id="txt_deviceCategory_{{producer.agentName}}"  name="deviceCategory_{{producer.agentName}}"  [(ngModel)]="tab_deviceName[producer.agentName]">
+        </td>
+        <td  class="num">
+            <span id="txt_power_{{producer.agentName}}">{{fnum2(producer.power)}}</span>
+            <span class='disabled_power'>{{fnum2(producer.disabledPower)}}</span>
+            <input size="5" type="text"  class="form-text hide"  id="power_{{producer.agentName}}"  name="power_{{producer.agentName}}"  [(ngModel)]="tab_power[producer.agentName]">
+        </td>
+        <!--<td>{{producer.linkedAgents}}</td>-->
+        <td>
+            <ng-container *ngFor="let item of producer.ongoingContractsRepartition | keyvalue; let idx=index;">
+                <ng-containter *ngIf="idx % 5 ==4"><br></ng-containter>
+                {{item.key}} <span class='txt_num'>({{fnum2(item.value.current)}})</span>
+            </ng-container>
+        </td>
+        <td class="num">{{fnum2(producer.ongoingContractsTotal.current)}}</td>
+        <td class="txt_ok num">{{fnum2(producer.availablePower)}}</td>
+        <td class="num">{{fnum2(producer.offersTotal)}}</td>
+        <td>
+            <ng-container *ngFor="let item of producer.offersRepartition | keyvalue; let idx=index;">
+                <ng-containter *ngIf="idx % 5 ==4"><br></ng-containter>
+                {{item.key}} <span class='txt_num'>({{fnum2(item.value)}})</span>
+            </ng-container>
+        </td>
+        <td>
+            <button id="restart_{{producer.agentName}}"  class="{{producer.hasExpired?'':'hide'}}"  (click)="modify_agent(producer, 'restartAgent');">Restart</button>
+            <button id="modify_{{producer.agentName}}"   class="{{producer.hasExpired || producer.isDisabled ?'hide':''}}"  (click)="modify_agent(producer, 'modifyAgent');">Modify</button>
+            <button id="save_{{producer.agentName}}"  class="hide"  (click)="save_agent(producer);">Save</button>
+            <button id="stop_{{producer.agentName}}"  class="{{producer.isInSpace && (producer.hasExpired  || producer.isDisabled) ?'hide':''}}"  (click)="stop_agent(producer);">Stop</button>
+        </td>
+    </tr>
+</tbody>
+</table>
+
+
+
+<form (ngSubmit)="addConsumer()">
+    <fieldset>
+        <legend>Add consumer</legend>
+        <div class="form-group">
+            <label>Start time:<input size="5" type="text"  class="form-text" name="c_beginTime"  [(ngModel)]="c_beginTime"></label>
+            &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+            <label>Duration (minutes):<input size="5" class="form-text" name="c_duration" (keyup)="set_c_endTime($event);"  [(ngModel)]="c_duration"></label>
+            &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+            <label>End time:<input size="5" type="text"  class="form-text" name="c_endTime"  [(ngModel)]="c_endTime"></label>
+            &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+            <label>Power (W):<input size="5" class="form-text" name="c_power" [(ngModel)]="c_power" ></label>
+            &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+            <label>Tolerance (mn):<input size="5" class="form-text" name="c_delayToleranceMinutes"   [(ngModel)]="c_delayToleranceMinutes"></label>
+            &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+            <label>Device<input size="10" class="form-text" name="c_deviceName"   [(ngModel)]="c_deviceName"></label>
+            &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+            <label>(Category) :
+                <select [(ngModel)]="c_deviceCategory"  name="c_deviceCategory" __ngOptions=" item of test"    >
+                    <option *ngFor="let category of listDeviceCategoryConsumer" [value]="category.value">{{category.label}}</option>
+                </select>
+            </label>
+            <label>Priority :
+                <select [(ngModel)]="c_priorityLevel"  name="c_priorityLevel" __ngOptions=" item of test"    >
+                    <option value="Low">Low</option>
+                    <option value="Medium">Medium</option>
+                    <option value="High">High </option>
+                </select>
+            </label>
+            <!-- this.nodeContent['listPriorityLevel'] -->
+            &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+            <button class="btn btn-success" type="submit">Save</button>
+        </div>
+    </fieldset>
+</form>
+<form (ngSubmit)="addProducer()">
+    <fieldset>
+        <legend>Add producer</legend>
+            <div class="form-group">
+                <label>Start time:<input size="5" type="text"  class="form-text" name="p_beginTime"  [(ngModel)]="p_beginTime"></label>
+                &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+                <label>Duration (minutes):<input size="5" class="form-text" name="p_duration"   (keyup)="set_p_endTime($event);" [(ngModel)]="p_duration"></label>
+                &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+                <label>End time:<input size="5" type="text"  class="form-text" name="p_endTime"  [(ngModel)]="p_endTime"></label>
+                &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+                <label>Power (W):<input size="5" class="form-text" name="p_power" [(ngModel)]="p_power" ></label>
+                &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+                <label>Device<input size="10" class="form-text" name="p_deviceName"   [(ngModel)]="p_deviceName"></label>
+                &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+                <label>(Category) :
+                    <select [(ngModel)]="p_deviceCategory"  name="p_deviceCategory" __ngOptions=" item of test"    >
+                        <option *ngFor="let category of listDeviceCategoryProducer" [value]="category.value">{{category.label}}</option>
+                    </select>
+                </label>
+                &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+                <button class="btn btn-success" type="submit">Save</button>
+            </div>
+        </fieldset>
+</form>

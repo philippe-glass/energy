@@ -1,0 +1,132 @@
+<app-header></app-header>
+
+<div class="content ">
+    <h2>Home history</h2>
+    <app-barchart *ngIf="chartData" [data]="chartData"></app-barchart>
+    <div class="d3-chart" id="chart">
+    </div>
+
+<br>
+<table class="table table-hover">
+    <thead>
+        <tr>
+            <th class='next_bloc'>Time</th>
+            <th class='next_bloc'>Evt type</th>
+            <th>Agent</th>
+            <th>Begin</th>
+            <th>End</th>
+            <th>Power(W)</th>
+            <th>Variation</th>
+            <th>(min)</th>
+            <th>(max)</th>
+            <th class=" next_bloc">Requested(W)</th>
+            <th>Produced(W)</th>
+            <th>Provided(W)</th>
+            <th>Margin(W)</th>
+            <th>Consumed(W)</th>
+            <th>Available(W)</th>
+            <th>Missing(W)</th>
+            <th class='next_bloc'>Unsatisfied consumers</th>
+            <th class=''>Warnings unsatisfied</th>
+            <th style="min-width:100px">(Min)</th>
+            <!-- <th>Contract Doublon</th>-->
+            <th class='next_bloc' style="min-width:800px"> Offers
+              <button id='btDisplayAllOffers'  size="20"  (click)="displayAllOffers(true);">display</button>
+              <button id='btHideAllOffers'  size="20"  (click)="displayAllOffers(false);">hide</button>
+            </th>
+        </tr>
+    </thead>
+<tbody>
+    <tr *ngFor="let nodeTotal of nodeTotalHistoryDisplay" scope="row"  >
+          <td class='center next_bloc' *ngIf= "nodeTotal.rowspan > 0" [attr.rowspan]="nodeTotal.rowspan"  >{{nodeTotal.date| date:'HH:mm:ss'}}</td>
+          <td class='center next_bloc {{getClassEventType(nodeTotal.event)}}'>
+            <div *ngIf="(nodeTotal.event == null)">
+              Refresh
+            </div>
+            <div *ngIf="(nodeTotal.event != null)">
+              <span title="{{getTextMoveOver(nodeTotal.event)}}">
+                {{nodeTotal.event.type +  (nodeTotal.event.isComplementary? "(2)": "")}}
+               <!-- {{nodeTotal.event.warningType == null ? "" : "("+ nodeTotal.event.warningType + ")"}} -->
+              </span>
+            </div>
+          </td>
+          <td class='center'>{{nodeTotal.event == null ? "" : nodeTotal.event.issuer}}</td>
+          <td>{{nodeTotal.event == null ? "" : nodeTotal.event.beginDate | date:'HH:mm:ss'}}</td>
+          <td>{{nodeTotal.event == null ? "" : disaplyTime(nodeTotal.event.endDate)}}</td>
+          <td class="num">{{nodeTotal.event == null ? "" : fnum2(nodeTotal.event.power)}}</td>
+          <td class="num">{{nodeTotal.event == null ? "" : fnum2_minus_plus(nodeTotal.event.powerUpdate)}}</td>
+          <td class="num">{{nodeTotal.event == null ? "" : (nodeTotal.event.type == 'CONTRACT_UPDATE' ? fnum2_minus_plus(nodeTotal.event.powerMinUpdate) : "")}}</td>
+          <td class="num ">{{nodeTotal.event == null ? "" : (nodeTotal.event.type == 'CONTRACT_UPDATE' ? fnum2_minus_plus(nodeTotal.event.powerMaxUpdate) : "")}}</td>
+          <td *ngIf= "nodeTotal.rowspan > 0" [attr.rowspan]="nodeTotal.rowspan" class="num txt_requested next_bloc">{{fnum2(nodeTotal.requested)}}</td>
+          <td *ngIf= "nodeTotal.rowspan > 0" [attr.rowspan]="nodeTotal.rowspan" class="num txt_produced">{{fnum2(nodeTotal.produced)}}</td>
+          <td *ngIf= "nodeTotal.rowspan > 0" [attr.rowspan]="nodeTotal.rowspan" class="num txt_provided">{{fnum2(nodeTotal.provided)}}</td>
+          <td *ngIf= "nodeTotal.rowspan > 0" [attr.rowspan]="nodeTotal.rowspan" class="num txt_margin">{{fnum2(nodeTotal.providedMargin)}}</td>
+          <td *ngIf= "nodeTotal.rowspan > 0" [attr.rowspan]="nodeTotal.rowspan" class="num">{{fnum2(nodeTotal.consumed)}}</td>
+          <td *ngIf= "nodeTotal.rowspan > 0" [attr.rowspan]="nodeTotal.rowspan" class="num txt_ok">{{fnum2(nodeTotal.available)}}</td>
+          <td *ngIf= "nodeTotal.rowspan > 0" [attr.rowspan]="nodeTotal.rowspan" class="num txt_warning_high">{{fnum2(nodeTotal.missing)}}</td>
+          <td *ngIf= "nodeTotal.rowspan > 0" [attr.rowspan]="nodeTotal.rowspan" class="txt_warning_high next_bloc">
+            <ng-container  *ngFor="let nextRequest of nodeTotal.listConsumerMissingRequests" scope="row">
+              <span  >{{nextRequest.issuer}}({{nextRequest.power}})</span>
+            </ng-container>
+          </td>
+          <td *ngIf= "nodeTotal.rowspan > 0" [attr.rowspan]="nodeTotal.rowspan" class="next_bloc ">
+            <ng-container  *ngFor="let nextRequest of nodeTotal.listConsumerMissingRequests" scope="row">
+              <div *ngIf="nextRequest.hasWarning">
+                <span class="{{getClassWarningRequest(nextRequest)}}"  >{{nextRequest.issuer}}({{nextRequest.power}}):{{nextRequest.warningDurationSec}} </span>
+              </div>
+            </ng-container>
+          </td>
+          <td *ngIf= "nodeTotal.rowspan > 0" [attr.rowspan]="nodeTotal.rowspan" class="num {{getClassMissingRequests(nodeTotal)}}" >{{fnum2(nodeTotal.minRequestMissing)}}</td>
+         <!--
+            <td *ngIf= "nodeTotal.rowspan > 0" [attr.rowspan]="nodeTotal.rowspan" class=" {{getClassContractDoublons(nodeTotal)}}">{{nodeTotal.contractDoublons}}</td>
+         -->
+          <td class='next_bloc ' *ngIf= "nodeTotal.rowspan > 0" [attr.rowspan]="nodeTotal.rowspan" id="{{'TD_' + nodeTotal.id}}">
+              <div *ngIf="nodeTotal.offers !=null">
+                  <button  size="20"  (click)="displayOffers2(nodeTotal.id);">{{nodeTotal.offers.length}} offer{{nodeTotal.offers.length>1?'s':''}}</button>
+                  <span class='display_none' id='offers_{{nodeTotal.id}}' *ngIf="nodeTotal.offers != null ">
+                    <ng-container  *ngFor="let nextOffer of nodeTotal.offers" scope="row" class="{{getClassOffer(nextOffer)}}">
+                        <span  class="{{getClassOffer(nextOffer)}}"><br>{{offerToStr(nextOffer)}}</span>
+                    </ng-container>
+                  </span>
+              </div>
+          </td>
+    </tr>
+</tbody>
+</table>
+
+
+
+<!--  Model windows -->
+
+<!-- Modal -->
+<div class="modal fade" id="myModal" role="dialog">
+    <div class="modal-dialog">
+      <!-- Modal content-->
+      <div class="modal-content">
+        <div class="modal-header" style="padding:35px 50px;">
+          <button type="button" class="close" data-dismiss="modal">&times;</button>
+          <h4><span class="glyphicon glyphicon-lock"></span> Login</h4>
+        </div>
+        <div class="modal-body" style="padding:40px 50px;">
+          <form role="form">
+            <div class="form-group">
+              <label for="usrname"><span class="glyphicon glyphicon-user"></span> Username</label>
+              <input type="text" class="form-control" id="usrname" placeholder="Enter email">
+            </div>
+            <div class="form-group">
+              <label for="psw"><span class="glyphicon glyphicon-eye-open"></span> Password</label>
+              <input type="text" class="form-control" id="psw" placeholder="Enter password">
+            </div>
+            <div class="checkbox">
+              <label><input type="checkbox" value="" checked>Remember me</label>
+            </div>
+              <button type="submit" class="btn btn-success btn-block"><span class="glyphicon glyphicon-off"></span> Login</button>
+          </form>
+        </div>
+        <div class="modal-footer">
+          <button type="submit" class="btn btn-danger btn-default pull-left" data-dismiss="modal"><span class="glyphicon glyphicon-remove"></span> Cancel</button>
+          <p>Not a member? <a href="#">Sign Up</a></p>
+          <p>Forgot <a href="#">Password?</a></p>
+        </div>
+      </div>
+</div>

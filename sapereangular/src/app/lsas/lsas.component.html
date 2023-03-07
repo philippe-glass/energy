@@ -1,0 +1,34 @@
+<app-header></app-header>
+<div class="content">
+
+<table class="table table-hover">
+<thead>
+<tr>
+<th>LSA</th>
+</tr>
+</thead>
+<tbody>
+    <tr *ngFor="let lsaForm of list_lsa" scope="row">
+        <td><ul>
+                <li><span class='caption1'>Agent : </span><span class='data'> {{lsaForm.agentName}}</span></li>
+                <li><span class='caption1'>Service consumption : </span><span class='data'>{{lsaForm.subDescription}}</span></li>
+                <li><span class='caption1'>Properties :</span>
+                    <ul>
+                        <li *ngFor="let property of lsaForm.propertyList">
+                            <span class='data'>< {{property.name}} : {{property.value}} >  </span>
+                                <span class='caption2'>#B:</span><span class='data'>{{property.bond}}  </span>
+                                <span class='caption2'>#Q:</span><span class='data'>{{property.query}}  </span>
+                                <span class='caption2'>#S:</span><span class='data'>{{property.state}}  </span>
+                                <span class='caption2'>#</span><span class='data'>{{property.chosen}} </span>
+                        </li>
+                    </ul>
+                </li>
+                <li><span class='caption1'>Synthetic properties :</span>
+                        <ng-container *ngFor="let item of lsaForm.syntheticProperties | keyvalue">
+                            <span class='caption2'>{{item.key}} : </span>{{item.value}}  </ng-container>
+                </li>
+            </ul>
+        </td>
+    </tr>
+</tbody>
+</table>

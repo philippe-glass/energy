@@ -1,0 +1,133 @@
+
+ .display_yes {
+   display: yes;
+ }
+
+.display_none {
+   display:none;
+}
+
+.content {
+    padding-top: 20px;
+    width: 90%;
+    margin: 0 auto;
+    padding-bottom: 20px;
+    align:left;
+
+  }
+
+  .caption1 {
+    color: blue;
+  }
+
+  .caption2 {
+    color: blue;
+
+  }
+
+  .data {
+    font-style: italic;
+  }
+
+  .expired_true {
+    background-color: #DBDBDB; color:grey;
+  }
+
+  .txt_warning_veryhigh {
+    color: rgb(252, 40, 0); background-color:black; font-weight: bold;
+  }
+
+  .txt_warning_high {
+    color:red;
+  }
+
+  .txt_warning_medium {
+    color:rgb(238, 157, 37);
+  }
+
+  .txt_ok {
+    color:rgb(16, 218, 93);
+  }
+
+
+  .txt_produced {
+    color:darkgreen;
+  }
+
+  .txt_provided {
+    color:rgba(113, 245, 52);
+  }
+
+  .txt_margin {
+    color:gray
+  }
+  .txt_requested {
+    color:rgba(9, 53, 175, 0.712);
+  }
+
+  td.warning_high {
+    background-color:rgb(252, 133, 133);
+  }
+
+  td.warning_medium {
+    background-color:rgb(253, 214, 104);
+  }
+
+  td.warning_light {
+    background-color:rgb(252, 232, 175);
+  }
+
+  td.warning_ok {
+    background-color:rgb(76, 248, 142);
+  }
+
+  td.warning_ok_light {
+    background-color:rgb(187, 245, 210);
+  }
+
+  td.no_event {
+    background-color:rgb(225, 225, 225);
+  }
+
+  td.num {
+    text-align: right;
+  }
+
+  th {text-align:center}
+
+  th.center {
+    text-align: center;
+
+  }
+
+  td.center {
+    text-align: center;
+  }
+
+  td.next_bloc{
+    border-left: 1px solid black;
+  }
+
+  th.next_bloc{
+    border-left: 1px solid black;
+  }
+
+  td.next_rowbloc{
+    border-top:thin solid;
+  }
+
+  button.hide {
+    display: none;
+  }
+
+  input.hide {
+    display: none;
+  }
+
+ .offer_accepted {
+   font-weight: bold; background-color: orange;
+ }
+
+ .offer_contract_validated {
+  font-weight: bold;background-color:rgb(76, 248, 142); ;
+ }

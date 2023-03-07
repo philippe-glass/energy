@@ -1,0 +1,171 @@
+
+
+  .content {
+    padding-top: 20px;
+    padding-left: 0px;
+    width: 90%;
+    margin: 0 auto;
+    padding-bottom: 20px;
+  }
+
+  .header_consumers {
+    background-color: rgba(9, 71, 243, 0.712);
+    font-size: 18px;
+    color: white;
+    font-weight: normal;
+    border: 1px solid black;
+  }
+
+  .total_consumers {
+    font-weight: bold;
+    background-color:rgba(9, 71, 243, 0.712);
+    border: 1px solid black;
+  }
+
+  .header_producers {
+    background-color:darkgreen;
+    font-size: 18px;
+    color: white;
+    font-weight: normal;
+    border: 1px solid black;
+  }
+
+  .total_producers {
+    font-weight: bold;
+    background-color:darkgreen;
+    border: 1px solid black;
+  }
+
+  .caption1 {
+    color: blue;
+  }
+
+  .caption2 {
+    color: blue;
+
+  }
+
+  .data {
+    font-style: italic;
+  }
+
+  .expired_true {
+    background-color: #F0F0F0; color:grey;
+  }
+
+  .disabled_power {
+     color:grey;font-style: italic;
+  }
+
+  .tr_expired {
+    background-color: #F0F0F0; color:grey;
+  }
+
+ .tr_not_inspace {
+  background-color: rgb(248, 133, 133);
+ }
+
+ .tr_disabled {
+   background-color: rgb(176, 201, 247);
+ }
+
+ .tr_ok {
+  background-color: lightgreen;
+ }
+
+
+ .txt_num {
+   font-size: 11px;
+ }
+
+  .txt_warning_high {
+    color:red;
+  }
+
+  .txt_warning_medium {
+    color:rgb(238, 157, 37);
+  }
+
+  .txt_ok {
+    color:rgb(16, 218, 93);
+  }
+
+  td.warning_duration_catastrophic {
+    background-color: rgb(0, 0, 0); color:white;
+  }
+
+  td.warning_duration_veryhigh {
+    background-color: rgb(252, 40, 0); color:black;
+  }
+
+  td.warning_duration_high {
+    background-color:rgb(252, 133, 133);
+  }
+
+  td.warning_duration_medium {
+    background-color:rgb(252, 194, 183);
+  }
+
+  td.warning_duration_weak {
+    background-color:rgb(252, 237, 234);
+  }
+
+  td.warning_high {
+    background-color:rgb(252, 133, 133);
+  }
+
+  td.warning_medium {
+    background-color:rgb(248, 206, 90);
+  }
+
+  td.offers_ok {
+    background-color:rgb(199, 250, 218);
+  }
+
+  td.warning_ok {
+    background-color:rgb(76, 248, 142);
+  }
+
+  td.num {
+    text-align: right;
+  }
+
+  th {text-align:center}
+
+  th.center {
+    text-align: center;
+
+  }
+  td.center {
+    text-align: center;
+  }
+
+  td.next_bloc{
+    border-left: 1px solid black;
+  }
+
+  th.next_bloc{
+    border-left: 1px solid black;
+  }
+
+  button.hide {
+    display: none;
+  }
+
+  input.hide {
+    display: none;
+  }
+
+  .inline_button {
+    display: inline-block;
+    margin: 0 2%;
+    text-align: center!important;
+}
+
+.display_yes {
+  display: yes;
+}
+
+.display_none {
+  display:none;
+}

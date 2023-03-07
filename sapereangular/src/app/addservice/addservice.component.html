@@ -1,0 +1,31 @@
+<app-header></app-header>
+<div class="content">
+  <form (ngSubmit)="showtest()">
+    <div class="form-group">
+      <label>Name:<input class="form-control" type="text" name="name" [(ngModel)]="name" /></label><br />
+      <small id="name" class="form-text text-muted">Service name (example : service1)</small>
+    </div>
+    <div className="form-group">
+      <label>Input:<input class="form-control" type="text" name="input" [(ngModel)]="input" /></label><br />
+      <small id="input" class="form-text text-muted">Input (example : A)</small>
+    </div>
+    <div className="form-group">
+      <label>Output:<input class="form-control" type="text" name="output" [(ngModel)]="output" /></label><br />
+      <small id="output" class="form-text text-muted">Output (example : B)</small>
+    </div>
+    <button class="btn btn-success" type="submit">Add new Service</button>
+  </form>
+
+  <form (ngSubmit)="addServices()">
+    <div class="form-group">
+        <label>Number:<input class="form-text" name="number" [(ngModel)]="number"></label><br />
+    </div>
+    <div class="form-group">
+        <label>Input:<input class="form-text" name="inputs" [(ngModel)]="inputs"></label><br />
+    </div>
+    <div class="form-group">
+        <label>Output:<input class="form-text" name="outputs" [(ngModel)]="outputs"></label><br />
+    </div>
+    <button class="btn btn-success" type="submit">Add</button>
+</form>
+</div>

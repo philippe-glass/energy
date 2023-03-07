@@ -1,0 +1,330 @@
+
+
+.content {
+    padding-top: 20px;
+    width: 90%;
+    margin: 0 auto;
+    padding-bottom: 20px;
+    align:left;
+
+  }
+.table_trans_matrix {
+    border-width: 2px;
+}
+
+.main_table {
+  width: 800px;
+}
+
+td.label {
+  min-width:100px;
+ text-align: center;
+//  __background-color: lightgray;
+}
+
+ .trans_matrix {
+  width: 100px;
+  min-width:100px;
+  border-width:1px;
+  border-top-style:solid;
+  border-bottom-style:solid;
+  border-left-style:solid;
+  border-right-style:solid;
+ }
+
+ button.distance_vector {
+  background-color: #bde6f2;  color:blue;    text-decoration:underline;
+}
+
+ td.matrix_hearder {
+   min-width:100px;
+  text-align: center;
+  background-color: #bde6f2;
+//  __background-color: lightgray;
+}
+
+td.matrix_info {
+  min-width:100px;
+  font-style: italic;
+  text-align: center;
+  font-size: 11px;
+}
+
+span.matrix_info_small {
+  font-size: 9px;
+}
+
+.states {
+  width: 200px;
+  min-width:200px;
+  border-width:1px;
+  border-top-style:solid;
+  border-bottom-style:solid;
+  border-left-style:solid;
+  border-right-style:solid;
+  text-align: center;
+ }
+
+
+td.states_hearder {
+  min-width:200px;
+ text-align: center;
+ //background-color: lightgray;
+ background-color: #bde6f2;
+}
+
+
+td.statistics_hearder {
+  min-width:100px;
+ text-align: center;
+ //background-color: lightgray;
+ background-color: #bde6f2;
+ border-width:1px;
+ border-top-style:solid;
+ border-bottom-style:solid;
+ border-left-style:solid;
+ border-right-style:solid;
+ text-align: center;
+}
+
+  .caption1 {
+    color: blue;
+  }
+
+  .caption2 {
+    color: blue;
+
+  }
+
+  .data {
+    font-style: italic;
+  }
+
+  .expired_true {
+    background-color: #DBDBDB; color:grey;
+  }
+
+  .txt_warning_veryhigh {
+    color:blue;background-color: #080808
+  }
+
+  .txt_warning_high {
+    color:red;
+  }
+
+  .txt_warning_medium {
+    color:rgb(238, 157, 37);
+  }
+
+  .txt_ok {
+    color:rgb(16, 218, 93);
+  }
+
+  .txt_correction2 {
+    color:rgb(16, 218, 93);
+    font-weight: n;
+  }
+
+  td.warning_fairly_good {
+    color:rgb(184, 248, 209);
+  }
+
+    .txt_correction {
+    color:rgb(246, 71, 7);
+    font-weight: n;
+  }
+
+  .txt_produced {
+    color:darkgreen;
+  }
+
+  .txt_requested {
+    color:rgba(9, 53, 175, 0.712);
+  }
+
+  td.warning_high {
+    background-color:rgb(252, 133, 133);
+  }
+
+  td.warning_medium {
+    background-color:rgb(248, 206, 90);
+  }
+
+  td.warning_ok {
+    background-color:rgb(76, 248, 142);
+  }
+
+  td.num {
+    text-align: right;
+  }
+
+  th {
+    text-align:center
+  }
+
+  th.center {
+    text-align: center;
+
+  }
+
+  td.end_bloc{
+    border-right: 3px solid black;
+  }
+
+  td.begin_col_bloc{
+    border-left: 3px solid black;
+  }
+  td.end_col_bloc{
+    border-right: 3px solid black;
+  }
+
+
+  td.next_bloc{
+    border-left: 2px solid black;
+  }
+
+  td.next_bloc2{
+    border-top: 2px solid black;
+  }
+
+  td.next_bloc3{
+    border-top: 3px solid black;
+  }
+
+  th.next_bloc{
+    border-left: 1px solid black;
+  }
+
+  button.hide {
+    display: none;
+  }
+
+  input.hide {
+    display: none;
+  }
+
+
+  input.single_line{
+    float:left;
+  }
+
+  form.single_line {
+    display: flex; /* 2. display flex to the rescue */
+    flex-direction: row;
+  }
+
+  label, input {
+    display: block; /* 1. oh noes, my inputs are styled as block... */
+  }
+
+  .display_yes {
+    display: yes;
+  }
+
+ .display_none {
+    display:none;
+ }
+ .p_10 {
+  background-color:#808080;
+}
+ .p_9 {
+  background-color:#B0B0B0;
+}
+ .p_8 {
+  background-color: #B8B8B8;
+}
+.p_7 {
+  background-color: #C0C0C0;
+}
+.p_6 {
+  background-color: #C8C8C8;
+}
+.p_5 {
+  background-color: #D0D0D0;
+}
+.p_4 {
+  background-color: #D8D8D8;
+}
+.p_3 {
+  background-color: #E0E0E0;
+}
+.p_2 {
+  background-color: #E8E8E8;
+}
+.p_1 {
+  background-color: #F0F0F0;
+}
+
+.p_stationary  {
+  background-color:#080808; color:#FFF;
+}
+
+
+
+.state_10 {
+  background-color:#00004D; color: #FFF;
+}
+ .state_9 {
+  background-color:#000080;  color: #FFF;
+}
+ .state_8 {
+  background-color: #0000FF;  color: #FFF;
+}
+.state_7 {
+  background-color: #3333FF;
+}
+.state_6 {
+  background-color: #7b7bfd;
+}
+.state_5 {
+  background-color: #8f8ffc;
+}
+.state_4 {
+  background-color: #9999FF;
+}
+.state_3 {
+  background-color: #b8b8fc;
+}
+.state_2 {
+  background-color: #ccccfa;
+}
+.state_1 {
+  background-color: #FFF;
+}
+
+.rate_perfect {
+  background-color: rgb(18, 228, 18);
+}
+.rate_very_good {
+  background-color: rgb(46, 214, 46);
+}
+.rate_good {
+  background-color: rgb(102, 219, 102);
+}
+.rate_fairly_good {
+  background-color: rgb(150, 227, 150);
+}
+.rate_medium {
+  background-color: rgb(227, 224, 150);
+}
+.rate_poor {
+  background-color: rgb(237, 161, 22);
+}
+.rate_very_poor {
+  background-color: rgb(236, 71, 71);
+}
+.rate_disastrous {
+  background-color: #080808;color: red;
+}
+
+.differential_low {
+  color:lightgray;
+}
+
+.differential_medium {
+   color:gray;
+}
+
+.differential_high {
+  color:red;
+}
