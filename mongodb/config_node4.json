@@ -1,0 +1,12 @@
+[{
+  "_id": {
+    "$oid": "6139c1d9403b8d1e851ad5b2"
+  },
+  "name": "N4",
+  "localip": " localhost",
+ "localport" : "10004",
+  "neighbours": [
+     " localhost:10001",
+  ],
+  "_class": "com.sapereapi.model.Config"
+}]

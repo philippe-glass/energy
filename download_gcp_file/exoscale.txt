@@ -1,0 +1,19 @@
+cd C:\Users\phili\OneDrive\Documents\Doc Philippe récents\Fomration M2 IA\Cours\IA2 Dynamique des connaissances\Partage_VM
+
+
+launch unbunto
+
+s3cmd ls --config unige-meyrin-bucket-key.s3cfg
+
+s3cmd --config unige-meyrin-bucket-key.s3cfg get s3://data-smart-grid/SE05000318/2022-06-23*
+
+s3cmd --config unige-meyrin-bucket-key.s3cfg get s3://data-smart-grid/SE05000318/2022-06-23*
+
+
+
+s3cmd --config unige-meyrin-bucket-key.s3cfg get s3://data-smart-grid/SE05000318/2022-06-23* exoscale/SE05000318/ --force
+
+
+s3cmd get s3://data-smart-grid/SE05000318/2022-06-23* exoscale/SE05000318/ --force
+
+

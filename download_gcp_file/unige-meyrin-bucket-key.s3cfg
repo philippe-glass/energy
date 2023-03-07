@@ -1,0 +1,6 @@
+[default]
+host_base = sos-ch-gva-2.exo.io
+host_bucket = %(bucket)s.sos-ch-gva-2.exo.io
+access_key = EXO8da264c7480a9a4f6e9cfff3
+secret_key = iiwpDQ6P0b7etuXpeQjgd2k41WoDalmpDAlv7LDuDVQ
+use_https = True

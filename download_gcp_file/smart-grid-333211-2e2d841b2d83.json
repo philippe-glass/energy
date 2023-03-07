@@ -1,0 +1,12 @@
+{
+  "type": "service_account",
+  "project_id": "smart-grid-333211",
+  "private_key_id": "2e2d841b2d83ebf321f2edd0fd6bc4be9bce998b",
+  "private_key": "-----BEGIN PRIVATE KEY-----\nMIIEvgIBADANBgkqhkiG9w0BAQEFAASCBKgwggSkAgEAAoIBAQCfkg52iB0JIIUq\n46sHDgP7+PEcUP6tthwe2l7oUGSqxhVXW10W1btcspX24u/oWZM40Z1MFv2Dd5LL\nz3Q7UG+ROSsdglQxwN6lt3/mfUdEVNeGatS2xvDqNe6aoofg7Zei48B0tWiz6ZLp\nQthYWbzhjAy97EJMmkcqogw3x7vJzbhXbOxVQEQ1Nsh9VMoFJS+CCTHvAInARGbL\nxn+hurcUtvffWN/6K8UOzUCPT1yyIGjDaETJKaoKB/dHYqQvt80Bos2yqDanqynX\nNkB3eJckT1PIsMXvkU7PznefrxEjBFRondFLXUJjk1hMuTPe4sUMgdJMUXRhQXAM\nVJxIeD1vAgMBAAECggEAJzMGmYizdVAHVrNqCsgfI3GSrY2aGstfWhbz9Kb3K9qQ\nWI7prdfgeJOocmdqXw5OM8mOligZrAeeSLIUUBPg7HB6Tnv7OeOy7kvHQDRrYvZi\nobMxwRrbCPYpwNQHhDJpq0q+twzvhS7ud54DrqSQ2WmBodBdsxq9O9RmIvfOgnLD\nIcjisco0TdtYUeHrgNT2jwXs58r3/H8S/8UNkJ07uw9db6ZV0AiLg7FTEwIrHugX\ns/bwkgDYNdfm4+H+nuRmVg8jIPweK5suIbXphho5Wutl+fcH6NYKsrTxqtFO65jX\nP5ccewE6+jJBnFtByqPwOhnXj+unvvRcQPFHY+0D8QKBgQDSadfMkIpV28ct2Nwc\nzZCczglsB23me3AuXh4vUvTda+aJl7RpQXNiREu3r0N36T6mNLEIfUg7ApzYioUr\nkBw4oimN7WdL+PLk4Ocrw1PCYkfTUpaPzPf8sJlbXeA8JZ06YL4oy+KADYWEXEaR\njl23DnpWEAQA/1welYeh0fqn3wKBgQDCJFBaI3ugzHRMz5NUJqVuEzssPZ2hAu8N\nuneMMEsq6tuiF+kyaZczE3JsozBkhGRzEyltyBXna9kcwOfk8ZPhO0yMTwBCpNby\nYaYQbxrw9tdAY9T2z6K3wgRHsdsEM6c3qeBfZAfl0A0198OwB+dVZ1E/ey4XUC4k\nWxGSC4BccQKBgQC6FIyaBoGwaIr/SrduaYUohzXh6bgRirys5ONA6tZOMyxQJm+Q\nXieSkd98dGzwUL/s8NBXN6R3O1pGTkpzOiEbHJ4vO/KMR39XVmZaV4VtdMkcY/9u\n8M+nEu6s1JqH1qPzirbhEV4f7NVVNt3Zv9O1HgKmtcc0sqBfE9I9E5vedQKBgQCu\nlyuvtENEuzlHrlDnF44kLKVFRvAP0WycIvnJl9Cxet4jqm8rx+uSokV/z04Ax1Ly\nbeQO9yZDpShuBElHCb2citBvSciJJmarOQe3tcM7ujCflmf5wYaqzI8+zoKRB8a0\nd0/xWSsFEBIhW3yfPKxckHpvpV4w1wl35nIprbA08QKBgEWCLKrqICH51klveoLE\n1BXdvfOVw8AOW+8bLk9v89mhucJqHqCyb2LCCd4N4tN3bUxM80UWfqE/W3vkegfE\nIeDLkEyznu5uWSxaIvNH4bKlxiRb149CsA83CAN5x+RSDfNpU2x9bHgCDJ+2+sYe\nOEfSGTo66nQon8TuMfrkNq9W\n-----END PRIVATE KEY-----\n",
+  "client_email": "download-file-data-grid-bucket@smart-grid-333211.iam.gserviceaccount.com",
+  "client_id": "104327166001996715824",
+  "auth_uri": "https://accounts.google.com/o/oauth2/auth",
+  "token_uri": "https://oauth2.googleapis.com/token",
+  "auth_provider_x509_cert_url": "https://www.googleapis.com/oauth2/v1/certs",
+  "client_x509_cert_url": "https://www.googleapis.com/robot/v1/metadata/x509/download-file-data-grid-bucket%40smart-grid-333211.iam.gserviceaccount.com"
+}

@@ -1,0 +1,23 @@
+db.config.save (
+{
+  "id" : "1",
+  "name" : "conf1",
+  "localip" : " localhost",
+  "localport" : "10001",
+  "neighbours" : [" localhost:10002"]
+} )
+
+
+db.user.save (
+{
+  "id" : "1",
+  "username" : "foo",
+  "password" : "psswrd"
+}
+,
+{
+  "id" : "2",
+  "username" : "sapere",
+  "password" : "sapere12"
+}
+)
