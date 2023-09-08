@@ -118,6 +118,54 @@
                   "with": "src/environments/environment.node4.ts"
                 }
               ]
+            },
+            "vm_node1": {
+              "fileReplacements": [
+                {
+                  "replace": "src/environments/environment.ts",
+                  "with": "src/environments/environment.vm_node1.ts"
+                }
+              ]
+            },
+            "vm_node2": {
+              "fileReplacements": [
+                {
+                  "replace": "src/environments/environment.ts",
+                  "with": "src/environments/environment.vm_node2.ts"
+                }
+              ]
+            },
+            "vm_node3": {
+              "fileReplacements": [
+                {
+                  "replace": "src/environments/environment.ts",
+                  "with": "src/environments/environment.vm_node3.ts"
+                }
+              ]
+            },
+            "vm_node4": {
+              "fileReplacements": [
+                {
+                  "replace": "src/environments/environment.ts",
+                  "with": "src/environments/environment.vm_node4.ts"
+                }
+              ]
+            },
+            "raspberry_sim1": {
+              "fileReplacements": [
+                {
+                  "replace": "src/environments/environment.ts",
+                  "with": "src/environments/environment.raspberry_sim1.ts"
+                }
+              ]
+            },
+            "raspberry_sim2": {
+              "fileReplacements": [
+                {
+                  "replace": "src/environments/environment.ts",
+                  "with": "src/environments/environment.raspberry_sim2.ts"
+                }
+              ]
             }
           }
         },
@@ -141,6 +189,24 @@
             },
             "node4": {
               "browserTarget": "angular:build:node4"
+            },
+            "vm_node1": {
+              "browserTarget": "angular:build:vm_node1"
+            },
+            "vm_node2": {
+              "browserTarget": "angular:build:vm_node2"
+            },
+            "vm_node3": {
+              "browserTarget": "angular:build:vm_node3"
+            },
+            "vm_node4": {
+              "browserTarget": "angular:build:vm_node4"
+            },
+            "raspberry_sim1": {
+              "browserTarget": "angular:build:raspberry_sim1"
+            },
+            "raspberry_sim2": {
+              "browserTarget": "angular:build:raspberry_sim2"
             }
           }
         },
@@ -201,6 +267,24 @@
             },
             "node4": {
               "devServerTarget": "angular:serve:node4"
+            },
+            "vm_node1": {
+              "devServerTarget": "angular:serve:vm_node1"
+            },
+            "vm_node2": {
+              "devServerTarget": "angular:serve:vm_node2"
+            },
+            "vm_node3": {
+              "devServerTarget": "angular:serve:vm_node3"
+            },
+            "vm_node4": {
+              "devServerTarget": "angular:serve:vm_node4"
+            },
+            "raspberry_sim1": {
+              "devServerTarget": "angular:serve:raspberry_sim1"
+            },
+            "raspberry_sim2": {
+              "devServerTarget": "angular:serve:raspberry_sim2"
             }
           }
         }

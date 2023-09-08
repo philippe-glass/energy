@@ -5,7 +5,9 @@ WORKDIR /app
 COPY . .
 
 RUN npm install
-RUN $(npm bin)/ng build --prod
+# RUN $(npm bin)/ng build --prod
+RUN npm install -g @angular/cli@7.3.9
+
 
 FROM nginx:alpine
 

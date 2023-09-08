@@ -16,7 +16,7 @@ export class LocalservicesComponent implements OnInit {
   selectedLsa="";
   text;
   constructor(private httpClient: HttpClient,private _constant: ConstantsService) { 
-    this.httpClient.get(this._constant.baseAppUrl+'lsasList').
+    this.httpClient.get(this._constant.baseAppUrl+'sapere/lsasList').
       subscribe((res :any[])=> {
         this.lsas=res;
       })
@@ -29,7 +29,7 @@ export class LocalservicesComponent implements OnInit {
   onSelect(lsa){
     this.show=true;
     this.selectedLsa=lsa.name;
-    this.httpClient.get(this._constant.baseAppUrl+'qtable/'+lsa.name).subscribe(
+    this.httpClient.get(this._constant.baseAppUrl+'sapere/qtable/'+lsa.name).subscribe(
       res=>{
         this.actions=Object.values(res);
         this.states=Object.keys(res);
@@ -42,7 +42,7 @@ export class LocalservicesComponent implements OnInit {
   }
 
   diffuse(){
-    this.httpClient.get(this._constant.baseAppUrl+'diffuse?name=' + this.selectedLsa + '&hops=1', { responseType: 'text' }).
+    this.httpClient.get(this._constant.baseAppUrl+'sapere/diffuse?name=' + this.selectedLsa + '&hops=1', { responseType: 'text' }).
       subscribe(res => {
         console.log(res);
       })

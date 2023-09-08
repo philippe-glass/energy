@@ -50,23 +50,23 @@
               </span>
             </div>
           </td>
-          <td class='center'>{{nodeTotal.event == null ? "" : nodeTotal.event.issuer}}</td>
+          <td class='center'>{{nodeTotal.event == null ? "" : nodeTotal.event.issuer + (nodeTotal.event.issuerLocal? "" : "*") }}</td>
           <td>{{nodeTotal.event == null ? "" : nodeTotal.event.beginDate | date:'HH:mm:ss'}}</td>
           <td>{{nodeTotal.event == null ? "" : disaplyTime(nodeTotal.event.endDate)}}</td>
-          <td class="num">{{nodeTotal.event == null ? "" : fnum2(nodeTotal.event.power)}}</td>
-          <td class="num">{{nodeTotal.event == null ? "" : fnum2_minus_plus(nodeTotal.event.powerUpdate)}}</td>
-          <td class="num">{{nodeTotal.event == null ? "" : (nodeTotal.event.type == 'CONTRACT_UPDATE' ? fnum2_minus_plus(nodeTotal.event.powerMinUpdate) : "")}}</td>
-          <td class="num ">{{nodeTotal.event == null ? "" : (nodeTotal.event.type == 'CONTRACT_UPDATE' ? fnum2_minus_plus(nodeTotal.event.powerMaxUpdate) : "")}}</td>
-          <td *ngIf= "nodeTotal.rowspan > 0" [attr.rowspan]="nodeTotal.rowspan" class="num txt_requested next_bloc">{{fnum2(nodeTotal.requested)}}</td>
-          <td *ngIf= "nodeTotal.rowspan > 0" [attr.rowspan]="nodeTotal.rowspan" class="num txt_produced">{{fnum2(nodeTotal.produced)}}</td>
-          <td *ngIf= "nodeTotal.rowspan > 0" [attr.rowspan]="nodeTotal.rowspan" class="num txt_provided">{{fnum2(nodeTotal.provided)}}</td>
-          <td *ngIf= "nodeTotal.rowspan > 0" [attr.rowspan]="nodeTotal.rowspan" class="num txt_margin">{{fnum2(nodeTotal.providedMargin)}}</td>
-          <td *ngIf= "nodeTotal.rowspan > 0" [attr.rowspan]="nodeTotal.rowspan" class="num">{{fnum2(nodeTotal.consumed)}}</td>
-          <td *ngIf= "nodeTotal.rowspan > 0" [attr.rowspan]="nodeTotal.rowspan" class="num txt_ok">{{fnum2(nodeTotal.available)}}</td>
-          <td *ngIf= "nodeTotal.rowspan > 0" [attr.rowspan]="nodeTotal.rowspan" class="num txt_warning_high">{{fnum2(nodeTotal.missing)}}</td>
+          <td class="num">{{nodeTotal.event == null ? "" : fnum3(nodeTotal.event.power)}}</td>
+          <td class="num">{{nodeTotal.event == null ? "" : fnum3_minus_plus(nodeTotal.event.powerUpdate)}}</td>
+          <td class="num">{{nodeTotal.event == null ? "" : (nodeTotal.event.type == 'CONTRACT_UPDATE' ? fnum3_minus_plus(nodeTotal.event.powerMinUpdate) : "")}}</td>
+          <td class="num ">{{nodeTotal.event == null ? "" : (nodeTotal.event.type == 'CONTRACT_UPDATE' ? fnum3_minus_plus(nodeTotal.event.powerMaxUpdate) : "")}}</td>
+          <td *ngIf= "nodeTotal.rowspan > 0" [attr.rowspan]="nodeTotal.rowspan" class="num txt_requested next_bloc">{{fnum3(nodeTotal.requested)}}</td>
+          <td *ngIf= "nodeTotal.rowspan > 0" [attr.rowspan]="nodeTotal.rowspan" class="num txt_produced">{{fnum3(nodeTotal.produced)}}</td>
+          <td *ngIf= "nodeTotal.rowspan > 0" [attr.rowspan]="nodeTotal.rowspan" class="num txt_provided">{{fnum3(nodeTotal.provided)}}</td>
+          <td *ngIf= "nodeTotal.rowspan > 0" [attr.rowspan]="nodeTotal.rowspan" class="num txt_margin">{{fnum3(nodeTotal.providedMargin)}}</td>
+          <td *ngIf= "nodeTotal.rowspan > 0" [attr.rowspan]="nodeTotal.rowspan" class="num">{{fnum3(nodeTotal.consumed)}}</td>
+          <td *ngIf= "nodeTotal.rowspan > 0" [attr.rowspan]="nodeTotal.rowspan" class="num txt_ok">{{fnum3(nodeTotal.available)}}</td>
+          <td *ngIf= "nodeTotal.rowspan > 0" [attr.rowspan]="nodeTotal.rowspan" class="num txt_warning_high">{{fnum3(nodeTotal.missing)}}</td>
           <td *ngIf= "nodeTotal.rowspan > 0" [attr.rowspan]="nodeTotal.rowspan" class="txt_warning_high next_bloc">
             <ng-container  *ngFor="let nextRequest of nodeTotal.listConsumerMissingRequests" scope="row">
-              <span  >{{nextRequest.issuer}}({{nextRequest.power}})</span>
+              <span  >{{nextRequest.issuer}}({{nextRequest.power}}) </span>
             </ng-container>
           </td>
           <td *ngIf= "nodeTotal.rowspan > 0" [attr.rowspan]="nodeTotal.rowspan" class="next_bloc ">
@@ -76,7 +76,7 @@
               </div>
             </ng-container>
           </td>
-          <td *ngIf= "nodeTotal.rowspan > 0" [attr.rowspan]="nodeTotal.rowspan" class="num {{getClassMissingRequests(nodeTotal)}}" >{{fnum2(nodeTotal.minRequestMissing)}}</td>
+          <td *ngIf= "nodeTotal.rowspan > 0" [attr.rowspan]="nodeTotal.rowspan" class="num {{getClassMissingRequests(nodeTotal)}}" >{{fnum3(nodeTotal.minRequestMissing)}}</td>
          <!--
             <td *ngIf= "nodeTotal.rowspan > 0" [attr.rowspan]="nodeTotal.rowspan" class=" {{getClassContractDoublons(nodeTotal)}}">{{nodeTotal.contractDoublons}}</td>
          -->

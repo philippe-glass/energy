@@ -1,4 +1,4 @@
 #!/bin/bash
 
-docker build -t faysalsaber/angular:1 .
-docker push faysalsaber/angular:1
+docker build -t philippeglass1/enduser_application:1 .
+docker push philippeglass1/enduser_application:1

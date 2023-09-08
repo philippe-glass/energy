@@ -30,7 +30,7 @@ export class AddserviceComponent implements OnInit {
   
   showtest() {
 
-    this.httpClient.post(this._constant.baseAppUrl+'addService',
+    this.httpClient.post(this._constant.baseAppUrl+'service/addService',
       { "name": this.name, "input": this.input.split(','), "output": this.output.split(',') }, { responseType: 'text' }).
       subscribe(res => {
         console.log(res);

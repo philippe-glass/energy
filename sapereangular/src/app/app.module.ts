@@ -16,12 +16,15 @@ import { ConstantsService } from './common/services/constants.service';
 import { LoginComponent } from './login/login.component';
 import { HeaderComponent } from './header/header.component';
 import { LocalservicesComponent } from './localservices/localservices.component';
+import { OldConfigComponent } from './oldconfig/oldconfig.component';
 import { ConfigComponent } from './config/config.component';
 import { LsasComponent } from './lsas/lsas.component';
 import { SimulationComponent } from './simulation/simulation.component';
 import { SGCurrentComponent } from './sgcurrent/sgcurrent.component';
 import { SGHistoryComponent } from './sghistory/sghistory.component';
 import { SGLearningComponent } from './sglearning/sglearning.component';
+import { ForcastingComponent } from './forcasting/forcasting.component';
+
 
 
 
@@ -34,12 +37,14 @@ import { SGLearningComponent } from './sglearning/sglearning.component';
     LoginComponent,
     HeaderComponent,
     LocalservicesComponent,
+    OldConfigComponent,
     ConfigComponent,
     LsasComponent,
     SimulationComponent,
     SGCurrentComponent,
     SGHistoryComponent,
     SGLearningComponent,
+    ForcastingComponent,
     GraphComponent
       ],
   imports: [

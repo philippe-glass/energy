@@ -63,7 +63,6 @@ export class SGHistoryComponent implements OnInit {
   constructor(private httpClient: HttpClient,private _constant: ConstantsService, public _chartElem: ElementRef) {
     this.httpClient.get(this._constant.baseAppUrl+'energy/nodeTotalHistory').
       subscribe((res :any[])=> {
-
         this.nodeTotalHistory=res;
         console.log("this.httpClient.get : nodeTotalHistory = ", this.nodeTotalHistory );
         this.dataMax = [];
@@ -251,9 +250,18 @@ export class SGHistoryComponent implements OnInit {
     return fnum2(num);
   }
 
+  fnum3(num) {
+    return fnum3(num, false);
+  }
+
   fnum2_minus_plus(num) {
     var preffix = (num>0 ? '+' : '');
     return preffix + this.fnum2(num);
+  }
+
+  fnum3_minus_plus(num) {
+    var preffix = (num>0 ? '+' : '');
+    return preffix + this.fnum3(num);
   }
 
   reload() {
@@ -471,17 +479,6 @@ export class SGHistoryComponent implements OnInit {
   }
 
 
-  displayOffers(nodeTotalHistory) {
-    console.log("displayOffers", nodeTotalHistory , nodeTotalHistory.date, nodeTotalHistory.dateLast);
-    console.log("id", nodeTotalHistory.id);
-    var obj =  { "date":nodeTotalHistory.date, "dateNext":nodeTotalHistory.dateNext };
-    this.httpClient.post(this._constant.baseAppUrl+'energy/retrieveOffers', obj , { responseType: 'json' }).
-      subscribe((res :any[])=> {
-        var listOffers = res;
-        this.callback_retrieveOffers(nodeTotalHistory, listOffers);
-      });
-  }
-
   displayOffers2(histoId) {
       console.log("displayOffers2", histoId);
       var divObj = document.getElementById('offers_' + histoId);
@@ -523,25 +520,6 @@ export class SGHistoryComponent implements OnInit {
     return result;
   }
 
-
-  callback_retrieveOffers(nodeTotalHistory, listOffers) {
-    console.log("displayOffers : len = ", listOffers.length, " ,listOffers = ", listOffers);
-    var idTD = "TD_" + nodeTotalHistory.id ;
-    var sOffers = "";
-    for(var i = 0; i < listOffers.length; i++) {
-        var nextOffer = listOffers[i];
-        console.log("nextOffer", nextOffer);
-        sOffers = sOffers + "<br> " + this.offerToStr(nextOffer);
-    }
-    document.getElementById(idTD).innerHTML=sOffers;
-    //(document.getElementById(idTD)).style .width = '200px';
-        /*
-        var myModal = d3.select("myModal");
-        console.log("myModal = ", myModal);
-        this.myModal.open() ;
-        */
-        //this.reload();
-  }
 
 getClassBorderTop(nodeTotal) {
   // console.log("nodeTotal.idxEvent = ", nodeTotal.idxEvent);

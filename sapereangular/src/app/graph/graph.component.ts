@@ -17,7 +17,7 @@ export class GraphComponent implements OnInit {
   node=[];
   
   constructor(private httpClient: HttpClient,private _constant: ConstantsService) { 
-    this.httpClient.get(this._constant.baseAppUrl+'lsasList').
+    this.httpClient.get(this._constant.baseAppUrl+'sapere/lsasList').
       subscribe((res :any[])=> {
         for (let index = 0; index < res.length; index++) {
           this.lsas.push({'id':res[index]['name'],'source':res[index]['input'][0],'target':res[index]['output'][0],'label':res[index]['name']})
@@ -26,7 +26,7 @@ export class GraphComponent implements OnInit {
         console.log(this.lsas);
       })
 
-      this.httpClient.get(this._constant.baseAppUrl+'node').
+      this.httpClient.get(this._constant.baseAppUrl+'sapere/node').
       subscribe((res :any[])=> {
         for (let index = 0; index < res.length; index++) {
           this.node.push({'id':res[index],'label':res[index]});

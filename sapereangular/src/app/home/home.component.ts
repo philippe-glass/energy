@@ -21,7 +21,7 @@ export class HomeComponent implements OnInit {
     this.timeLeft=10;
     this.interval = setInterval(() => {
       if (this.timeLeft > 0 && this.result == "") {
-        this.httpClient.get(this._constant.baseAppUrl+'getResult?query=' + this.name, { responseType: 'text' })
+        this.httpClient.get(this._constant.baseAppUrl+'query/getResult?query=' + this.name, { responseType: 'text' })
           .subscribe(res => {
             this.result = res;
           })
@@ -47,7 +47,7 @@ export class HomeComponent implements OnInit {
   }
 
   addQuery() {
-    this.httpClient.post(this._constant.baseAppUrl+'addQuery',
+    this.httpClient.post(this._constant.baseAppUrl+'query/addQuery',
       { "name": this.name, "prop": this.property.split(','), "values": this.value.split(','), "waiting": this.waiting.split(',') })
       .subscribe(res => {
         console.log(res);
@@ -59,7 +59,7 @@ export class HomeComponent implements OnInit {
   }
 
   positiveReward() {
-    this.httpClient.get(this._constant.baseAppUrl+'reward?name=' + this.name + '&reward=10', { responseType: 'text' }).
+    this.httpClient.get(this._constant.baseAppUrl+'query/reward?name=' + this.name + '&reward=10', { responseType: 'text' }).
       subscribe(res => {
         this.result="";
         console.log(res);
@@ -67,7 +67,7 @@ export class HomeComponent implements OnInit {
   }
 
   negativeReward() {
-    this.httpClient.get(this._constant.baseAppUrl+'reward?name=' + this.name + '&reward=-10', { responseType: 'text' }).
+    this.httpClient.get(this._constant.baseAppUrl+'query/reward?name=' + this.name + '&reward=-10', { responseType: 'text' }).
       subscribe(res => {
         this.result="";
         console.log(res);

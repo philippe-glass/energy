@@ -1,5 +1,5 @@
 import { Component, OnInit, OnChanges, ChangeDetectorRef, ViewChild, ElementRef, Input, ViewEncapsulation } from '@angular/core';
-import { HttpClient, HttpParams  } from '@angular/common/http';
+import { HttpClient, HttpParams, HttpHeaders  } from '@angular/common/http';
 import { ConstantsService } from '../common/services/constants.service';
 import { fnum_minus_plus, fnum0, fnum2,fnum3, precise_round, formatTime, formatDate, formatTime2, timeYYYYMMDDHMtoDate, formatTimeWindow
   , getDefaultInitTime, getDefaultHour, getDefaulInitDay, getDefaultTargetTime, getDefaultTargetDay } from '../common/util.js';
@@ -23,6 +23,7 @@ export class SGLearningComponent implements OnInit  {
   private stateNb = 0;
   private sTimeWindow = "";
   private prediction = {};
+  private fedAvgResult = {};
   private listPredictions = [];
  // private avgSateProbabilities = [];
   private listCorrections = [];
@@ -34,16 +35,24 @@ export class SGLearningComponent implements OnInit  {
   private entropieResult = {};
   //private nbPredictionItems = 0;
   private changeDetectorRef: ChangeDetectorRef;
-  private listLocations = [];
   private listStateDates = [];
+  private defaultNodeLocation = {};
+  private mapAllNodeLocations = {};
   private listYesNo = [{"label":"no", "value":false}, {"label":"yes", "value":true} ];
+
+  // form for Red-avg checkuo
+  private fedAvgCheckupRequest = {
+    "variableName":""
+  }
+
   // form for statistic request
   private statisticsRequest = {
      "minComputeDay":getDefaultTargetDay()
     ,"maxComputeDay":getDefaultTargetDay()
     ,"minTargetDay":null
     ,"maxTargetDay":null
-    ,"location":""
+    ,"nodeName":""
+    ,"nodeLocation":{}
     ,"mergeHorizons":true
     ,"mergeUseCorrections":false
     ,"mergableFields":[
@@ -56,11 +65,12 @@ export class SGLearningComponent implements OnInit  {
   private singlePredictionRequest = {
        "initDay":getDefaulInitDay()
       ,"initTime":getDefaultInitTime()
-      ,"initDate":null
+      //,"initDate":null
       ,"targetDay":getDefaultTargetDay()
       ,"targetTime": getDefaultTargetTime()
-	    ,"targetDate":null
-	    ,"location":""
+	   // ,"targetDate":null
+     // ,"nodeLocation":{}
+      ,"nodeName":""
 	    ,"useCorrections":false
   }
   // form for massive prediction request
@@ -68,14 +78,16 @@ export class SGLearningComponent implements OnInit  {
       "targetDay":getDefaultTargetDay()
      ,"targetHour":Math.max(0,getDefaultHour()-2)
      ,"horizonInMinutes":5
-     ,"location":""
+     ,"nodeLocation":{}
+     ,"nodeName":""
      ,"variableName":""
      ,"useCorrections":true
      ,"generateCorrections":false
   };
   // filter for matrix refresh
   private matrixFilter = {
-       "location":""
+       "nodeLocation":{}
+      ,"nodeName":""
       ,"variableName":""
       ,"startHourMin":getDefaultHour()
       ,"startHourMax":(1+getDefaultHour())
@@ -86,30 +98,38 @@ export class SGLearningComponent implements OnInit  {
   constructor(private httpClient: HttpClient,private _constant: ConstantsService, public _chartElem: ElementRef, private cd: ChangeDetectorRef) {
     this.changeDetectorRef = cd;
     //this.changeDetectorRef.detectChanges();
-    this.httpClient.get(this._constant.baseAppUrl+'energy/getLocations').
+    this.httpClient.get(this._constant.baseAppUrl+'energy/getNodeConfig').
       subscribe((result :any[])=> {
-        this.listLocations = result;
-        console.log("this.listLocations = ", this.listLocations);
-        if(this.listLocations.length>0) {
-          var defaultLocation = (this.listLocations[0]).value;
-          console.log("defaultLocation", defaultLocation);
-          if(this.statisticsRequest['location'] == "") {
-            this.statisticsRequest['location'] = defaultLocation;
+        this.defaultNodeLocation = result;
+        console.log("this.defaultNodeLocation = ", this.defaultNodeLocation);
+        var defaultNodeName = this.defaultNodeLocation["name"];
+          console.log("defaultNodeName", defaultNodeName);
+          if(this.statisticsRequest['nodeName'] == "") {
+            this.statisticsRequest['nodeName'] = defaultNodeName;
+            this.statisticsRequest['nodeLocation'] = this.defaultNodeLocation;;
           }
-          if(this.singlePredictionRequest['location'] == "") {
-            this.singlePredictionRequest['location'] = defaultLocation;
+          if(this.singlePredictionRequest['nodeName'] == "") {
+            this.singlePredictionRequest['nodeName'] = defaultNodeName;
+           // this.singlePredictionRequest['nodeLocation'] = this.defaultNodeLocation;;
           }
-          if(this.massivePredictionRequest['location'] == "")  {
-            this.massivePredictionRequest['location'] = defaultLocation;
+          if(this.massivePredictionRequest['nodeName'] == "")  {
+            this.massivePredictionRequest['nodeName'] = defaultNodeName;
+            //this.massivePredictionRequest['nodeLocation'] = this.defaultNodeLocation;;
           }
-          if(this.matrixFilter['location'] == "")  {
-            this.matrixFilter['location'] = defaultLocation;
+          if(this.matrixFilter['nodeName'] == "")  {
+            //this.matrixFilter['location'] = defaultLocation;
+            this.matrixFilter['nodeName'] = defaultNodeName;
+            //this.matrixFilter['nodeLocation'] = this.defaultNodeLocation;
           }
-        }
       });
 
-
-
+    this.httpClient.get(this._constant.baseAppUrl+'energy/getMapAllNodeConfigs').
+      subscribe((result :any[])=> {
+        this.mapAllNodeLocations = result;
+        Object.entries(this.mapAllNodeLocations).forEach(([key, value]) => {
+          console.log('------- getMapAllNodeConfigs Key : ' + key + ', Value : ' + value["mainServiceAddress"], value["url"])
+        })
+      });
 
       this.httpClient.get(this._constant.baseAppUrl+'energy/getStateDates').
       subscribe((result :any[])=> {
@@ -136,6 +156,72 @@ export class SGLearningComponent implements OnInit  {
   }
 
 
+
+  aux_selectNormalizedMatrixRow(trMatrix, rowId, includeCorrections) {
+    if (trMatrix === undefined) {
+      return [];
+    }
+    var norm_matrix = includeCorrections ? trMatrix["normalizedMatrix2"] :  trMatrix["normalizedMatrix1"];
+    return norm_matrix.array[rowId];
+  }
+
+  aux_selectAllObsMatrixRow(trMatrix, rowId) {
+    if (trMatrix === undefined) {
+      return [];
+    }
+    var matrix1 = trMatrix.allObsMatrix;
+    return matrix1.array[rowId];
+  }
+
+  aux_selectAllCorrectionsMatrixRow(trMatrix, rowId) {
+    if (trMatrix === undefined) {
+      return [];
+    }
+    var matrix1 = trMatrix.allCorrectionsMatrix;
+    return matrix1.array[rowId];
+  }
+
+  aux_displayAllObsMatrixRowSum(trMatrix, rowId) {
+    var row = this.aux_selectAllObsMatrixRow(trMatrix, rowId);
+    var obsNb = this.computeRowSum(row);
+    var result ="" + obsNb;
+  return result;
+  }
+
+  aux_displayAllCorrectionsMatrixRowSum(trMatrix, rowId){
+    var row = this.aux_selectAllCorrectionsMatrixRow(trMatrix, rowId);
+    var obsNb = this.computeRowSum(row);
+    var result = this.displayCorrectionsNb(obsNb);
+  return result;
+  }
+
+  aux_selectAllObsMatrixCell(trMatrix, rowId, columnId) {
+    //console.log("selectAllObsMatrixCell begin", variableName, timeWindow, rowId);
+    if (trMatrix === undefined) {
+      return null;
+    }
+    var matrix = trMatrix.allObsMatrix;
+    return matrix.array[rowId][columnId];
+  }
+
+  aux_selectAllCorrectionsMatrixCell(trMatrix, rowId, columnId) {
+    //console.log("selectNormalizedMatrixRow begin", variableName, timeWindow, rowId);
+    if (trMatrix === undefined) {
+      return null;
+    }
+    var matrix = trMatrix.allCorrectionsMatrix;
+    return matrix.array[rowId][columnId];
+  }
+
+  aux_getClassNormalizedMatrixRow(trMatrix, rowId) {
+    var row =  this.aux_selectNormalizedMatrixRow(trMatrix, rowId, false);
+    var sum = this.computeRowSum(row);
+    if(sum==0) {
+      return "warning_high";
+    }
+    return "";
+  }
+
   selectNormalizedMatrixRow2(variableName, timeWindow, rowId) {
     var includeCorrections = this.doIncludeCorrections();
     //console.log("selectNormalizedMatrixRow2 variableName = ",variableName, " , includeCorrections = ", includeCorrections);
@@ -144,21 +230,13 @@ export class SGLearningComponent implements OnInit  {
 
   selectNormalizedMatrixRow(variableName, timeWindow, rowId, includeCorrections) {
     var trMatrix = this.selectTransitionMatrix(variableName, timeWindow);
-    if (trMatrix === undefined) {
-      return [];
-    }
-    var norm_matrix = includeCorrections ? trMatrix.normalizedMatrix2 :  trMatrix.normalizedMatrix1;
-    return norm_matrix.array[rowId];
+    return this.aux_selectNormalizedMatrixRow(trMatrix, rowId, includeCorrections);
   }
 
   selectAllObsMatrixRow(variableName, timeWindow, rowId) {
     //console.log("selectNormalizedMatrixRow begin", variableName, timeWindow, rowId);
     var trMatrix = this.selectTransitionMatrix(variableName, timeWindow);
-    if (trMatrix === undefined) {
-      return [];
-    }
-    var matrix1 = trMatrix.allObsMatrix;
-    return matrix1.array[rowId];
+    return this.aux_selectAllObsMatrixRow(trMatrix, rowId);
   }
 
  displayAllObsMatrixRowSum(variableName, timeWindow, rowId) {
@@ -186,11 +264,7 @@ export class SGLearningComponent implements OnInit  {
   selectAllCorrectionsMatrixRow(variableName, timeWindow, rowId) {
     //console.log("selectNormalizedMatrixRow begin", variableName, timeWindow, rowId);
     var trMatrix = this.selectTransitionMatrix(variableName, timeWindow);
-    if (trMatrix === undefined) {
-      return [];
-    }
-    var matrix = trMatrix.allCorrectionsMatrix;
-    return matrix.array[rowId];
+    return this.aux_selectAllCorrectionsMatrixRow(trMatrix, rowId);
   }
 
   displayAllObsMatrixCell(variableName, timeWindow, rowId, columnId) {
@@ -218,21 +292,13 @@ export class SGLearningComponent implements OnInit  {
   selectAllObsMatrixCell(variableName, timeWindow, rowId, columnId) {
     //console.log("selectAllObsMatrixCell begin", variableName, timeWindow, rowId);
     var trMatrix = this.selectTransitionMatrix(variableName, timeWindow);
-    if (trMatrix === undefined) {
-      return null;
-    }
-    var matrix = trMatrix.allObsMatrix;
-    return matrix.array[rowId][columnId];
+    return this.aux_selectAllObsMatrixCell(trMatrix, rowId, columnId);
   }
 
   selectAllCorrectionsMatrixCell(variableName, timeWindow, rowId, columnId) {
     //console.log("selectNormalizedMatrixRow begin", variableName, timeWindow, rowId);
     var trMatrix = this.selectTransitionMatrix(variableName, timeWindow);
-    if (trMatrix === undefined) {
-      return null;
-    }
-    var matrix = trMatrix.allCorrectionsMatrix;
-    return matrix.array[rowId][columnId];
+    return this.aux_selectAllCorrectionsMatrixCell(trMatrix, rowId, columnId);
   }
 
   getClassDifferentialItem(value) {
@@ -258,12 +324,9 @@ export class SGLearningComponent implements OnInit  {
   }
 
   getClassNormalizedMatrixRow(variableName, timeWindow, rowId) {
-    var row =  this.selectNormalizedMatrixRow(variableName, timeWindow, rowId, false);
-    var sum = this.computeRowSum(row);
-    if(sum==0) {
-      return "warning_high";
-    }
-    return "";
+
+    var trMatrix = this.selectTransitionMatrix(variableName, timeWindow);
+    return this.aux_getClassNormalizedMatrixRow(trMatrix, rowId);
   }
 
   geClassMostLikelyState(predictionResult) {
@@ -385,9 +448,49 @@ export class SGLearningComponent implements OnInit  {
   }
 
   refreshMatrices(){
+    var matrixFilter = this.matrixFilter;
     console.log("refreshMatrices : matrixFilter = ", this.matrixFilter);
-    this.httpClient.post(this._constant.baseAppUrl+'energy/allNodeTransitionMatrices', this.matrixFilter , { responseType: 'json' }).
+    var chosenNodeLocation = this.defaultNodeLocation;
+    var chosenNodeName = matrixFilter["nodeName"];
+    var chosenBaseUrl = this._constant.baseAppUrl + "energy";
+    if(chosenNodeName  != "" && this.mapAllNodeLocations.hasOwnProperty(chosenNodeName)) {
+      console.log("refreshMatrices : chosenNodeName = ", chosenNodeName);
+      console.log("refreshMatrices : mapAllNodeLocations = ", this.mapAllNodeLocations);
+      chosenNodeLocation = this.mapAllNodeLocations[chosenNodeName];
+      //matrixFilter["nodeLocation"] = chosenNodeLocation;
+      matrixFilter["nodeName"] = chosenNodeLocation["nodeName"];
+      console.log("refreshMatrices : chosenNodeLocation = ", chosenNodeLocation);
+      chosenBaseUrl = chosenNodeLocation["url"];
+    } else {
+      console.log("init condition : defaultNodeConfig = ",  this.defaultNodeLocation);
+    }
+    console.log("refreshMatrices : matrixFilter = ", this.matrixFilter
+    , "chosenNodeLocation = ", chosenNodeLocation, "chosenBaseUrl = ", chosenBaseUrl);
+    var sep = chosenBaseUrl.endsWith("/")? "" : "/";
+    var serviceUrl = chosenBaseUrl + "/" + 'allNodeTransitionMatrices';
+    console.log("refreshMatrices : calling service 1", serviceUrl, chosenBaseUrl);
+    //serviceUrl = serviceUrl.replace("//allNodeTransitionMatrices", "/allNodeTransitionMatrices");
+    //serviceUrl = "http://localhost:9191/energy/allNodeTransitionMatrices";
+    console.log("refreshMatrices : calling service 2", serviceUrl);
+    let str = ""+this.matrixFilter;
+
+    //this.httpClient.post(this._constant.baseAppUrl+'energy/allNodeTransitionMatrices', this.matrixFilter , { responseType: 'json' }).
+    let apiHeader = new HttpHeaders().set('Content-Type', 'application/json; charset=utf-8');
+    //let bytes = str.getBytes();
+    apiHeader.set("charset", "utf-8");
+    apiHeader.set( 'Authorization', 'Bearer my-token');
+    //apiHeader.set("Content-Length", "utf-8");
+
+
+    let filterParams = new HttpParams();
+    Object.entries(this.matrixFilter).forEach(([key, value]) => {
+        filterParams = filterParams.append(key,""+value);
+    });
+    console.log("refreshMatrices filterParams = ", filterParams);
+    this.httpClient.get(serviceUrl,  { params: filterParams } ).
+    //this.httpClient.post(serviceUrl, this.matrixFilter , { responseType: 'json' , headers:apiHeader}).
       subscribe((res :any[])=> {
+        console.log("subscribe result = ", res);
         this.listNodeTransitionMatrices =  res;
         this.nodeTransitionMatrices=null
         this.listTimeWindows = [];
@@ -438,19 +541,52 @@ export class SGLearningComponent implements OnInit  {
       });
   }
 
-  getPrediction(){
-    this.singlePredictionRequest['initDate'] = timeYYYYMMDDHMtoDate(this.singlePredictionRequest['initDay'], this.singlePredictionRequest['initTime']);
-    this.singlePredictionRequest['targetDate'] = timeYYYYMMDDHMtoDate(this.singlePredictionRequest['targetDay'], this.singlePredictionRequest['targetTime']);
-    console.log("getPRedicton singlePredictionRequest = ", this.singlePredictionRequest);
-    this.httpClient.post(this._constant.baseAppUrl+'energy/getPrediction', this.singlePredictionRequest, { responseType: 'json' }).
+  getSinglePrediction(){
+    var initDate = timeYYYYMMDDHMtoDate(this.singlePredictionRequest['initDay'], this.singlePredictionRequest['initTime']);
+    var targetDate = timeYYYYMMDDHMtoDate(this.singlePredictionRequest['targetDay'], this.singlePredictionRequest['targetTime']);
+    /*
+    this.singlePredictionRequest['initDate'] = initDate;
+    this.singlePredictionRequest['initDate'] = this.singlePredictionRequest['initDay'] + "T"+ this.singlePredictionRequest['initTime'];
+    this.singlePredictionRequest['initDate'] = "2023-05-01";
+    */
+    console.log(initDate, initDate.getTime());
+    /*
+    this.singlePredictionRequest['targetDate'] = targetDate;
+    this.singlePredictionRequest['targetDate'] = "2023-05-02";
+    */
+    this.singlePredictionRequest['longInitDate'] = initDate.getTime();
+    this.singlePredictionRequest['longTargetDate'] = targetDate.getTime();
+    console.log("getSinglePrediction singlePredictionRequest2 = ", this.singlePredictionRequest);
+    var chosenNodeName =  this.singlePredictionRequest["nodeName"];
+    var chosenBaseUrl = this._constant.baseAppUrl + "energy";
+    if(chosenNodeName  != "" && this.mapAllNodeLocations.hasOwnProperty(chosenNodeName)) {
+      console.log("getSinglePrediction : chosenNodeName = ", chosenNodeName);
+      var chosenNodeLocation = this.mapAllNodeLocations[chosenNodeName];
+      this.singlePredictionRequest["nodeLocation"] = chosenNodeLocation;
+      console.log("getSinglePrediction : chosenNodeLocation = ", chosenNodeLocation);
+      chosenBaseUrl = chosenNodeLocation["url"];
+    } else {
+      this.singlePredictionRequest["nodeLocation"] = this.defaultNodeLocation;
+    }
+        var serviceUrl = chosenBaseUrl+'/getPrediction';
+    console.log("getSinglePrediction : calling service", serviceUrl);
+    let reqparams = new HttpParams();
+    Object.entries(this.singlePredictionRequest).forEach(([key, value]) => {
+      if(key != "_initTime" && key != "_targetTime" && key != "_initDay"
+       && key != "_targetDay" && key != "_nodeLocation") {
+        reqparams = reqparams.append(key,""+value);
+      }
+    });
+    //this.httpClient.get(serviceUrl, this.singlePredictionRequest, { responseType: 'json' }).
+    this.httpClient.get(serviceUrl,  { params: reqparams } ).
     subscribe(res => {
       this.prediction = res;
-      console.log("getPrediction : this.prediction = ", this.prediction);
+      console.log("getSinglePrediction : this.prediction = ", this.prediction);
       console.log("before changeDetectorRef");
       //this.reload();
       if(this.prediction.hasOwnProperty('mapLastResults')) {
         var mapLastResults = this.prediction['mapLastResults'];
-        console.log("mapLastResults", mapLastResults);
+        console.log("getSinglePrediction : mapLastResults", mapLastResults);
       }
       this.changeDetectorRef.detectChanges();
 
@@ -469,6 +605,32 @@ export class SGLearningComponent implements OnInit  {
     return result;
   }
 
+  checkupFedAVG() {
+    console.log("checkupFedAVG : fedAvgCheckupRequest = ", this.fedAvgCheckupRequest);
+    var chosenBaseUrl = this._constant.baseAppUrl + "energy";
+    var serviceUrl = chosenBaseUrl+'/checkupFedAVG';
+    console.log("checkupFedAVG : calling service", serviceUrl);
+    let requestParams = new HttpParams();
+    Object.entries(this.fedAvgCheckupRequest).forEach(([key, value]) => {
+        if(value!= undefined )    {
+          requestParams = requestParams.append(key,""+value);
+        }
+    });
+    this.httpClient.get(serviceUrl, { params: requestParams }).
+      subscribe((result :any[])=> {
+        this.fedAvgResult = result;
+        console.log("checkupFedAVG : fedAvgResult = ", this.fedAvgResult);
+        var maptrMatrices = this.fedAvgResult['nodeTransitionMatrices']
+        var nodeName = this.defaultNodeLocation["name"];
+        console.log("nodeName = ", nodeName);
+        var trMatrix = maptrMatrices[nodeName];
+        console.log("trMatrix :", trMatrix);
+        var idxState = 0;
+        var row = this.aux_selectNormalizedMatrixRow(trMatrix, idxState, true);
+        console.log("first row :", row);
+      })
+  }
+
   getStatistics() {
     console.log("getStatistics : statisticsRequest = ", this.statisticsRequest);
     var useCorrectionsFilter = this.statisticsRequest['useCorrectionsFilter']
@@ -481,12 +643,43 @@ export class SGLearningComponent implements OnInit  {
     if(useCorrectionsFilter == 'true') {
       this.statisticsRequest["useCorrectionFilter"] = "true";
     }
+    var minComputeDay =  timeYYYYMMDDHMtoDate(this.statisticsRequest["minComputeDay"], "00:00");
+    var maxComputeDay =  timeYYYYMMDDHMtoDate(this.statisticsRequest["maxComputeDay"], "00:00");
+    //var minTargetDay =  timeYYYYMMDDHMtoDate(this.statisticsRequest["minTargetDay"], "00:00");
+    //var maxTargetDay =  timeYYYYMMDDHMtoDate(this.statisticsRequest["maxTargetDay"], "00:00");
+    console.log("getStatistics1 : minComputeDay = ", minComputeDay, " maxComputeDay = ", maxComputeDay);
+    this.statisticsRequest["longMinComputeDay"] = minComputeDay.getTime();
+    this.statisticsRequest["longMaxComputeDay"] = maxComputeDay.getTime();
+    //this.statisticsRequest["longMinTargetDay"] = minTargetDay.getTime();
+    //this.statisticsRequest["longMinTargetDay"] = maxTargetDay.getTime();
     console.log("getStatistics1 : useCorrectionsFilter = ", this.statisticsRequest['useCorrectionsFilter'], typeof this.statisticsRequest['useCorrectionsFilter']);
-    this.httpClient.post(this._constant.baseAppUrl+'energy/computePredictionStatistics', this.statisticsRequest, { responseType: 'json' }).
+    var chosenNodeName =  this.statisticsRequest["nodeName"];
+    var chosenBaseUrl = this._constant.baseAppUrl + "energy";
+    if(chosenNodeName  != "" && this.mapAllNodeLocations.hasOwnProperty(chosenNodeName)) {
+      console.log("getStatistics1 : chosenNodeName = ", chosenNodeName);
+      var chosenNodeLocation = this.mapAllNodeLocations[chosenNodeName];
+      this.statisticsRequest["nodeLocation"] = chosenNodeLocation;
+      console.log("getStatistics1 : chosenNodeLocation = ", chosenNodeLocation);
+      chosenBaseUrl = chosenNodeLocation["url"];
+    } else {
+      this.statisticsRequest["nodeLocation"] = this.defaultNodeLocation;
+    }
+
+    var serviceUrl = chosenBaseUrl+'/computePredictionStatistics';
+    console.log("getStatistics1 : calling service", serviceUrl, "generateCorrections = ", this.statisticsRequest["enerateCorrections"]);
+
+    let requestParams = new HttpParams();
+    Object.entries(this.statisticsRequest).forEach(([key, value]) => {
+        if(key != "nodeLocation" && value!= undefined )    {
+          requestParams = requestParams.append(key,""+value);
+        }
+    });
+    console.log("chosenBaseUrl requestParams = ", requestParams);
+    this.httpClient.get(serviceUrl,  { params: requestParams } ).
     subscribe((result :any[])=> {
           this.listStatisitcs = result;
           //this.listErrors = result["errors"];
-          console.log("getStatistics : this.listPredictions = ", this.listPredictions, "listErrors = ", this.listErrors);
+          console.log("getStatistics : this.listStatisitcs = ", this.listStatisitcs, "listErrors = ", this.listErrors);
           console.log("before changeDetectorRef");
           console.log("fieldsToMerge", this.statisticsRequest['fieldsToMerge'])
           var weightedEntropie = 0.0;
@@ -498,11 +691,18 @@ export class SGLearningComponent implements OnInit  {
             this.totalStatistics['arraySumsOfProba'][state_idx] = 0;
           }
           var lastBeginHours = null;
+          console.log("this.listStatisitcs.length = ", this.listStatisitcs.length);
           for(var i = 0; i < this.listStatisitcs.length; i++) {
             var nextStatistic = this.listStatisitcs[i];
+            console.log("nextStatistic = ", nextStatistic);
             nextStatistic['firstOfRowBloc'] = false;
             var beginDate =  nextStatistic['timeSlot']['beginDate'];
-            var beginTime = (beginDate.split("T"))[1];
+            console.log("beginDate = ", beginDate);
+            var datatimeSep = "T";
+            if (!beginDate.includes("T")) {
+              datatimeSep = " ";
+            }
+            var beginTime = (beginDate.split(datatimeSep))[1];
             var beginHours = beginTime.substring(0,2);
             //console.log("nextStatistic", beginDate, beginHours, lastBeginHours);
             if(lastBeginHours == null || (lastBeginHours != beginHours)) {
@@ -529,6 +729,7 @@ export class SGLearningComponent implements OnInit  {
               this.totalStatistics['nbOfPredictions2'] =  this.totalStatistics['nbOfPredictions2'] + nextStatistic['nbOfPredictions'];
             }
           }
+          console.log("totalStatistics = ", this.totalStatistics);
           this.totalStatistics['sucessRate'] = 0;
           this.totalStatistics['shannonEntropie'] = 0.0;
           this.totalStatistics['giniIndex'] = 0.0;
@@ -553,14 +754,36 @@ export class SGLearningComponent implements OnInit  {
 
   getMassivePredictions() {
     console.log("getMassivePredictions : massivePredictionRequest = " , this.massivePredictionRequest);
-    this.httpClient.post(this._constant.baseAppUrl+'energy/getMassivePredictions', this.massivePredictionRequest, { responseType: 'json' }).
+    var chosenNodeName =  this.massivePredictionRequest["nodeName"];
+    var chosenBaseUrl = this._constant.baseAppUrl + "energy";
+    if(chosenNodeName  != "" && this.mapAllNodeLocations.hasOwnProperty(chosenNodeName)) {
+      console.log("getMassivePredictions : chosenNodeName = ", chosenNodeName);
+      var chosenNodeLocation = this.mapAllNodeLocations[chosenNodeName];
+      this.massivePredictionRequest["nodeLocation"] = chosenNodeLocation;
+      console.log("getMassivePredictions : chosenNodeLocation = ", chosenNodeLocation);
+      chosenBaseUrl = chosenNodeLocation["url"];
+    } else {
+      this.massivePredictionRequest["nodeLocation"] = this.defaultNodeLocation;
+    }
+    var targetDay =  timeYYYYMMDDHMtoDate(this.massivePredictionRequest["targetDay"], "00:00");
+    //var longTargetDay = targetDay.getTime();
+    this.massivePredictionRequest["longTargetDay"]  = targetDay.getTime();
+
+    let requestParams = new HttpParams();
+    Object.entries(this.massivePredictionRequest).forEach(([key, value]) => {
+      if(value!= undefined && key != "nodeLocation" ){
+        requestParams = requestParams.append(key,""+value);
+      }
+    });
+    var serviceUrl = chosenBaseUrl+'/getMassivePredictions';
+    this.httpClient.get(serviceUrl, { params: requestParams }).
     subscribe((result :any[])=> {
           this.listPredictionItems = [];
           this.listPredictions = result["listPredictions"];
           this.listErrors = result["errors"];
           this.listCorrections = result["listCorrections"];
           console.log("getMassivePredictions : this.listPredictions = ", this.listPredictions, "listCorrections = ", this.listCorrections);
-          console.log("before changeDetectorRef");
+          console.log("before changeDetectorRef listPredictionsTotal =", this.listPredictionsTotal);
           //this.reload();
           var entropieByTrMatrixId = result['entropieByTrMatrixId'];
           var mapTrMatrixKey = result['mapTrMatrixKey'];
@@ -744,5 +967,13 @@ fnum2(num, displayZero=false) {
   formatOnlyTime(sdate) {
     var date = new Date(sdate);
     return formatTime2(date);
+  }
+
+  getNodeLocationLabel(nodeLocation) {
+    var prefix = "neighbor"
+    if(this.defaultNodeLocation["name"] == nodeLocation.name) {
+      prefix = "home";
+    }
+    return prefix+" " + nodeLocation.name;
   }
 }

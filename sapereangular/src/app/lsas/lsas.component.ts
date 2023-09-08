@@ -12,10 +12,10 @@ export class LsasComponent implements OnInit {
   list_lsa = [];
 
   constructor(private httpClient: HttpClient,private _constant: ConstantsService) { 
-    this.httpClient.get(this._constant.baseAppUrl+'lsasObj').
+    console.log("call url",this._constant.baseAppUrl+'sapere/lsasObj' );
+    this.httpClient.get(this._constant.baseAppUrl+'sapere/lsasObj').
       subscribe((res :any[])=> {
         this.list_lsa=res;
-        console.log(this._constant.baseAppUrl+'lsas2');
         console.log("this.httpClient.get : lsas2.lsas[0] = ", this.list_lsa[0]);
       })
   }

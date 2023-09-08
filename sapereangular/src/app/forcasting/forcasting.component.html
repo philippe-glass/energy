@@ -1,0 +1,69 @@
+<app-header></app-header>
+<div class="content">
+    <form (ngSubmit)="callForcasting()">
+        <fieldset>
+            <legend>Forcasting</legend>
+            <div class="form-group">
+                <label>Date Year/month/day:
+                    <select [(ngModel)]="forcastingRequest.year"  name="forcastingRequest.year">
+                        <option *ngFor="let item of forcastingRef.listOfYears" [value]="item.value">{{item.label}}</option>
+                    </select>
+                    &nbsp;
+                    <select [(ngModel)]="forcastingRequest.month"  name="forcastingRequest.month">
+                        <option *ngFor="let item of forcastingRef.listOfMonths" [value]="item.value">{{item.label}}</option>
+                    </select>
+                    &nbsp;
+                    <select [(ngModel)]="forcastingRequest.day"  name="forcastingRequest.day">
+                        <option *ngFor="let item of forcastingRef.listOfDays" [value]="item.value">{{item.label}}</option>
+                    </select>
+                </label>
+                <label>&nbsp;time (GMT):
+                    <select [(ngModel)]="forcastingRequest.time"  name="forcastingRequest.time">
+                        <option *ngFor="let item of forcastingRef.listOfTimes" [value]="item.value">{{item.label}}</option>
+                    </select>
+                </label>
+                <br>
+                <label class="txt_warning_high"> (between {{sInterval}})</label>
+                &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+                <br><br>
+                <label>samplingNb:<input size="5" class="form-text" name="forcastingRequest.samplingNb"   [(ngModel)]="forcastingRequest.samplingNb"></label>
+                <br><br>
+                <button class="btn btn-success" type="submit">Submit</button>
+            </div>
+        </fieldset>
+    </form>
+    <div class='txt_warning_high' >
+        <b>{{inputError}}</b>
+    </div>
+    <div *ngIf="nbValues">
+        <h3>Forcasting result: horizon = {{forcastingRequest.time}} + 1H</h3>
+        <table class="table table-hover">
+            <thead>
+                <tr>
+                    <th></th>
+                    <th>value 1</th>
+                    <th>value 2</th>
+                    <th>value 3</th>
+                    <th>value 4</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <th><b>Time</b></th>
+                    <td *ngFor="let value of forcastingResult.timestamps"> {{value}}</td>
+                </tr>
+                <tr>
+                    <th><b>Forcast</b></th>
+                    <td *ngFor="let value of forcastingResult.predicetedValues"> {{value}}</td>
+                </tr>
+                <tr>
+                    <th><b>Real values</b></th>
+                    <td *ngFor="let value of forcastingResult.realValues"> {{value}}</td>
+                </tr>
+            </tbody>
+        </table>
+        <div *ngIf="forcastingResult.errorReturned" class='txt_warning_high' >
+            <b>ERROR: {{forcastingResult.errorMessage}}</b>
+        </div>
+
+    </div>

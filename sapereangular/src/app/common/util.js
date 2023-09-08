@@ -153,6 +153,15 @@ export function formatDate(date) {
     return formatTime(current);
   }
 
+  export function getDefaultTimeZone() {
+    var current = new Date();
+    var scurrent = current.toString();
+    var idxGMT = scurrent.indexOf("GMT");
+    var result = scurrent.substring(idxGMT+3,idxGMT+8);
+    console.log("getDefaultTimeZone", scurrent, idxGMT, "return :", result);
+    return result;
+  }
+
   export function getDefaultTime2(shiftMinutes) {
     var current = new Date();
     current.setTime(current.getTime() + (shiftMinutes*60*1000));

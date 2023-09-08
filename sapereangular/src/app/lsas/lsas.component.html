@@ -15,7 +15,10 @@
                 <li><span class='caption1'>Properties :</span>
                     <ul>
                         <li *ngFor="let property of lsaForm.propertyList">
-                            <span class='data'>< {{property.name}} : {{property.value}} >  </span>
+                               <span class='data_label'> {{property.name}} : </span>
+                               <span class='data'> {{property.valueLine1}}
+                                    <DD *ngFor="let line of property.valueFollowingLines">{{line}}</DD>
+                                </span>
                                 <span class='caption2'>#B:</span><span class='data'>{{property.bond}}  </span>
                                 <span class='caption2'>#Q:</span><span class='data'>{{property.query}}  </span>
                                 <span class='caption2'>#S:</span><span class='data'>{{property.state}}  </span>
