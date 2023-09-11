@@ -1,0 +1,21 @@
+version: "2"
+services:
+  mongodb:
+    image: mongo:latest
+    container_name: "mongodb"
+    ports:
+    - 27017:27017
+  app:
+    image: houcembenmahfoudh/springbootapi:1
+    ports:
+    - 10009:10009
+    restart:
+      on-failure
+    links:
+    - mongodb
+  angular:
+    image: houcembenmahfoudh/angular:1
+    ports:
+    - 4200:80
+    links:
+    - app

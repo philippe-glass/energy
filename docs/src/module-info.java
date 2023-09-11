@@ -1,0 +1,2 @@
+module latex2doc {
+}

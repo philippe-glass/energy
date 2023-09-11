@@ -1,0 +1,333 @@
+
+
+
+\geometry{
+a4paper,
+top=40mm,
+bottom=40mm,
+left=40mm,
+right=40mm
+
+
+\title{State of the art for the thesis:
+Coordination model and digital twins for managing energy consumption and production in a smart grid
+
+
+Philippe \textsc{Glass
+\newline{}{ supervised by Giovanna \textsc{Di Marzo Serugendo}}
+
+UNIGE, Geneva, Switzerland
+
+September 2023
+
+
+Because of their complexity, smart grids call on a wide range of research fields. This paper focuses on three research areas that are essential for designing a smart grid solution based on coordination systems: coordination models in theme-self, Multi-agents systems, and machine learning applied to energy. Coordination models constitute a relevant solution for designing a bio-inspired environment in which entities representing connected devices can interact with each other and dynamically generate services. The bio-inspired coordination models seem to be the most appropriate.
+Multi-agents systems are essential to design entities as intelligent and autonomous agents and a number of research works have adapted such systems in the field of energy. The holon model is relevant for generic entities that can be integrated into a multi-level smart grid. In addition, the concept of digital twin can be used to designate agents that are virtual representatives of electrical appliances. Concerning machine learning, given the highly volatile nature of renewable energies, we will examine existing adaptations of learning models and frameworks used to distribute computations between different computational units. The "gossip" approach, which uses a purely distributed model, seems to be the most suitable for microgrid infrastructures.
+
+
+\begin{keywords
+Smart grids, Coordination model, Coordination law, Digital twin, Tuple space, Node, Self-composition of services, Federated Learning, Gossip Learning.
+\end{keywords
+
+
+Introduction:
+
+The development of smart grids has become an important issue in recent years, reinforced by the drastic rise in energy costs, the growing risk of energy shortages and the need to increase the share of renewable energies in energy supplies.
+
+In this paper, we define smart grids as electricity networks that use computer technologies to adjust the flow of electricity between suppliers and consumers. By collecting information on the state of the network, they contribute to improve the balance between production, distribution, and consumption. A smart grid is made up of a number of interconnected nodes containing computing units, which are generally connected to electrical devices that consume or produce electricity - except for the highest-level nodes.
+
+According to surveys that examine the use of the smart grid concept [1], there are a multitude of definitions which differ according to the user's point of view (technical or economic or commercial) or according to the region. However, certain concepts of the various existing definitions seem to converge, such as dynamic infrastructures that combine the circulation of information and electricity, the real-time interactivity, and the cooperation of different power system actors within the same network.
+
+Today, the development of such infrastructures is still at a "pioneering" stage and has not yet reached a sufficiently mature state: indeed, to date, smart grid designers have to contend with a number of definite issues, such as the lack of standardisation both in the design and development of such infrastructures, and at the legal level, which further complicates their implementation, especially when stakeholders from different countries are involved. The fact that smart grids combine many scientific and technical fields also complicates their implementation.
+
+However, according to Mozina [2], there are some attempts at standardisation, such as IEEE 1547, which defines the rules for interconnecting Distributed Generators on a smart grid. The standard cites obvious requirements for the interconnection of Distributed Generators but offers few methods, solutions or options for meeting these requirements. Some more recent supplementary standards deal with issues that were only briefly addressed in 1547, such as the following standards that apply to resources distributed with power supply systems:
+-  1547.1: Conformance Test Procedures.
+-  1547.2: Application Guide for Interconnecting Distributed Resources with Electric Power Systems.
+-  1547.3: Draft Guide for Monitoring, Information Exchange, and Control.
+
+
+Smart grids involve many areas of research. The aim of this study is to use coordination models to design a smart grid application. We will thus focus on 3 areas that are relevant to this objective:
+-  Coordination models, which make it possible to design a system in which agents interact dynamically: a coordination model provides an infrastructure in which different agents interact with each other in a dynamic and decentralised way.
+-  Multi-agents approaches to exchanging energy, an unavoidable research area, given that any smart grid infrastructure comprises various autonomous actors seeking to buy or sell electricity locally.
+-  Learning approaches applied to energy use, on a micro grid scale.
+
+
+Coordination models:
+
+The proliferation of ubiquitous embedded systems producing huge amounts of data has shown the limits of centralised systems and has led to the search for alternative solutions meeting several requirements [3]:
+-  Location: services are now time and space dependent as they depend on the physical and social environment.
+
+-  Self-adaptation: to cope with the unpredictability of the environment, the entities that make up the system must be autonomous and proactive.
+
+-  Diversity: the model must allow the integration of heterogeneous devices and the dynamic integrating of new services and components at any time.
+
+Background of coordination models:
+
+To meet such a challenge, researchers have modelled coordination models in which responsibilities are decentralised (hence the emergence of self-organisation). Such models offer systems better scalability, better robustness and better distribution of computational loads on the different entities.
+Gelernter et al. [4] define a coordination model as the glue that binds separate activities into an ensemble. This general definition has been applied to open Multi-agents systems, in which active agents are defined as distinct entities that can be easily integrated into the ensemble. Such models enable large-scale deployment of open Multi-agents systems.
+
+A solution inspired by ecosystems:
+
+
+The Multi-agents approach has made it possible to respond to this type of requirement by proposing decentralised and adaptive systems that promote interaction and collaboration between entities. Such systems generate services built on the fly to respond spontaneously to a request.
+From this was born the coordination model: it provides a framework composed of an abstraction layer and an associated infrastructure that provides the basic technologies to guarantee interactions between heterogeneous components. Each device agent provides a set of services and submits data about itself (properties and capabilities) under the form of a tuple (couple, triple or more of properties with a value attached)
+
+Coordination models have largely drawn inspiration from nature, and biological systems. Such systems present interesting characteristics because they are robust, resilient, able to adapt to environmental changes and able to obtain complex behaviours by applying elementary rules.
+Fernandez-Marquez et al. [5] represent the biological in two layers: the organisms and the environment. The corresponding computational model contains an additional layer: the infrastructure layer, which is necessary to host the agents in devices (see figure 1).
+
+
+Element caption: The two entity models: biological and computer, inspired from Fernandez-Marquez et al.~cite{FernandezMarquez2011BIOCOREBS:
+The entities used in the computational model are the following:
+-  The agents: these are autonomous and pro-active software entities running at a hosting company.
+-  The infrastructure: an entity composed of a set of connected hosts and infrastructure agents. A host entity provides computing and communication capabilities, sensors, actuators while an infrastructure agent acts at the infrastructure level to implement environmental behaviours present in nature, such as diffusion, evaporation and aggregation.
+-  The environment: this is the real-world space where the infrastructure is located. The agent can detect an event using the sensors provided by the hosts.
+
+The design of coordination models is the result of analysing the interactions between the mechanisms of existing self-organising systems and experimenting with high-level mechanisms already well known in the scientific literature.
+
+First inspiration: the concept of stigmergy:
+
+
+Stigmergy is the first recognised mechanism in the definition of spatial coordination systems. The zoologist Pierre Paul GrassÃ© first introduced it in 1959 [6] by observing insect colonies such as termites or ants, which use pheromones.
+The principle of stigmergy is that the trace left in the environment by the initial action of an agent stimulates a subsequent action, performed by the same or a different agent. In this way, successive actions tend to reinforce each other and thus lead to the spontaneous emergence of a coherent, apparently systematic activity.
+Various searches  [7] have used extensively this principle in intelligent systems, notably in robotics, to coordinate the movements of swarms of robots or to help find directions in an unknown environment, and in dynamic networks, to compute the most efficient routing between two nodes.
+
+The inspirations of chemistry:
+
+
+Chemistry was also one of the first sources of inspiration: it has been a starting point to realise dynamic service composition or knowledge aggregation schemes.
+
+ This approach considers chemical reactions as simple laws that regulate the evolution of complex physical phenomena, thus coordinating the behaviour of a large number of components. This contributes to the evolution of complex systems such as biological or meteorological organisms.
+Gamma was the first "chemical" model: it considers an abstract chemical machine in which molecules (representing coordinated entities) interact according to a set of chemical reactions. BanÃ¢tre et al. [8] use chemical reactions to represent states transformations.
+Meyer et al. [9] have used this model for example in dynamic routing with the "Fraglet" approach, which defines a "Fraglet" as a sample of information and routing instructions. Fraglets thus circulate through the network and evolve after applying successive chemical reactions.
+
+The inspirations of physics:
+
+
+Other coordination models have drawn inspiration from the way physical masses move and self-organise according to gravitational and electromagnetic fields [10]. These models make the agents evolve from calculation rules analogous to the calculation of a resultant of force vectors in physics. For example, the Co-fields model [11] exploits composite computational fields to coordinate the movement of users and robots in an environment.
+Other approaches suggest the adoption of virtual force fields to control the shape of the hardware self-assembly. The TOTA model [12] ("Tuples On The Air") manages the coordination of robot agents (either in motion or reconfiguration) based on tuples that propagate in the environment.
+
+The inspirations of biochemistry:
+
+
+Biochemical models are more advanced, although they are also based on chemical reactions. They allow to address some of the limitations of purely chemical models. The biochemical tuple space [13] improves the chemical tuple space by introducing distribution and topology. More precisely, these are 'first-order' coordination concepts, such as compartmentalisation of the environment, diffusion (borrowed from physical coordination models), neighbourhood, which structures the topology of coordination, and local spaces for carrying out chemical reactions.
+Biochemical coordination models appear to be very flexible in enabling the spatial formation of both localised and distributed patterns of activity.
+The chemical reactions mechanism has allowed to build different pattern of behaviours identified in natural environments of information systems. Fernandez-Marquez et al. [14] have defined a set of modular elementary pattern, and high-level pattern, which are composed of elementary pattern. For example, the pattern "Gradient" is composed of the patterns "Spreading" and "Aggregation".
+Werfel et al., Lee et al. have exploited biochemical models in many ubiquitous middleware for particular uses, such as crowd mobility management [15] or participatory sensing [16].
+
+Use of coordination models in the field of electricity:
+
+There are some uses of bio-inspired coordination models in the field of electricity, which apply algorithms inspired by insect colonies or generic reproduction. These very simple models are limited to biological concepts and do not use those borrowed from chemistry, physics or topology.
+Peres et al. [17] present a coordination model and optimisation methodologies inspired by ants, bats and genetic algorithms to solve the problem of tuning stabilisers for electrical systems. The objective of the optimisation presented is to maximise the closed-loop damping ratio that satisfies pre-specified operating conditions.
+
+
+Zhao et al. [18] propose a wind power consumption dispatching model using a multi-time scale coordination model to overcome the obstruction problem of large-scale wind power consumption. An improved version of the model uses swarm optimisation to minimise system operating costs and optimise energy configuration.
+
+Bhattacharyya et al. [19] try to solve reactive power planning problems by using bio-inspired coordination models based on Particle Swarm Optimisation. They have also used this model to evaluate the system's total operating cost and optimisation gains.
+Note that these approaches are limited to the use of coordination model concepts in algorithms: they do not use a coordination medium strictly speaking (such as a tuple space or other type of environment capable of propagating and transforming data asynchronously between autonomous agents).
+On a more general note, to date, very few bio-chemical inspiration models have been used in the field of electricity.
+However, the University of Geneva has carried out some bio-chemical model experiments aimed at exchanging energy on a very small scale.
+
+Ben Mahfoudh et al. [20] have adapted the middleware of the SAPERE model to design spatial services to exchange energy between autonomous agents connected to different locations in a network, and considering different criteria in the negotiation process, such as price, time availability, quantity, energy type, and section bandwidth.
+
+Glass et al. [21] have adapted the SAPERE coordination model for the exchange of electricity between producer and consumer devices at the scale of a house and by considering power demand and power availability. They carried out simulations based on household consumption statistics.
+
+
+Synthesis:
+
+In terms of research, coordination models have reached an advanced level of maturity. They have drawn inspiration from living systems, chemistry and physics.
+The SAPERE model [22] seems to be the only biochemical model that can support coordination using stigmergy, chemistry and physics at the same time.
+
+Table 2 summarises the evaluation of some coordination models based on different criteria.
+
+
+Element caption: caption{Review of coordination models:
+Table 3 summarises the evaluation of some use of coordination models based on different criteria.
+This table shows that, to date, the use of coordination models is still very marginal in the field of electricity. Of the various inspirations, the biological inspiration is still predominant, and the bio-chemical inspiration has not yet been tested, except at the University of Geneva. Furthermore, there are no applications on physics-based models.
+
+Element caption: caption{Review of coordination model applications for electricity:
+
+Multi-agents approach for energy exchanges:
+
+Multi-agents systems are the ideal solution for implementing distributed applications to solve complex problems, such as crowd management, robot automation, biomedical simulations or energy engineering. Jennings et al.  [23] define a Multi-agents System (MAS) as a system made up of a set of agents active in a certain environment and interacting according to certain rules. In a MAS, an agent is a physical or software, autonomous entity that is pro-active, reactive, social, able to participate to an organised activity, to achieve its goals, by interacting with other agents.
+According to Daneshfar et al.'s review [24], agents have 3 main characteristics:
+-  Reactivity: they can react quickly to changes in their environment.
+-  Pro-activity: they are motivated by their own objectives.
+-  Social capacity: they can negotiate, cooperate or compete. They communicate with each other using a common language (defined in an ontology).
+
+According to Roche et al.'s review [25], Multi-agents System offer several advantages over centralised systems:
+-  Agents only act locally: if the view and knowledge of agents is limited to their neighbours in the microgrid they belong to, the amount of data to be transmitted (and the corresponding costs) is dramatically reduced in comparison to other communication intensive methods.
+-  Agents are flexible, plug \& play, and fault tolerant. The structure of a Multi-agents Systems or of its environment can change without any significant consequence for the functioning of the system itself.
+-  Multi-agents Systems are well-suited for solving difficult problems, where the computation can be distributed among several agents.
+
+According to Malik et al.'s comprehensive review of the smart grid literature [26], some research works [27] have designed smart grid models using intelligent agents as key entities to solve specific problems: grid security, load management (storage or battery supply as needed), supply and demand management, power sales, pricing, outage management, frequency control, and voltage control. Each type of agent addresses a specific problem, and its decisions have impact in the smart grid structure.
+
+
+Using of Multi-agents Framework:
+
+Many different tools are available for designing and implementing Multi-agents System. The most commonly used for the type of applications is Java-based JADE [28], which facilitate the development of agent applications in line with the FIPA specifications for inter-operable intelligent Multi-agents systems. FIPA protocols include the simple inquiry protocol, the contract-net negotiation protocol, and the English and Dutch auctions. JADE [29] provides a distributed agent platform that can be distributed across several hosts. Is also provides services and functionalities, such as a Directory Facilitator, a programming interface to simplify registration of agent services, a transport mechanism exchange messages with other agents, a compliant IIOP protocol to connect different agent platforms, and a Graphical User Interface to manage agents and platforms.
+Some other MAS framework exists, such as ZEUS, SkeletonAgent or MadKit.
+In the field of electricity, Kuzin et al. [30] have proposed a method for controlling smart grids in case of failure detection of a main alternative current power source.
+They used the JADE Multi-agents framework to implement a flexible protection of critical loads against main grid failures and the MACsimJX interface to ensure communication between agents and the smart grid model. According to the simulation results, they achieved good response times and effective control of energy resources to ensure smart grid stability.
+Mocci et al. [31] have used hierarchical Multi-agents systems working with JADE to integrate smart charging of electric vehicles with active demand participation via an aggregator agent. The proposed Multi-agents System operates with hierarchical and decentralised control and simulates a dynamic non-cooperative single-objective game, which converges to the Nash equilibrium.
+
+Using of Multi-agents Architectures:
+
+The architecture of the Multi-agents system reflects the structure of the organisation we wish to set up between the different agents. It defines in particular the possible roles of the different agents and may or may not include different hierarchical levels.
+
+3-level hierarchical architecture:
+
+
+According to Roche et al. [32], despite the multiplicity of systems to manage and the degrees of intelligence of agents, most articles in the literature show a basic structure, generally based on three hierarchical layers:
+-  The top layer, corresponding to distribution network operators and higher-level networks. This layer coordinates several micro-grids and optimises global energy market operations at a strategic level.
+-  The intermediary layer, corresponding to microgrid coordinator. This layer optimises microgrid operation by distributing energy between generators and loads.
+-  The bottom layer, corresponding to generators, load and storage agents. In this layer, each agent controls a more or less intelligent device that enables it to react in real time.
+In the field of electricity, Logenthiran et al. [33] and Dimeas et al. [34] have used a 3 layers architecture with the following agent roles:
+-  The top layer contains two agents managing the entire network: the Distribution Network Operator and the Market Operator.
+-  The intermediary layer contains the central Micro Grid Controller.
+-  The bottom layer contains the 2 following types of local controllers: the micro-source and the load controllers.
+Dimeas et al. also propose to use auction algorithms to manage price negotiation between producers and consumers.
+Rumley et al. [35] propose other types of architecture by defining feeder and load agent. Feeder agents use dynamic adaptation to reconfigure their links in case of shortages or excesses of energy resources, or major losses due to energy transport.
+James et al. [36] propose an architecture which include the following agent types: buyer, seller, bulletin board, physical device, and others.
+
+
+However, other research, as described below, has developed more sophisticated architectures that take greater account of the diversity of issues to address in a smart grid.
+
+
+"Link" based architecture:
+
+
+Albana [37] proposes the "Link" paradigm to enables the grid market to flourish, by encouraging consumers to actively participate in grid operation and making the decentralised operating structure in a smart grid more reliable. The proposed architecture contains three main components: the Grid-Link, the Producer-Link and the Storage-Link. The "Link" generic component represents all components in the entire power grid and the customer plants. This architecture reduces in a minimum the number of exchanged data and enables a secure, reliable, and sustainable operation in normal and emergency cases.
+
+Using holonic structures:
+
+
+Some approaches have modelled smart grid networks using holonic structure [38]. Holonic word, comes from the Greek word "holon", a union formed from the words "holos", meaning whole and the word "on", meaning parts. In this way, Ada et al. consider a holon in a hierarchical structure both as an entire element and as a part of a higher-level element. In a Holonic Multi-agents system (HMAS), the holon is an agent participating in one organisation that also represents an entire organisation itself. As represented in figure 4, such a structure allows the recursive integration of heterogeneous controls at different scales of the network (at the level of an electrical appliance, a house, a neighbourhood). This model aims to meet certain requirements such as the implementation of multiple authorities at different levels, the integration of heterogeneous systems, the need for permanent adaptation and the need to satisfy demands that can be contradictory. Some tests performed on a prototype implementation has proved that it is indeed possible to meet these requirements.
+
+
+Element caption: Generic Holonic architecture control, inspired from~cite{frey2015generic:. This schema represents a simplified micro-grid with district-level, house-level and appliance-level goals.
+The Kansas State University also used the holonic approach to model and implement a smart power distribution system [39]. The university has built an evolutionary and iterative framework suitable for the development of complex, adaptive, and autonomous systems. This framework, which is based on the definition of different goals, roles and state transitions, starts with a simple implementation and allows iterative enrichment. It uses a recommendation system to evolve the structure.
+
+In terms of design tools, Cossentino et al. [40] have implemented agent-oriented framework such as ASPECS (Agent-oriented Software Process for Engineering Complex Systems) to design a holonic organisational meta-model with a step-by-step guide from requirements to code allowing the modelling of a system at different levels of details using a set of refinement methods.
+
+
+Use of Intelligent Digital Twin concept:
+
+The joint use of technologies such as IoT, Artificial Intelligence, Cloud Computing or Virtualisation has favoured the development of digital twins. Grieves et al. [41] defines a Digital Twin as a virtual representation of a physical product containing information about said product, with its origins in the field of product life-cycle management. In a survey on Digital Twin, Barricelli et al. [42] define it as a computer-based model that is simulating, emulating, mirroring, or "twinning" the life of a physical entity, which may be an object, a process, a human, or a human-related feature. A digital twin benefit from the autonomy (sensing and acting) available to agents in Multi-agents systems [43].
+
+According to Marah et al. [44], autonomous agents have powerful capabilities that enable to fulfil the requirements for integrating it with a Digital Twin. Therefore, Multi-agents System (MAS) is the main model for programming agents in a cyber-physical systems layer as well as in the Digital Twin layer.
+
+They are actually also "intelligent" digital twins, since they interact, make decisions based on the information collected, have advanced capabilities such as negotiating or learning [45].
+Tzanis et al. [46] have implemented a hybrid Digital Twins model for fault identification in a smart-grids containing distributed energy resources. The model is composed of a data-driven machine learning subsystem and a discrete deterministic one. This model, which combines machine learning sub-models and differential equations based sub-models, enable the Digital Twin to reduce the calculation time, and ensure a sufficient speed to work on real time.
+Ebrahimi et al. [47] has designed a digital twin model of complex renewable energy generators as wind or hydro power plant. They present a comprehensive modelling strategy which contains different level of modelling and apply uncertainty and intelligent algorithm tools.
+
+
+Synthesis:
+
+Table 5 summarises the evaluation of some Multi-agents systems applications in the field of electricity, based on different criteria: it shows that there are no electrical applications using both Multi-agents systems and digital twins. On the other hand, Multi-agents systems are widely used, especially in comparison with digital twins. This may be explained by the relative novelty of the digital twin concept. In addition, some M.A.S. applications seem complete: they use both a dedicated framework and a scalable architecture. This further underlines the maturity of Multi-agents systems.
+
+
+Element caption: caption{Review of Multi-agents systems:
+Multi-agents learning:
+
+In a microgrid structure, a node, also called an edge device, is a computational entity able to store and process data and software. Typically, the coordination platform and the digital twins execute within a node (e.g., an edge device).
+In this paragraph, we study machine learning methods to allow edge devices to predict the consumption and production at its own level (that is, locally) or at the micro-grid level (that is, globally). As a result, we need to distinguish between the learning model itself, which an edge device (e.g., a node) in the network runs at its level to predict electrical behaviours based on data observed at its level, and the framework used at the microgrid level to federate the learning done by the individual nodes. These two orthogonal elements constitute the learning techniques implemented throughout a microgrid.
+
+In what follows, the first subsection focuses on frameworks used to federate learning between different computational units, while the second subsection focuses on the different types of learning models used by a computational unit in the domain of energy.
+
+Distributed collaborative Machine Learning frameworks:
+
+In terms of frameworks, we present here two main families of approaches, one called federated learning, which uses a centralised model, and the other called "gossip", which uses a purely distributed model.
+
+Federated Learning: the general approach:
+
+
+Federated learning (FL) is a paradigm in which multiple machines collaboratively train an artificial learning model while keeping their training data at the local level. Thus, the machines involved in learning simply send the models learned on their local training data, not the data itself, to a central machine (see figure 6). The central server aggregates the model weights (e.g., with an average function). Federated learning paradigm contrasts with centralised learning, in which all machines send all data to a central server to execute the learning model.
+
+Element caption: Federated Learning approach, inspired from~cite{savi2021short:. In this approach, a central server, represented in the middle of the diagram, manages the distribution and collection of model weights that the subordinate nodes update.
+
+In the general approach, according to Savi et al. [48], each node receives the model weights from the central server, computes the model at its level, and sends the updated weight back to the central server. The central server then manages the communication and aggregation of the weights calculated and returned by each node.
+In the field of energy, Ibrahem et al. [49] have proposed a federated learning approach that uses a privacy-preserving aggregation scheme for energy theft detection in smart grids. They have designed an aggregator server that receives only the encrypted form of model parameters from individual nodes. This protects the network from external intrusions and preserves the privacy of the nodes.
+Experimental results have shown that the proposed approach detects energy theft with greater accuracy and less computational and communication overhead.
+
+
+"Gossip-based" Federated Learning:
+
+
+Another variant, called "decentralised federated learning" or also "Gossip based" [50], is completely decentralised. Indeed, in this approach, the local node also manages the aggregation and communication operations.
+
+In more general terms, the "Gossip" mechanism is a composition of aggregation and spreading mechanisms.
+Fernandez-Marquez et al. [51] also define it as a mechanism that seeks to reach a shared agreement on the value of certain system parameters in a decentralised way: all the agents that execute Gossip mechanism work together to gradually reach this agreement by aggregating their own knowledge with that of their neighbours and by disseminating this aggregated knowledge. In this way, the aggregation scheme increases the knowledge and reduces the uncertainty of a single agent by considering the needs of the whole population.
+
+The figure 7 represents the "Gossip based" Learning which is an application of the gossip mechanism to a set of nodes that train a learning model. This mechanism, also called "decentralised and federated learning" is a framework in which a local node performs locally all actions. More precisely, each node executes alternatively the computation phase and the inter-nodes communication phase.
+-  During the computation phase, the node applies several local updates of the learning model.
+-  During the inter-node communication phase, the node applies several cycles of inter-node communication: first, it retrieves weights from its neighbours and merges them with its local weights (obtained through local learning), secondly, it sends the resulting merged weights to the neighbour nodes. It also updates its own weights with the merged weights. An aggregation function provides the merge result, typically the average of inputs, but not necessarily. Note that the aggregation function can be customised or defined on the fly.
+
+According to Liu et al. [52], this approach reduces the communication traffic among the nodes and prevents disclosing sensitive local data to other nodes. During the inter-node communication phase, one node only sends the computed weights of its learning model. It does not send the data that the learning model receives as input.
+
+Element caption: "Gossip based" Decentralised Federated Learning approach, inspired from Liu et al.~cite{liu2022decentralized:
+
+An empirical study [53] provides a systematic comparison of Federated Learning and Gossip Learning approaches, using experimental scenarios including a real unsubscribe trace collected on cell phones, under different conditions: continuous or in bursts communication, different bandwidth, network size, and techniques of compression.
+One might think that, because of the use of lighter computing units (located at node level and not in the cloud), gossip learning performance would be much poorer.
+Surprisingly, the results showed that best gossip variants perform comparably to the best federated learning variants.
+
+Another approach has experimented Gossip Learning on an ultra-dynamic configuration, such a network of electric vehicles that are moving in an urban environment [54]. In order to predict the trajectories of different vehicles, this experiment has applied Gossip learning to a fleet of moving cars, with each vehicle device locally executing the LTSM learning model. The results suggest that in this type of highly dynamic configuration, we can improve accuracy by encouraging nodes with better-trained models to opportunistically propagate data to nodes with insufficiently trained models.
+As the "Gossip based" federated learning approach is new, there are still very few applications in the field of energy.
+Giuseppi et al. [55] has proposed a decentralised federated learning algorithm for non-intrusive load monitoring (NILM) applied to a network of energy communities. NILM is a process for analysing voltage and current variations that occur in a home: it aims to deduct the appliances used, as well as individual energy consumption. For different types of appliances, they have compared the predictive accuracy between decentralised and centralised Federated Learning: the results confirmed that the decentralised version tends to outperform the centralised version.
+
+Moussa et al. [56] are currently preparing an experiment with gossip-based federated learning on a microgrid network composed of Grid Edge Devices, on which the LSTM learning model is executed locally on each node. The gossip mechanisms will be executed on the weights of the learning model, using a coordination platform. To date, the integration of gossip mechanisms is in progress.
+
+Machine learning models:
+
+The increasingly massive deployment of sensors to monitor energy consumption has resulted in the production of a huge amount of data.
+In addition, the advent of renewable energies has led to high data volatility over time.
+We must therefore choose appropriate learning methods to meet such a challenge: they must be able to understand data that is both large, dimensional, and volatile, while operating seamlessly from an embedded device with limited memory space.
+
+The Markov Chain model:
+
+
+The Markov chains model uses a discrete-time Markov random processes, for which stochastic matrices give the probabilities of all possible state transitions [57].
+For these random processes, the probability of future states depends only on the present state and not on past states: this characterises the "absence of memory".
+This stochastic model allows continuous learning with newly collected data (both the weight vector and the chains). The University of Mashhad has experimented with this model to predict the energy produced by photo-voltaic cells [58]. The results obtained confirmed the performance of Markov chains for energy production, after sufficient training of the model. This model also has the advantage of being able to slide in time by applying a learning window. This allows the model to adapt more easily when observed behaviours change significantly over time.
+
+Gradient Boosting (XGBoost):
+
+
+XGBoost [59], which stands for extreme gradient boosting, is a supervised machine training method for classification and regression used by the AutoML Training tool. This method is based on decision trees and improves on other methods such as random forest and gradient optimisation. It is effective with large, complex datasets, using a variety of optimisation methods. Data scientists use widely XGBoost and XGBoost provides state-of-the-art results on many problems.
+In the field of energy, Gupta et al. [60] have experimented XGBoost model for solar power prediction. According to the result, the XGB model outperforms the FB prophet model with is also suitable for a large dataset with a high seasonality.
+
+
+LSTM:
+
+
+In the field of energy, the LSTM model (Long Short-Term Memory) [61], which is an advanced and more flexible Recurrent Neural Network architecture, has become one of the most popular models for predicting time series with large fluctuations over time. It is a natural candidate model to adopt in the context of short-term load forecasting. One of the first evaluations of LSTM in this field [62] reveals that LSTM outperforms classical Artificial Neural Networks: LSTM is especially much better at learning long-term temporal correlations. This research has tested LSTM model on a publicly available residential smart meter dataset, whose performance is compared to various references, including the state of the art in load forecasting.
+
+
+Multi-agents reinforcement learning:
+
+
+Reinforcement learning (RL) [63] is an area of machine learning concerned with how intelligent agents learn to make decisions in an environment in order to maximise the notion of cumulative reward. As a result, RL differs from supervised learning in that it does not require the presentation of labelled input/output pairs, nor the explicit correction of sub-optimal actions. Note that RL problem is mathematically known as a Markov Decision Process (MDP), where, at each time unit, an agent in a state $s$ performs an action $a$, receives a scalar reward $r$, and moves to the next state $s'$ according to the environment dynamics.
+In the field of electricity, Roesch et al. [64] has used reinforcement learning to minimise the global cost at the scale of complex micro-grid system composed of production resource, battery storage, and short-term market trading. In the modelling, the total cost includes electricity and production costs and fluctuations of electricity prices in real-time market. The reward function, meanwhile, considers the different types of costs as well as the different types of interacting agents (resource, battery, and market agents). Experiments have shown that this approach outperforms more conventional optimisation approaches such as reactive rule-based benchmark-scenario, both in terms of cost optimisation and calculation time.
+Chakraborty et al. [65] have also proposed the use of reinforcement learning in a microgrid application. In their proposal, the aim of reinforcement learning is to select a prosumer peer with whom negotiation of an electricity contract is most likely to succeed. The negotiation between two pairs A and B succeeds only if A and B find a contract that satisfies both A and B requirements. The results confirmed a significant increase in the ratio of successful negotiations with the use of reinforcement learning.
+Synthesis:
+
+Table 8 summarises the evaluation of some applications in the field of electricity, based on different criteria: it shows that machine learning models are widely used locally, at the device level. However, few applications use distribution frameworks to manage learning weight exchanges between nodes, and in particular, the decentralised "Gossip" approach remains largely unexplored to date.
+
+Element caption: caption{Review of collaborative ML frameworks:
+
+General synthesis:
+
+In order to provide an overall summary of the various related work carried out, table 9 summarises the evaluation of the different references, taking into account the main features we are studying in this paper: the use of a coordination model, digital twins, Multi-agents systems, machine learning algorithms and the use of a decentralised distribution framework (Gossip Learning type).
+Please note that for reasons of impartiality, we have removed from this table the references directly involved in the work of the thesis "Coordination model and digital twins for managing energy consumption and production in a smart grid".
+Looking at this table, it's interesting to note that no research work has yet combined all the areas we're looking at. Multi-agents systems and automatic learning techniques are the most explored in the context of smart grids, but for example, do not also use coordination models and digital twins.
+
+Element caption: caption{General review
+
+Conclusion:
+
+In this paper, we have reviewed three areas of research that we consider essential to the design of a smart grid infrastructure based on coordination models. We therefore focused on the following 3 areas: coordination models, Multi-agents systems and machine learning applied to energy. Coordination models have reached an advanced level of maturity in terms of research and use interesting concepts borrowed from biology, chemistry and physics. To date, even if some power-grid applications use bio-inspired coordination model, no bio-chemical model has yet been used in smart grid infrastructure.
+Multi-agents systems have reached a more advanced level of maturity, and Multi-agents Systems applications in the smart grids field have developed considerably since the 2000s: there is a wide variety of architectures, and some applications use frameworks such as JADE to facilitate agent integration. Few applications use the much more recent concept of Digital Twin.
+As far as automatic learning techniques are concerned, a number of algorithms have been explored for predicting electrical behaviours. Depending on the specific use, the most popular models seem to vary, but they are all well suited to highly volatile time series.
+A number of approaches use frameworks to distribute the model calculations performed by the various nodes. The vast majority of applications use 'centralised' federated learning, and the decentralised 'gossip' approach is still marginal in the field of smart grids, although some applications of gossip learning are beginning to appear for the management of electric vehicles.
+This review of the state of the art suggests that the different areas of research we are exploring correspond to contrasting levels of maturity in the implementation of smart grids. Multi-agents systems as well as Machine Learning techniques are used almost systematically, and coordination models as well as collaborative and decentralised ML frameworks are still in their infancy in the fields of smart grids, although they are used for other areas of application.
+According to the general overview of selected smart grid implementations, no approach has yet combined coordination models, Multi-agents systems, digital twins, machine learning techniques and machine learning distribution frameworks. Therefore, it would be interesting to experiment with a smart grid implementation combining these different domains. Each of these research areas could bring a potential gain.
+

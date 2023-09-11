@@ -1,0 +1,23 @@
+/.metadata/
+/docs/papers/PhD_Thesis.FINAL.pdf
+/docs/papers/2011TOU30066.pdf
+/docs/papers/PMC-SAPERE-preprint.pdf
+/docs/papers/KD_memoire.pdf
+/docs/papers/Markov Chains.pdf
+/docs/papers/1-s2.0-S037877961500293X-main.pdf
+/docs/papers/early_findings_revised(1).pdf
+/docs/papers/SGComm16_Aksanli.pdf
+/docs/papers/economcours.pdf
+/docs/papers/1-s2.0-S0968090X16302492-main.pdf
+/docs/papers/Generic Holonic Control Architecture.pdf
+/docs/papers/JLAMP20.pdf
+/docs/papers/ST-Cours.pdf
+/download_gcp_file/dump_last.sql
+/download_gcp_file/dump/dump_last.sql
+/download_gcp_file/dump/dump_light_last.sql
+/mariadb/energy/backup/*.sql
+/docs/latex2doc/main.tex
+/docs/latex2doc/report.doc
+bin
+/docs/latex2doc/*.docx
+/SapereMiddlewareStandalone/doc
