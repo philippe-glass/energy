@@ -275,11 +275,12 @@ public class ConsumersProcessingMangager {
 		String ipSource = (chosenLSA==null)? "" : chosenLSA.getSyntheticProperty(SyntheticPropertyName.SOURCE).toString();
 		String sState = "";
 		removeOffer(producerAgent, consumer, newOffer.isComplementary(), "addOffer");
+		/*
 		try {
 			sState = SapereUtil.addOutputsToLsaState(chosenLSA, new String[] { "OFFER" });
 		} catch (Exception e) {
 			logger.error(e);
-		}
+		}*/
 		// add offer in OFFER property
 		ProtectedSingleOffer protectedOffer = new ProtectedSingleOffer(newOffer.clone());
 		Property pOffer = new Property("OFFER", protectedOffer.clone(), consumer, consumer, sState,	ipSource, false);
@@ -460,7 +461,7 @@ public class ConsumersProcessingMangager {
 		String comment = "";
 		boolean isOK = availability >= -0.001;
 		if(!isOK) {
-			comment = producerAgent.getAgentName() + " : availability not sufficient in checkup : W=" + UtilDates.df.format(availability);
+			comment = producerAgent.getAgentName() + " : availability not sufficient in checkup : W=" + UtilDates.df3.format(availability);
 			logger.warning("general checkup " + comment );
 		}
 		// Send confirmation to consumer agents
@@ -569,7 +570,7 @@ public class ConsumersProcessingMangager {
 		double available1 = computeAvailablePower(producerAgent,true, false);
 		if(available1 > 0) {
 			String agentName = producerAgent.getAgentName();
-			logger.info("Agent " + agentName + " has " + UtilDates.df.format(available1) + " W");
+			logger.info("Agent " + agentName + " has " + UtilDates.df3.format(available1) + " W");
 			logger.info("  waiting request " + getTableWaitingRequest().keySet()
 					+ " main warning request " + mainProcessingTable.generateTableRequestWarnings().keySet()
 					+ " complementary warning request " + secondProcessingTable.generateTableRequestWarnings().keySet());
@@ -698,7 +699,7 @@ public class ConsumersProcessingMangager {
 		double available1 = computeAvailablePower(producerAgent,false, false);
 		String tab1 = "    ";
 		String tab2 = tab1 + tab1;
-		logger.info(" ----------- Agent " + agentName + " has " + UtilDates.df.format(available1) + " W available ---------");
+		logger.info(" ----------- Agent " + agentName + " has " + UtilDates.df3.format(available1) + " W available ---------");
 		logger.info(tab1 + "Waiting Requests : ");
 		List<EnergyRequest> requestList = producerAgent.getProducerPolicy().sortRequests(getWaitingRequest());
 		for(EnergyRequest request : requestList) {
@@ -739,7 +740,7 @@ public class ConsumersProcessingMangager {
 		String firstWarningConsumer = nodeTotal==null? "" : nodeTotal.getMaxWarningConsumer();
 		if(producerAgent.hasHighWarningDuration()) {
 			String beginTag = "#########  " + agentName + " ";
-			logger.warning(beginTag + "High Warning level : " + nodeTotal.getMaxWarningDuration() + " at " + UtilDates.formatTimeOrDate(nodeTotal.getDate())
+			logger.warning(beginTag + "High Warning level : " + nodeTotal.getMaxWarningDuration() + " at " + UtilDates.formatTimeOrDate(nodeTotal.getDate(), timeShiftMS)
 				+ " First Warning request : " + firstWarningConsumer);
 			if(!mainProcessingTable.hasConsumer(firstWarningConsumer) && !secondProcessingTable.hasConsumer(firstWarningConsumer)) {
 				logger.warning(beginTag  + firstWarningConsumer + " not found in waiting requests or waiting offers or contracts table");
@@ -748,10 +749,10 @@ public class ConsumersProcessingMangager {
 					logger.warning(beginTag + "last requests bonding : " + getStrLogBondedRequests(firstWarningConsumer));
 				}
 				if(mainProcessingTable.logOperationHasConsumer(firstWarningConsumer)) {
-					logger.warning(beginTag + "last operations on main table : " + mainProcessingTable.getStrLogOperations(firstWarningConsumer));
+					logger.warning(beginTag + "last operations of " + firstWarningConsumer + " on main table : " + mainProcessingTable.getStrLogOperations(firstWarningConsumer));
 				}
 				if(secondProcessingTable.logOperationHasConsumer(firstWarningConsumer)) {
-					logger.warning(beginTag + "last operations on complementary table : " + secondProcessingTable.getStrLogOperations(firstWarningConsumer));
+					logger.warning(beginTag + "last operations of " + firstWarningConsumer + " on complementary table : " + secondProcessingTable.getStrLogOperations(firstWarningConsumer));
 				}
 				if(tableBondedRequests.containsKey(firstWarningConsumer)) {
 					logger.warning(beginTag + "last request " + tableBondedRequests.get(firstWarningConsumer));
@@ -855,6 +856,7 @@ public class ConsumersProcessingMangager {
 										supply0.getEndDate()
 										: request.getEndDate();
 								EnergySupply supply = new EnergySupply(agentName, supply0.getIssuerLocation()
+										, supply0.getIssuerDistance()
 										, false /*isComplementary*/
 										, providedPower, providedPowerMin, providedPowerMax
 										, providedBeginDate, providedEndDate
@@ -879,7 +881,7 @@ public class ConsumersProcessingMangager {
 									SingleOffer newOffer = new SingleOffer(agentName, supply, OFFER_VALIDITY_SECONDS, request.clone());
 									newOffer.setLog(logConsumerList);
 									String logTotal = generateNodeTotalLog(producerAgent, nodeTotal);
-									newOffer.setLog2(logTotal + "  avb="+ UtilDates.df.format(availablePower));
+									newOffer.setLog2(logTotal + "  avb="+ UtilDates.df3.format(availablePower));
 									Long offerId = EnergyDbHelper.registerSingleOffer(newOffer, producerAgent.getStartEvent(), nodeTotal.getId());
 									newOffer.setId(offerId);
 									addOffer(producerAgent,newOffer);
@@ -913,8 +915,9 @@ public class ConsumersProcessingMangager {
 		return nbNewOFfers;
 	}
 
-	public void handleConsumerRequest(EnergyAgent producerAgent, EnergyRequest request, String consumer) {
+	public void handleConsumerRequest(EnergyAgent producerAgent, EnergyRequest request, String consumer, Lsa bondedLsa) {
 		try {
+			request.setIssuerDistance(bondedLsa.getSourceDistance());
 			String agentName = producerAgent.getAgentName();
 			if(producerAgent.hasHighWarningDuration() && request.getWarningDurationSec() >= ConsumersProcessingMangager.WARNING_DURATION_THRESHOLD) {
 				logger.warning("handleConsumerRequest " + request);
@@ -941,6 +944,8 @@ public class ConsumersProcessingMangager {
 				// add waiting request
 				addOrUpdateRequest(producerAgent, consumer, request);
 				producerAgent.setPropertyChosen(consumer, "REQ");
+			} else {
+				logger.info("Agent " + producerAgent.getAgentName() + " cannot supply request " + request );
 			}
 		} catch (NumberFormatException e) {
 			logger.error(e);

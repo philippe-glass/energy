@@ -1,5 +1,11 @@
 package com.sapereapi.model;
 
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
+
+import com.sapereapi.util.SapereUtil;
+
 import eu.sapere.middleware.lsa.Property;
 
 public class PropertyForm {
@@ -44,6 +50,32 @@ public class PropertyForm {
 
 	public String getValue() {
 		return value;
+	}
+
+	public List<String> getValueLines() {
+		if(value==null) {
+			return new ArrayList<String>();
+		}
+		List<String> result = new ArrayList<String>(Arrays.asList(value.split(SapereUtil.CR)));
+		return result;
+	}
+
+	public String getValueLine1() {
+		if(value==null) {
+			return "";
+		}
+		String[] lines = value.split(SapereUtil.CR);
+		return lines[0];
+	}
+
+	public List<String> getValueFollowingLines() {
+		if(value != null && value.contains(SapereUtil.CR)) {
+			List<String> result = new ArrayList<String>(Arrays.asList(value.split(SapereUtil.CR)));
+			result.remove(0);
+			return result;
+		} else {
+			return new ArrayList<String>();
+		}
 	}
 
 	public void setValue(String value) {

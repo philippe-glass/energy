@@ -5,13 +5,10 @@ import java.util.Date;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Random;
 
 import com.sapereapi.agent.energy.manager.ConsumersProcessingMangager;
 import com.sapereapi.db.EnergyDbHelper;
 import com.sapereapi.exception.DoublonException;
-import com.sapereapi.log.SapereLogger;
-import com.sapereapi.model.TimeSlot;
 import com.sapereapi.model.energy.EnergyEvent;
 import com.sapereapi.model.energy.EnergyEventTable;
 import com.sapereapi.model.energy.EnergySupply;
@@ -26,31 +23,27 @@ import com.sapereapi.util.SapereUtil;
 import com.sapereapi.util.UtilDates;
 
 import eu.sapere.middleware.agent.AgentAuthentication;
-import eu.sapere.middleware.agent.SapereAgent;
 import eu.sapere.middleware.lsa.Lsa;
-import eu.sapere.middleware.lsa.LsaType;
 import eu.sapere.middleware.lsa.Property;
 import eu.sapere.middleware.lsa.SyntheticPropertyName;
+import eu.sapere.middleware.node.NodeConfig;
 import eu.sapere.middleware.node.NodeManager;
 import eu.sapere.middleware.node.notifier.event.DecayedEvent;
-import eu.sapere.middleware.node.notifier.event.LsaUpdatedEvent;
 import eu.sapere.middleware.node.notifier.event.PropagationEvent;
-import eu.sapere.middleware.node.notifier.event.RewardEvent;
 
-public abstract class EnergyAgent extends SapereAgent implements IEnergyAgent {
+public abstract class EnergyAgent extends MicroGridAgent implements IEnergyAgent {
 	protected int id;
 	protected EnergyEvent waitingStartEvent = null;
 	protected EnergyEvent startEvent = null;
 	protected EnergyEvent expiryEvent = null;
 	protected EnergyEvent stopEvent = null;
 	private static final long serialVersionUID = 1L;
-	protected static SapereLogger logger = SapereLogger.getInstance();
 	protected List<Property> propertiesToPost = new ArrayList<Property>();
 	protected boolean firstDecay = true;
 	protected int eventDecay = 0;
 	protected List<RegulationWarning> receivedWarnings = new ArrayList<RegulationWarning>();
 	protected Map<String, Lsa> tableChosenLsa = null;
-	protected String location = NodeManager.getLocation();
+	protected NodeConfig nodeConfig = NodeManager.getNodeConfig();
 	protected String[] lsaInputTags;
 	protected String[] lsaOutputTags;
 	public final static int DISABLED_DURATION_MINUTES = 5;
@@ -58,24 +51,20 @@ public abstract class EnergyAgent extends SapereAgent implements IEnergyAgent {
 	protected NodeTotal lastNodeTotal = null;
 	protected Date timeLastDecay = null;
 	protected long timeShiftMS = 0;
-	Random rand = new Random();
 
 	public EnergyAgent(int _id, String name, AgentAuthentication authentication, String[] _lsaInputTags,
 			String[] _lsaOutputTags, EnergySupply energySupply) {
-		super(name, authentication, _lsaInputTags, _lsaOutputTags, LsaType.Service);
+		super(name, authentication, _lsaInputTags, _lsaOutputTags);
 		initCommonFields(_id, authentication, energySupply, _lsaInputTags, _lsaOutputTags);
 	}
 
 	public void initCommonFields(int _id, AgentAuthentication _authentication, EnergySupply _energySupply,
 			String[] _lsaInputTags, String[] _lsaOutputTags) {
 		setEpsilon(0); // No greedy policy
+		super.initSGAgent(this.agentName, _authentication, _lsaInputTags, _lsaOutputTags);
 		id = _id;
-		lsaInputTags = _lsaInputTags;
-		lsaOutputTags = _lsaOutputTags;
-		this.authentication = _authentication;
-		super.setInput(lsaInputTags);
-		super.setOutput(lsaOutputTags);
-		setUrl(_authentication.getAgentLocation());
+		this.lsaInputTags = _lsaInputTags;
+		this.lsaOutputTags = _lsaOutputTags;
 		this.tableChosenLsa = new HashMap<String, Lsa>();
 		this.debugLevel = 0;
 		this.timeShiftMS = _energySupply.getTimeShiftMS();
@@ -146,9 +135,9 @@ public abstract class EnergyAgent extends SapereAgent implements IEnergyAgent {
 		EnergySupply supply = getEnergySupply();
 		EventType eventType = getExpiryEventType();
 		Date expiryDate = supply.getEndDate();
-		expiryEvent = new EnergyEvent(eventType, this, false, supply.getPowerSlot()
-				, new TimeSlot(expiryDate, expiryDate) // supply.getTimeSlot()
-				, "");
+		expiryEvent = new EnergyEvent(eventType, supply, "");
+		expiryEvent.setBeginDate(expiryDate);
+		expiryEvent.setEndDate(expiryDate);
 		if (startEvent != null) {
 			expiryEvent.setOriginEvent(this.startEvent.clone());
 		}
@@ -170,7 +159,9 @@ public abstract class EnergyAgent extends SapereAgent implements IEnergyAgent {
 		}
 		EnergySupply supply = getEnergySupply();
 		EventType eventType = getStopEventType();
-		stopEvent = new EnergyEvent(eventType, this, false, supply.getPowerSlot(), new TimeSlot(timeStop, timeStop), log);
+		stopEvent = new EnergyEvent(eventType, supply, log);
+		stopEvent.setBeginDate(timeStop);
+		stopEvent.setEndDate(timeStop);
 		if (startEvent != null) {
 			stopEvent.setOriginEvent(startEvent.clone());
 		}
@@ -380,55 +371,13 @@ public abstract class EnergyAgent extends SapereAgent implements IEnergyAgent {
 	}
 
 	@Override
-	public void onLsaUpdatedEvent(LsaUpdatedEvent event) {
-		logger.info("onLsaUpdatedEvent:" + agentName);
-	}
-
-	@Override
-	public void onRewardEvent(RewardEvent event) {
-		String previousAgent = "";
-		String newState = "";
-		for (Property prop : event.getLsa().getPropertiesByQuery(event.getQuery())) {
-			if (prop.getChosen()) {
-				previousAgent = prop.getBond();
-				newState = prop.getState();
-				break;
-			}
-		}
-		logger.info("State to reward " + newState + " by " + event.getReward() + " - " + event.getMaxSt1());
-		if (!newState.equals(""))
-			addState(getPreviousState(newState, getOutput()), 1, event.getReward(), event.getMaxSt1());
-
-		logger.info("reward previous service " + previousAgent);
-
-		Lsa lsaReward = NodeManager.instance().getSpace().getLsa(previousAgent);
-		if (lsaReward != null && lsaReward.getSyntheticProperty(SyntheticPropertyName.TYPE).equals(LsaType.Service)) {
-			rewardLsa(lsaReward, event.getQuery(), event.getReward(),
-					getBestActionQvalue(getPreviousState(newState, getOutput()))); // maxQSt1
-			lsaReward.addSyntheticProperty(SyntheticPropertyName.DIFFUSE, "1");
-		}
-
-		if (lsaReward != null) {
-			if (previousAgent.contains("*")
-					&& !lsaReward.getSyntheticProperty(SyntheticPropertyName.TYPE).equals(LsaType.Query)) {
-				lsaReward.addSyntheticProperty(SyntheticPropertyName.TYPE, LsaType.Reward);
-				lsaReward.addSyntheticProperty(SyntheticPropertyName.QUERY, event.getQuery());
-				logger.info("lsaReward " + lsaReward.toVisualString());
-				logger.info("send to -> " + lsaReward.getSyntheticProperty(SyntheticPropertyName.SOURCE).toString());
-				sendTo(lsaReward, lsaReward.getSyntheticProperty(SyntheticPropertyName.SOURCE).toString());
-			}
-
-		}
-	}
-
-	@Override
 	public void onPropagationEvent(PropagationEvent event) {
 		// logger.info("onPropagationEvent " + location + " " + this.agentName + " " +
 		// event);
 		Lsa eventLsa = event.getLsa();
 		String source = eventLsa.getSyntheticProperty(SyntheticPropertyName.SOURCE).toString();
-		if (!"".equals(source) && !location.equals(source)) {
-			logger.info("onPropagationEvent : source = " + source + " , localIpPort = " + location);
+		if (!"".equals(source) && !nodeConfig.getMainServiceAddress().equals(source)) {
+			logger.info("onPropagationEvent : source = " + source + " , localIpPort = " + nodeConfig.getMainServiceAddress());
 		}
 		if (eventLsa.getAgentName().contains("*")) {
 			logger.info("onPropagationEvent : eventLsa.getAgentName() = " + eventLsa.getAgentName());
@@ -625,4 +574,13 @@ public abstract class EnergyAgent extends SapereAgent implements IEnergyAgent {
 	public Date getCurrentDate() {
 		return UtilDates.getNewDate(timeShiftMS);
 	}
+
+	public String getLocation() {
+		return this.authentication.getNodeLocation().getMainServiceAddress();
+	}
+
+	public String getNodeName() {
+		return this.authentication.getNodeLocation().getName();
+	}
+
 }

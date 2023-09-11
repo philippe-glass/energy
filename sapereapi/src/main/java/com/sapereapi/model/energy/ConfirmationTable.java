@@ -1,11 +1,17 @@
 package com.sapereapi.model.energy;
 
 import java.io.Serializable;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Hashtable;
+import java.util.List;
 import java.util.Map;
 
-public class ConfirmationTable implements Serializable {
+import eu.sapere.middleware.lsa.IPropertyObject;
+import eu.sapere.middleware.lsa.Lsa;
+import eu.sapere.middleware.node.NodeConfig;
+
+public class ConfirmationTable implements Serializable , IPropertyObject {
 	private static final long serialVersionUID = 3L;
 	private String issuer = null;
 	//protected Boolean isComplementary = Boolean.FALSE;
@@ -16,7 +22,6 @@ public class ConfirmationTable implements Serializable {
 			) {
 		super();
 		this.issuer = _issuer;
-		//this.isComplementary = _isComplementary;
 		this.table = new HashMap<String, Map<Boolean, ConfirmationItem>>();
 		;
 	}
@@ -105,7 +110,7 @@ public class ConfirmationTable implements Serializable {
 	}
 
 	@Override
-	public ConfirmationTable clone() {
+	public ConfirmationTable copyForLSA() {
 		ConfirmationTable result = new ConfirmationTable(this.issuer);
 		for(String receiver : table.keySet()) {
 			Map<Boolean, ConfirmationItem> mapConfirmationItems =  table.get(receiver);
@@ -115,5 +120,19 @@ public class ConfirmationTable implements Serializable {
 			}
 		}
 		return result;
+	}
+
+	@Override
+	public ConfirmationTable clone() {
+		return copyForLSA();
+	}
+
+	@Override
+	public void completeContent(Lsa bondedLsa, Map<String, NodeConfig> mapNodeLocation) {
+	}
+
+	@Override
+	public List<NodeConfig> retrieveInvolvedLocations() {
+		return new ArrayList<NodeConfig>();
 	}
 }

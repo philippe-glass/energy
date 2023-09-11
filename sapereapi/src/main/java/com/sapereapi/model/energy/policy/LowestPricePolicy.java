@@ -36,8 +36,8 @@ public class LowestPricePolicy implements IConsumerPolicy{
 		}
 	}
 
-	private PricingTable computeAvgPricingTable() {
-		return SapereUtil.auxComputeMapPricingTable(mapProducerPower, mapProducerPricingTale);
+	private PricingTable computeAvgPricingTable(long timeShiftMS) {
+		return SapereUtil.auxComputeMapPricingTable(mapProducerPower, mapProducerPricingTale, timeShiftMS);
 
 	}
 
@@ -46,12 +46,12 @@ public class LowestPricePolicy implements IConsumerPolicy{
 		if(!currentRequest.hasExpired() && mapProducerPricingTale.size() > 0) {
 			String tag = this.getClass().getSimpleName() + ".updateRequest " + currentRequest.getIssuer() + " : ";
 			Date current = currentRequest.getCurrentDate();
-			PricingTable avgPricingTable = computeAvgPricingTable();
+			PricingTable avgPricingTable = computeAvgPricingTable(currentRequest.getTimeShiftMS());
 			logger.info(tag + " : avgPricingTable = " + avgPricingTable);
 			Date minEndTime = new Date(current.getTime() +  (long) (0.5 * currentRequest.getTotalDurationMS()));
 			TimeSlot targetTimeSlot = avgPricingTable.getLowestPriceTimeSlot(current, minEndTime);
 			Double correspondingRate = avgPricingTable.getRatesTable().get(targetTimeSlot);
-			logger.info(tag + " , current = " + UtilDates.formatTimeOrDate(current) + ", targetTimeSlot = " + targetTimeSlot + " correspondingRate = "+ correspondingRate);
+			logger.info(tag + " , current = " + UtilDates.formatTimeOrDate(current, currentRequest.getTimeShiftMS()) + ", targetTimeSlot = " + targetTimeSlot + " correspondingRate = "+ correspondingRate);
 			if(targetTimeSlot != null) {
 				Date newBeginDate = targetTimeSlot.getBeginDate();
 				if (newBeginDate.before(current)) {
@@ -73,8 +73,8 @@ public class LowestPricePolicy implements IConsumerPolicy{
 						logger.error(e);
 					}
 					logger.info(tag + currentRequest.getIssuer()  + ": change of request date from "
-					+ UtilDates.formatTimeOrDate(currentRequest.getBeginDate())
-					+ " to " + UtilDates.formatTimeOrDate(targetTimeSlot.getBeginDate())
+					+ UtilDates.formatTimeOrDate(currentRequest.getBeginDate(), currentRequest.getTimeShiftMS())
+					+ " to " + UtilDates.formatTimeOrDate(targetTimeSlot.getBeginDate(), currentRequest.getTimeShiftMS())
 					+ " corresponding rate = " + correspondingRate
 					+ " "
 					);

@@ -36,9 +36,7 @@ import eu.sapere.middleware.lsa.SyntheticPropertyName;
 import eu.sapere.middleware.node.NodeManager;
 import eu.sapere.middleware.node.notifier.event.BondEvent;
 import eu.sapere.middleware.node.notifier.event.DecayedEvent;
-import eu.sapere.middleware.node.notifier.event.LsaUpdatedEvent;
 import eu.sapere.middleware.node.notifier.event.PropagationEvent;
-import eu.sapere.middleware.node.notifier.event.RewardEvent;
 
 public class RegulatorAgent extends SupervisionAgent implements ISupervisorAgent {
 	/**
@@ -110,58 +108,45 @@ public class RegulatorAgent extends SupervisionAgent implements ISupervisorAgent
 			if (lsa.hasBondedBefore(bondedLsa.getAgentName(), query)) {
 				logger.info("** " + bondedLsa.getAgentName() + " Already bound before query " + query);
 			}
-
-			int action = getActionToTake(bondedLsa.getSyntheticProperty(SyntheticPropertyName.STATE).toString()); // add
-																													// greedy
-			// lastEvent = null;
-			// if (!this.hasBondedBefore(bondedLsa.getAgentName(), query)) {
 			if (lsa.getSubDescription().size() >= 1) { // output
 				Lsa chosenLSA = getBondedLsaByQuery(query).get(rand.nextInt(getBondedLsaByQuery(query).size()));
-				String state = chosenLSA.getSyntheticProperty(SyntheticPropertyName.STATE).toString();
-				if (action == 0) {
-					addState(bondedLsa.getSyntheticProperty(SyntheticPropertyName.STATE).toString(), action, 0, 0);
-					lsa.addProperty(new Property(lsa.getSyntheticProperty(SyntheticPropertyName.OUTPUT).toString(), null,
-							query, chosenLSA.getAgentName(), state,
-							chosenLSA.getSyntheticProperty(SyntheticPropertyName.SOURCE).toString(), false));
-				} else if (action == 1) {
-					ipSource = chosenLSA.getSyntheticProperty(SyntheticPropertyName.SOURCE).toString();
-					Property pPrediction = chosenLSA.getOnePropertyByName("PRED");
-					if (pPrediction != null && pPrediction.getValue() instanceof PredictionData) {
-						PredictionData prediction = (PredictionData) pPrediction.getValue();
-						if(prediction.hasLastResult("produced")) {
-							AgentType bondAgentType = AgentType.getFromLSA(bondedLsa);
-							if (AgentType.LEARNING_AGENT.equals(bondAgentType)) {
-								if(false || lastPrediction==null || UtilDates.shiftDateMinutes(lastPrediction.getInitialDate(),0).before(prediction.getInitialDate())) {
-									lastPrediction = prediction;
-									int stateNb = NodeMarkovStates.getNbOfStates();
-									//List<Double> producedPrediction = prediction.getResult().get("produced");
-									MarkovState randomState = prediction.getLastRandomTargetState("produced");
-									if(randomState!=null && randomState.getId() == stateNb) {
-										// Over production
-										logger.info("Prediction of overProduction");
-										activateReschedule = false;
-										RescheduleTable rescheduleTable = getRescheduleTable();
-										double rescheduledPower = rescheduleTable.computeRescheduledPower(prediction.getLastTargetDate(), WarningType.OVER_PRODUCTION_FORCAST);
-										if(activateReschedule && rescheduledPower < 0.2*nodeContext.getMaxTotalPower()) {
-											//double horizonInMin = prediction.getTimeHorizonMinutes();
-											Date stopBegin = UtilDates.shiftDateMinutes(prediction.getLastTargetDate(), -10);
-											Date stopEnd = UtilDates.shiftDateMinutes(prediction.getLastTargetDate(), 50);
-											List<EnergySupply> listSupplies = retrieveListSupplies(stopBegin, stopEnd);
-											if (listSupplies.size() > 0) {
-												Collections.sort(listSupplies, supplyComparator);
-												int supplyIdx = 0;
-												while (rescheduledPower < 0.2*nodeContext.getMaxTotalPower() && supplyIdx < listSupplies.size()) {
-													EnergySupply nextSupply = listSupplies.get(supplyIdx);
-													String producer = nextSupply.getIssuer();
-													RescheduleItem recheduleItem = new RescheduleItem(producer, WarningType.OVER_PRODUCTION_FORCAST, stopBegin, stopEnd, nextSupply.getPower(), nodeContext.getTimeShiftMS());
-													rescheduleTable.addItem(producer, recheduleItem);
-													rescheduledPower = rescheduleTable.computeRescheduledPower(prediction.getLastTargetDate(), WarningType.OVER_PRODUCTION_FORCAST);
-													supplyIdx++;
-												}
-												// Update rescheduleTable in LSA
-												lsa.removePropertiesByName("RESCHEDULE");
-												lsa.addProperty(new Property("RESCHEDULE", rescheduleTable));
+				ipSource = chosenLSA.getSyntheticProperty(SyntheticPropertyName.SOURCE).toString();
+				Property pPrediction = chosenLSA.getOnePropertyByName("PRED");
+				if (pPrediction != null && pPrediction.getValue() instanceof PredictionData) {
+					PredictionData prediction = (PredictionData) pPrediction.getValue();
+					if(prediction.hasLastResult("produced")) {
+						AgentType bondAgentType = AgentType.getFromLSA(bondedLsa);
+						if (AgentType.LEARNING_AGENT.equals(bondAgentType)) {
+							if(false || lastPrediction==null || UtilDates.shiftDateMinutes(lastPrediction.getInitialDate(),0).before(prediction.getInitialDate())) {
+								lastPrediction = prediction;
+								int stateNb = NodeMarkovStates.getNbOfStates();
+								//List<Double> producedPrediction = prediction.getResult().get("produced");
+								MarkovState randomState = prediction.getLastRandomTargetState("produced");
+								if(randomState!=null && randomState.getId() == stateNb) {
+									// Over production
+									logger.info("Prediction of overProduction");
+									activateReschedule = false;
+									RescheduleTable rescheduleTable = getRescheduleTable();
+									double rescheduledPower = rescheduleTable.computeRescheduledPower(prediction.getLastTargetDate(), WarningType.OVER_PRODUCTION_FORCAST);
+									if(activateReschedule && rescheduledPower < 0.2*nodeContext.getMaxTotalPower()) {
+										//double horizonInMin = prediction.getTimeHorizonMinutes();
+										Date stopBegin = UtilDates.shiftDateMinutes(prediction.getLastTargetDate(), -10);
+										Date stopEnd = UtilDates.shiftDateMinutes(prediction.getLastTargetDate(), 50);
+										List<EnergySupply> listSupplies = retrieveListSupplies(stopBegin, stopEnd);
+										if (listSupplies.size() > 0) {
+											Collections.sort(listSupplies, supplyComparator);
+											int supplyIdx = 0;
+											while (rescheduledPower < 0.2*nodeContext.getMaxTotalPower() && supplyIdx < listSupplies.size()) {
+												EnergySupply nextSupply = listSupplies.get(supplyIdx);
+												String producer = nextSupply.getIssuer();
+												RescheduleItem recheduleItem = new RescheduleItem(producer, WarningType.OVER_PRODUCTION_FORCAST, stopBegin, stopEnd, nextSupply.getPower(), nodeContext.getTimeShiftMS());
+												rescheduleTable.addItem(producer, recheduleItem);
+												rescheduledPower = rescheduleTable.computeRescheduledPower(prediction.getLastTargetDate(), WarningType.OVER_PRODUCTION_FORCAST);
+												supplyIdx++;
 											}
+											// Update rescheduleTable in LSA
+											lsa.removePropertiesByName("RESCHEDULE");
+											lsa.addProperty(new Property("RESCHEDULE", rescheduleTable));
 										}
 									}
 								}
@@ -181,6 +166,7 @@ public class RegulatorAgent extends SupervisionAgent implements ISupervisorAgent
 		for (ExtendedEnergyEvent nextEvent : EnergyDbHelper.retrieveCurrentSessionEvents()) {
 			if (EventType.CONTRACT_START.equals(nextEvent.getType()) ||  EventType.CONTRACT_UPDATE.equals(nextEvent.getType())) {
 				EnergySupply supply = new EnergySupply(nextEvent.getLinkedConsumer(), nextEvent.getLinkedConsumerLocation()
+						, nextEvent.getIssuerDistance()
 						, nextEvent.isComplementary() // false
 						, nextEvent.getPower(),nextEvent.getPowerMin(),nextEvent.getPowerMax()
 						, nextEvent.getBeginDate(), nextEvent.getEndDate(), nextEvent.getDeviceProperties()
@@ -197,6 +183,7 @@ public class RegulatorAgent extends SupervisionAgent implements ISupervisorAgent
 			EventType evtType = nextEvent.getType();
 			if (EventObjectType.PRODUCTION.equals(evtType.getObjectType()) && !evtType.getIsEnding()) {
 				EnergySupply supply = new EnergySupply(nextEvent.getIssuer(), nextEvent.getIssuerLocation()
+						, nextEvent.getIssuerDistance()
 						, nextEvent.getIsComplementary() // false
 						, nextEvent.getPower(),nextEvent.getPowerMin(),nextEvent.getPowerMax()
 						, nextEvent.getBeginDate(), nextEvent.getEndDate(), nextEvent.getDeviceProperties()
@@ -313,7 +300,7 @@ public class RegulatorAgent extends SupervisionAgent implements ISupervisorAgent
 				// lsa.removePropertiesByName("WARNING");
 				cleanExpiredDate();
 				NodeTotal nodeTotal = EnergyDbHelper.retrieveLastNodeTotal();
-				if(!Sapere.isSupervisionDisabled()) {
+				if(!nodeContext.isSupervisionDisabled()) {
 					checkOverConsumption(nodeTotal);
 					checkOverProduction(nodeTotal);
 				}
@@ -337,16 +324,6 @@ public class RegulatorAgent extends SupervisionAgent implements ISupervisorAgent
 					+ e.getLocalizedMessage());
 
 		}
-	}
-
-	@Override
-	public void onLsaUpdatedEvent(LsaUpdatedEvent event) {
-		logger.info("onLsaUpdatedEvent:" + agentName);
-	}
-
-	@Override
-	public void onRewardEvent(RewardEvent event) {
-
 	}
 
 	Map<String, RegulationWarning> getMapWarnings() {
@@ -469,7 +446,7 @@ public class RegulatorAgent extends SupervisionAgent implements ISupervisorAgent
 				logger.warning(this.agentName + " checkupNotInSpace agent not in space " + notInSapce );
 				if(notInSapce.hasWaitingExpired()) {
 					logger.warning(this.agentName + " checkupNotInSpace : stop agent " + agentName);
-					Sapere.getInstance().stopAgent(agentName, notInSapce);
+					Sapere.getInstance().auxStopAgent(agentName, notInSapce);
 					//Sapere.getInstance().generateStopEvent(agentName, notInSapce);
 				} else {
 					result.put(agentName, notInSapce);

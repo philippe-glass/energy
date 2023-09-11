@@ -366,7 +366,9 @@ public class ContractProcessingManager {
 	public void handleRequestChanges(EnergyAgent consumerAgent, String tag) {
 		EnergyRequest newRequest = consumerAgent.getEnergyRequest();
 		Contract mainContract = getCurrentContract(false);
-		if(mainContract!=null) {
+		Contract secondContrat = getCurrentContract(true);
+		if(mainContract!=null && secondContrat==null) {
+			Contract mainContractBefore = mainContract.clone();
 			boolean changeOnRequest = mainContract.hasChangeOnRequest(newRequest);
 			//logger.info("handleRequestChanges changeOnRequest = " + changeOnRequest);
 			if(changeOnRequest) {
@@ -383,24 +385,38 @@ public class ContractProcessingManager {
 					// Update contract
 					try {
 						boolean hasChanged = mainContract.modifyRequest(newRequest, null, logger);
+						if(mainContract.hasGap()) {
+							logger.error("handleRequestChanges : mainContract has gap : " + mainContract
+									+ ", hasChanged = "  + hasChanged
+									+ ", newRequest = " + newRequest + ", contractBefore = "+mainContractBefore
+							);
+						}
 						if (hasChanged) {
-							logger.info("checkupContract : " + consumerAgent.getAgentName() + " receives contract update : "
+							logger.info("handleRequestChanges : " + consumerAgent.getAgentName() + " receives contract update : "
 									+ mainContract);
 							generateUpdateEvent(consumerAgent, WarningType.CHANGE_REQUEST, false);
 							// update CONTRACT property
 							refreshContractsProperties(consumerAgent);
 						}
 					} catch (UnauthorizedModificationException e) {
-						logger.warning(e.getMessage());
+						logger.warning("UnauthorizedModificationException thrown in handleRequestChanges : " + e.getMessage());
 						boolean stopContract = true;
-						if(Sapere.allowComplementaryRequests) {
+						if(Sapere.getNodeContext().isComplementaryRequestsActivated()) {
 							EnergyRequest requestInLsa = getRequestProperty(consumerAgent);
 							if(requestInLsa==null || !requestInLsa.isComplementary()) {
-								// Generate a complemantary reuqest with the missing power
-								EnergyRequest requestToSet = this.generateMissingRequest(consumerAgent);
-								if(requestToSet!=null && requestToSet.isComplementary()) {
+								// Generate a complemantary request with the missing power
+								EnergyRequest complementaryRequestToSet = this.generateMissingRequest(consumerAgent);
+								if(complementaryRequestToSet!=null && complementaryRequestToSet.isComplementary()) {
 									try {
-										mainContract.modifyRequest(newRequest, requestToSet, logger);
+										if(false) {
+											boolean hasChanged2 = mainContract.modifyRequest(newRequest, complementaryRequestToSet, logger);
+											if(mainContract.hasGap()) {
+												logger.error("handleRequestChanges (step2) : mainContract has gap : " + mainContract 
+														+ ", hasChanged2 = "  + hasChanged2
+														+ ", newRequest = " + newRequest + ", contractBefore = "+mainContractBefore
+												);
+											}
+										}
 										consumerAgent.getLsa().removePropertiesByName("REQ");
 										consumerAgent.getLsa().addProperty(new Property("REQ", generateMissingRequest(consumerAgent)));
 										logger.info("complementary request generated");
@@ -427,6 +443,13 @@ public class ContractProcessingManager {
 				} else {
 					logger.info("checkupRequestChanges " + consumerAgent.getAgentName() + " main contract = " + mainContract);
 				}
+			}
+			if(mainContract.hasGap()) {
+				double gap = mainContract.computeGap();
+				logger.error("handleRequestChanges (end) : mainContract has gap : " + mainContract
+						+ ", mainContractBefore = " + mainContractBefore
+						+ ", newRequest = " + newRequest + ""
+						+ ", gap = " + gap);
 			}
 		}
 	}
@@ -492,7 +515,9 @@ public class ContractProcessingManager {
 						if(confirmation.isComplementary() == isComplementary) {
 							Date confirmationDate = confirmation.getDate();
 							if(confirmationDate.before(currentContract.getBeginDate())) {
-								logger.warning("addProducerConfirmation " + consumerAgent.getAgentName() + " this confirmation [" + confirmation + " at " + UtilDates.formatTimeOrDate(confirmationDate) + "] of " + producer + " is before the contract begin date : it will not be taken into account ");
+								logger.warning("addProducerConfirmation " + consumerAgent.getAgentName() + " this confirmation ["
+										+ confirmation + " at " + UtilDates.formatTimeOrDate(confirmationDate, timeShiftMS) + "] of " + producer
+										+ " is before the contract begin date : it will not be taken into account ");
 							} else {
 								comment = confirmation.getComment();
 								// Add received confirmaitons in memory
@@ -555,7 +580,7 @@ public class ContractProcessingManager {
 		double missing = getMissing(consumerAgent);
 		if(missing > 0) {
 			EnergyRequest need = consumerAgent.getEnergyRequest();
-			if(Sapere.allowComplementaryRequests) {
+			if(Sapere.getNodeContext().isComplementaryRequestsActivated()) {
 				double powerProvided = mainProcessingData.getOngoingContractedPower();
 				if(powerProvided > 0) {
 					return need.generateComplementaryRequest(missing);
@@ -652,15 +677,15 @@ public class ContractProcessingManager {
 		if (Math.abs(gap1) > 0.0001) {
 			if(complContractInLsa==null) {
 				// In this case, wee should have only 1 contract
-				logger.error("### refreshLsaProperties " + consumerAgent.getAgentName() + "main contract has gap " + UtilDates.df2.format(gap1)
-					+ ", request : " + mainContractInLsa.getRequest().getPower()
+				logger.error("### refreshLsaProperties " + consumerAgent.getAgentName() + " main contract has gap " + UtilDates.df2.format(gap1)
+					+ ", request : " + mainContractInLsa.getRequest()
 					+ ", total supplied : " + mainContractInLsa.getPower()
 					+ ", by supplier : " + mainContractInLsa.getMapPower()
 					+ "");
 			} else {
 				double providedSdContract = complContractInLsa.getPower();
 				if(Math.abs(gap1 - providedSdContract) > 0.0001) {
-					logger.warning("refreshLsaProperties " + consumerAgent.getAgentName() + "main contract has gap " + UtilDates.df2.format(gap1) + " providedSdContract = " + providedSdContract);
+					logger.warning("refreshLsaProperties " + consumerAgent.getAgentName() + " main contract has gap " + UtilDates.df2.format(gap1) + " providedSdContract = " + providedSdContract);
 				}
 			}
 		}

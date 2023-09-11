@@ -1,7 +1,6 @@
 package com.sapereapi.agent.energy;
 
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Date;
 import java.util.HashSet;
 import java.util.List;
@@ -12,7 +11,6 @@ import com.sapereapi.agent.energy.manager.ContractProcessingManager;
 import com.sapereapi.agent.energy.manager.OffersProcessingManager;
 import com.sapereapi.db.EnergyDbHelper;
 import com.sapereapi.exception.PermissionException;
-import com.sapereapi.model.AgentState;
 import com.sapereapi.model.Sapere;
 import com.sapereapi.model.energy.CompositeOffer;
 import com.sapereapi.model.energy.EnergyEvent;
@@ -36,9 +34,10 @@ import com.sapereapi.util.UtilDates;
 
 import eu.sapere.middleware.agent.AgentAuthentication;
 import eu.sapere.middleware.lsa.Lsa;
-import eu.sapere.middleware.lsa.LsaType;
 import eu.sapere.middleware.lsa.Property;
 import eu.sapere.middleware.lsa.SyntheticPropertyName;
+import eu.sapere.middleware.node.NodeConfig;
+import eu.sapere.middleware.node.NodeManager;
 import eu.sapere.middleware.node.notifier.event.BondEvent;
 import eu.sapere.middleware.node.notifier.event.DecayedEvent;
 
@@ -78,10 +77,14 @@ public class ConsumerAgent extends EnergyAgent implements IEnergyAgent {
 		//receivedConfirmations = new HashMap<String, ConfirmationItem>();
 		contractProcessingManager = new ContractProcessingManager(this);
 		completeOutputPropertyIfNeeded();
-		if(Sapere.activateAggregation) {
+		if(Sapere.getNodeContext().isAggregationsActivated()) {
 			//addStandardAggregation(MapStandardOperators.OP_TEST1, "TEST_CONSUMPTION");
 			//addCustomizedAggregation(null, "CONTRACT1", false);
 		}
+	}
+
+	public IConsumerPolicy getConsumerPolicy() {
+		return consumerPolicy;
 	}
 
 	@Override
@@ -120,17 +123,6 @@ public class ConsumerAgent extends EnergyAgent implements IEnergyAgent {
 		}
 	}
 
-	public void reward(Lsa lsaResult, int reward) {
-		logger.info("rewarded-->" + lsaResult.getAgentName() + " by " + reward);
-		logger.info("lsaResult: " + lsaResult.toVisualString());
-
-		if (lsaResult.getAgentName().contains("*")) {
-			lsaResult.addSyntheticProperty(SyntheticPropertyName.TYPE, LsaType.Reward);
-			sendTo(lsaResult, lsaResult.getSyntheticProperty(SyntheticPropertyName.SOURCE).toString());
-		} else
-			this.rewardLsa(lsaResult, agentName, reward, 0.0);
-	}
-
 	// specific
 	public boolean isOK(CompositeOffer globalOffer, boolean isComplementary) {
 		EnergyRequest missing = contractProcessingManager.generateMissingRequest(this);
@@ -159,74 +151,65 @@ public class ConsumerAgent extends EnergyAgent implements IEnergyAgent {
 			if("__Consumer_N1_2".equals(agentName)) {
 				logger.info("onBondNotification " + this.agentName + " For debug");
 			}
-			int action = getActionToTake(bondedLsa.getSyntheticProperty(SyntheticPropertyName.STATE).toString()); // add greedy
 			if(hasWantedProperty(bondedLsa) || false) {
-					String query = bondedLsa.getSyntheticProperty(SyntheticPropertyName.QUERY).toString();
-					Lsa chosenLSA = bondedLsa;
-					String state = chosenLSA.getSyntheticProperty(SyntheticPropertyName.STATE).toString();
-					this.tableChosenLsa.put(bondedLsa.getAgentName(), chosenLSA);
-					if (action == 0) {
-						addState(bondedLsa.getSyntheticProperty(SyntheticPropertyName.STATE).toString(), action, 0, 0);
-						lsa.addProperty(new Property(lsa.getSyntheticProperty(SyntheticPropertyName.OUTPUT).toString(),
-								null, query, chosenLSA.getAgentName(), state,
-								chosenLSA.getSyntheticProperty(SyntheticPropertyName.SOURCE).toString(), false));
-					} else if (action == 1) {
-						try {
-							state = SapereUtil.addOutputsToLsaState(bondedLsa, new String[] {});
-							query = this.agentName;
-							AgentType bondAgentType = AgentType.getFromLSA(bondedLsa);
-							if (AgentType.PRODUCER.equals(bondAgentType)) {
-								//bondedLsa.getPropertiesByQuery(query);
-								// Get offer of production agent
-								String producer = SapereUtil.removeStar(chosenLSA.getAgentName());
-								Property pOffer = bondedLsa.getOnePropertyByQueryAndName(query, "OFFER");
-								Property pDisabled = chosenLSA.getOnePropertyByName("DISABLED");
-								Property pConfirm = chosenLSA.getOnePropertyByName("PROD_CONFIRM");
-								if (pDisabled!= null && pDisabled.getValue() instanceof RegulationWarning ) {
-									RegulationWarning warning = (RegulationWarning) pDisabled.getValue();
-									// handle producer disabled property
-									// Stop Contract if a producer is disabled
-									if(contractProcessingManager.hasProducer(producer)) {
-										contractProcessingManager.stopCurrentContracts(this, warning, this.agentName + " received a warning : " + warning);
-									}
-								}
-								if(pOffer!=null && pOffer.getValue() instanceof ProtectedSingleOffer) {
-									// handle producer offer
-									ProtectedSingleOffer protectedOffer = (ProtectedSingleOffer)  pOffer.getValue();
-									handleProducerOffer(protectedOffer);
-								}
-								if (pConfirm != null && pConfirm.getValue() instanceof ProtectedConfirmationTable) {
-									ProtectedConfirmationTable producerConfirmTable = (ProtectedConfirmationTable) pConfirm.getValue();
-									// handle producer confirmation
-									contractProcessingManager.handleProducerConfirmation(this,  producer,  producerConfirmTable) ;
-								}
-								if(this.consumerPolicy != null) {
-									Property pProd = chosenLSA.getOnePropertyByName("PROD");
-									if(pProd!=null && pProd.getValue() instanceof EnergySupply) {
-										EnergySupply supply = (EnergySupply)pProd.getValue();
-										consumerPolicy.setProducerPricingTable(supply);
-									}
-								}
-							} else if (AgentType.REGULATOR.equals(bondAgentType)) {
-								// TODO : use lsa.getOnePropertyByQueryAndName
-								Property pReschedule = chosenLSA.getOnePropertyByQueryAndName(agentName, "RESCHEDULE");
-								if(pReschedule!=null && pReschedule.getValue() instanceof RescheduleTable) {
-									// handle reschedule
-									RescheduleTable rescheduleTable = (RescheduleTable) pReschedule.getValue();
-									this.handleReschedule(rescheduleTable);
-								}
-								Property pWarning = chosenLSA.getOnePropertyByName("WARNING");
-								if(pWarning!=null && pWarning.getValue() instanceof RegulationWarning) {
-									RegulationWarning warning = (RegulationWarning) pWarning.getValue();
-									// handle regulation warning
-									handleWarning(warning);
-								}
+				String query = bondedLsa.getSyntheticProperty(SyntheticPropertyName.QUERY).toString();
+				Lsa chosenLSA = bondedLsa;
+				this.tableChosenLsa.put(bondedLsa.getAgentName(), chosenLSA);
+				try {
+					query = this.agentName;
+					bondedLsa = completeContent(bondedLsa);
+					AgentType bondAgentType = AgentType.getFromLSA(bondedLsa);
+					if (AgentType.PRODUCER.equals(bondAgentType)) {
+						//bondedLsa.getPropertiesByQuery(query);
+						// Get offer of production agent
+						String producer = SapereUtil.removeStar(chosenLSA.getAgentName());
+						Property pOffer = bondedLsa.getOnePropertyByQueryAndName(query, "OFFER");
+						Property pDisabled = chosenLSA.getOnePropertyByName("DISABLED");
+						Property pConfirm = chosenLSA.getOnePropertyByName("PROD_CONFIRM");
+						if (pDisabled!= null && pDisabled.getValue() instanceof RegulationWarning ) {
+							RegulationWarning warning = (RegulationWarning) pDisabled.getValue();
+							// handle producer disabled property
+							// Stop Contract if a producer is disabled
+							if(contractProcessingManager.hasProducer(producer)) {
+								contractProcessingManager.stopCurrentContracts(this, warning, this.agentName + " received a warning : " + warning);
 							}
-						} catch (Throwable e) {
-							logger.error(e);
 						}
-						this.removeBondedLsasOfQuery(query);
+						if(pOffer!=null && pOffer.getValue() instanceof ProtectedSingleOffer) {
+							// handle producer offer
+							ProtectedSingleOffer protectedOffer = (ProtectedSingleOffer)  pOffer.getValue();
+							handleProducerOffer(protectedOffer, bondedLsa);
+						}
+						if (pConfirm != null && pConfirm.getValue() instanceof ProtectedConfirmationTable) {
+							ProtectedConfirmationTable producerConfirmTable = (ProtectedConfirmationTable) pConfirm.getValue();
+							// handle producer confirmation
+							contractProcessingManager.handleProducerConfirmation(this,  producer,  producerConfirmTable) ;
+						}
+						if(this.consumerPolicy != null) {
+							Property pProd = chosenLSA.getOnePropertyByName("PROD");
+							if(pProd!=null && pProd.getValue() instanceof EnergySupply) {
+								EnergySupply supply = (EnergySupply)pProd.getValue();
+								consumerPolicy.setProducerPricingTable(supply);
+							}
+						}
+					} else if (AgentType.REGULATOR.equals(bondAgentType)) {
+						// TODO : use lsa.getOnePropertyByQueryAndName
+						Property pReschedule = chosenLSA.getOnePropertyByQueryAndName(agentName, "RESCHEDULE");
+						if(pReschedule!=null && pReschedule.getValue() instanceof RescheduleTable) {
+							// handle reschedule
+							RescheduleTable rescheduleTable = (RescheduleTable) pReschedule.getValue();
+							this.handleReschedule(rescheduleTable);
+						}
+						Property pWarning = chosenLSA.getOnePropertyByName("WARNING");
+						if(pWarning!=null && pWarning.getValue() instanceof RegulationWarning) {
+							RegulationWarning warning = (RegulationWarning) pWarning.getValue();
+							// handle regulation warning
+							handleWarning(warning);
+						}
 					}
+				} catch (Throwable e) {
+					logger.error(e);
+				}
+				this.removeBondedLsasOfQuery(query);
 			}
 		} catch (Throwable e) {
 			logger.error(e);
@@ -422,6 +405,10 @@ public class ConsumerAgent extends EnergyAgent implements IEnergyAgent {
 
 			// For propagation
 			addGradient(3);
+
+			// For debug : TO DELETE
+			//this.lsa.replacePropertyWithName(new Property("DEBUG_NEED", need));
+			// End TO DELETE
 		} catch (Throwable e) {
 			logger.error(e);
 			logger.error("Exception throw in decay handler of agent " + this.agentName + " " + event + " " + e.getMessage());
@@ -442,11 +429,26 @@ public class ConsumerAgent extends EnergyAgent implements IEnergyAgent {
 	}
 
 	// specific
-	private void handleProducerOffer(ProtectedSingleOffer protectedOffer) {
+	private void handleProducerOffer(ProtectedSingleOffer protectedOffer, Lsa bondedLsa) {
 		try {
 			SingleOffer receivedOffer =  protectedOffer.getSingleOffer(this);
 			SingleOffer newOffer = receivedOffer.clone();
-			newOffer.setIssuerDistance(Sapere.getInstance().getDistance(newOffer.getIssuerLocation(), newOffer.getIssuerDistance()));
+			if(!NodeManager.isLocal(newOffer.getIssuerLocation())) {
+				if(!newOffer.checkLocationId()) {
+					NodeConfig nodeLocation = bondedLsa.getAgentAuthentication().getNodeLocation();
+					newOffer.getIssuerLocation().setId(nodeLocation.getId());
+					String nodeName = newOffer.getIssuerLocation().getName();
+					NodeConfig nodeLocation2 = EnergyDbHelper.retrieveNodeConfigByName(nodeName);
+					newOffer.getIssuerLocation().setId(nodeLocation2.getId());
+				}
+				logger.info("handleProducerOffer " + this.agentName + " : receive offer from other node " + newOffer.getIssuerLocation().getName() + " : " + newOffer);
+				if(!newOffer.checkLocationId()) {
+					// TODO : set locationId
+					logger.error("handleProducerOffer offer has no locationid");
+				}
+			}
+			int isserDistance = bondedLsa.getSourceDistance();
+			newOffer.setIssuerDistance(isserDistance);
 			boolean isComplementary = newOffer.isComplementary();
 			boolean offerUsed = false;
 			if (contractProcessingManager.needOffer(isComplementary)) {
@@ -560,9 +562,21 @@ public class ConsumerAgent extends EnergyAgent implements IEnergyAgent {
 		boolean hasAlreadyNewContract =  contractProcessingManager.isContractWaitingValidation(isComplementary);
 		String msgTag = "handleReceivedOffers " + this.agentName + " [warningDuration=" + warningDuration + "] ";
 		String contractTag = isComplementary?"CONTRACT2" :"CONTRACT1";
+		// For debug
+		/*
+		String sConsumerWarning = (lastNodeTotal==null)? "" : lastNodeTotal.getMaxWarningConsumer();
+		long warningDuration2 = (lastNodeTotal==null)? 0 : lastNodeTotal.getMaxWarningDuration();
+		boolean isInHighWarning2 = (warningDuration2>=8) && (agentName.equals(sConsumerWarning));
+		if(isInHighWarning2) {
+			if(Math.abs(warningDuration2 - warningDuration) > 2) {
+				logger.warning("### generateNewContract : " + agentName+ " local warningDuration = " + warningDuration
+					+ ", warningDuration from node total = " + warningDuration2);
+			}
+		}*/
+		// End for debug
 		if(isInHighWarning) {
 			// For debug
-			logger.warning(msgTag + " begin : requested = " + UtilDates.df.format(need.getPower()) + " hasConfirmation = " + hasAlreadyNewContract + " has offers = " + offersProcessingManager.hasSingleOffer());
+			logger.warning(msgTag + " begin : requested = " + UtilDates.df3.format(need.getPower()) + " hasConfirmation = " + hasAlreadyNewContract + " has offers = " + offersProcessingManager.hasSingleOffer());
 			if(!hasAlreadyNewContract) {
 				offersProcessingManager.logOffers(msgTag);
 			}
@@ -576,6 +590,9 @@ public class ConsumerAgent extends EnergyAgent implements IEnergyAgent {
 			} else {
 				EnergyRequest missing = contractProcessingManager.generateMissingRequest(this);
 				CompositeOffer globalOffer = offersProcessingManager.generateGlobalOffer(this, missing);
+				if(!globalOffer.checkLocationId()) {
+					logger.error("after generateGlobalOffer : for debug : locationId is null");
+				}
 				if(isInHighWarning) {
 					logger.warning(msgTag + " after generateGlobalOffer globalOffer = " + globalOffer);
 				}
@@ -588,9 +605,11 @@ public class ConsumerAgent extends EnergyAgent implements IEnergyAgent {
 						logger.info(msgTag +  " contract is set");
 					}
 					// The Offer is OK : Confirm global offer to generate a contract
+					/*
 					AgentState state = new AgentState(Arrays.asList(getInput()), new ArrayList<String>());
 					state.addOutput(contractTag);
 					lsa.addSyntheticProperty(SyntheticPropertyName.STATE, state.toString());
+					*/
 					this.contractProcessingManager.generateNewContract(this, globalOffer);
 					offersProcessingManager.clearSingleOffers();
 				} else {
@@ -619,6 +638,39 @@ public class ConsumerAgent extends EnergyAgent implements IEnergyAgent {
 			need.resetWarningCounter(current);
 		} else if(missing > 0 && missing <= nodeTotalAvailable) {
 			need.incrementWarningCounter(current);
+			EnergyRequest reqProperty = this.contractProcessingManager.getRequestProperty(this);
+			if(reqProperty != null) {
+				// Syncrhonize the information of warning duration in need attribute and in the "REQ" property
+				if(reqProperty.getWarningDurationSec() != need.getWarningDurationSec()) {
+					logger.info("refreshRequestWarnings increment warning on req property : " + reqProperty);
+					reqProperty.incrementWarningCounter(current);
+				}
+				if(reqProperty.getWarningDate()!=null && !reqProperty.getWarningDate().equals(need.getWarningDate())) {
+					logger.error("warning dates are different " + SapereUtil.CR + "reqProperty : " + reqProperty + SapereUtil.CR + "need : " + need);
+				}
+				// For debug
+				String sConsumerWarning = (lastNodeTotal==null)? "" : lastNodeTotal.getMaxWarningConsumer();
+				long warningDurationLastTotal = (lastNodeTotal==null)? 0 : lastNodeTotal.getMaxWarningDuration();
+				long gapMS = (lastNodeTotal==null)? 0 : getCurrentDate().getTime() - lastNodeTotal.getDate().getTime();
+				boolean isInHighWarning = (warningDurationLastTotal>=8) && (agentName.equals(sConsumerWarning));
+				long refreshedWarningDuration = (int) (gapMS/1000) + warningDurationLastTotal;
+				if(isInHighWarning) {
+					if(need.getWarningDurationSec() != reqProperty.getWarningDurationSec()) {
+						logger.warning("--- refreshRequestWarnings " + agentName + " after incrementWarningCounter :"
+							+ ", req property duration = " + reqProperty.getWarningDurationSec()
+							+ ", req prop = " + reqProperty
+							+ ", need     = " + need
+								);
+					}
+					logger.warning("--- refreshRequestWarnings " + agentName + " after incrementWarningCounter : missing = " + UtilDates.df3.format(missing)
+							+ ", nodeTotalAvailable = " + UtilDates.df3.format(nodeTotalAvailable)
+							+ ", need warning duration = " + need.getWarningDurationSec()
+							+ ", warningDuration (from node) =  " + refreshedWarningDuration
+							+ ", gap since last total [MS] = " + gapMS
+							);
+				}
+				// End for debug
+			}
 		} else {
 			need.resetWarningCounter(current);
 		}

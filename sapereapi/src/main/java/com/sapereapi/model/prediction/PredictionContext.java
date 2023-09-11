@@ -9,8 +9,6 @@ import com.sapereapi.model.NodeContext;
 import com.sapereapi.model.markov.MarkovTimeWindow;
 import com.sapereapi.model.markov.TransitionMatrixKey;
 
-import eu.sapere.middleware.node.NodeManager;
-
 public class PredictionContext extends NodeContext implements Serializable {
 	/**
 	 * 
@@ -28,7 +26,11 @@ public class PredictionContext extends NodeContext implements Serializable {
 			,List<MarkovTimeWindow> _allTimeWindows
 			//,boolean _useCorrections
 			) {
-		super(nodeContext.getId(), nodeContext.getLocation(), nodeContext.getScenario(), nodeContext.getDatetimeShifts(), nodeContext.getMaxTotalPower(), nodeContext.getSessionId(), nodeContext.getVariables());
+		super(nodeContext.getId(), nodeContext.getNodeConfig(), nodeContext.getScenario(), nodeContext.getDatetimeShifts(), nodeContext.getMaxTotalPower(), nodeContext.getSessionId()
+				, nodeContext.getVariables()
+				, nodeContext.isSupervisionDisabled(), nodeContext.isComplementaryRequestsActivated()
+				, nodeContext.isAggregationsActivated(), nodeContext.isPredictionsActivated()
+				, nodeContext.getTimeZone(), nodeContext.getUrlForcasting());
 		this.learningAgentName = learningAgentName;
 		this.learningWindow = learningWindow;
 		this.allTimeWindows = _allTimeWindows;
@@ -39,17 +41,11 @@ public class PredictionContext extends NodeContext implements Serializable {
 		super();
 	}
 
+	/*
 	public boolean isLocal() {
-		return NodeManager.getLocation().equals(location);
-	}
+		return super.isLocal();
+	}*/
 
-	public String getLocation() {
-		return location;
-	}
-
-	public void setLocation(String location) {
-		this.location = location;
-	}
 
 	public String getScenario() {
 		return scenario;
@@ -134,7 +130,7 @@ public class PredictionContext extends NodeContext implements Serializable {
 		result.setLearningWindow(learningWindow);
 		result.setAllTimeWindows(allTimeWindows);
 		result.setScenario(scenario);
-		result.setLocation(location);
+		result.setNodeConfig(nodeConfig.clone());
 		result.setId(id);
 		Map<Integer, Map<String, TransitionMatrixKey>> copy = new HashMap<Integer, Map<String,TransitionMatrixKey>>();
 		for(Integer key1 : mapTransitionMatrixKeys.keySet()) {

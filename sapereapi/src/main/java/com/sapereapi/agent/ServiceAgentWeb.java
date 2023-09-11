@@ -34,8 +34,8 @@ public class ServiceAgentWeb extends SapereAgent {
 
 
 	public ServiceAgentWeb(String webServiceLink, AgentAuthentication authentication, String[] input, String[] output, String appid,
-			LsaType type) {
-		super(authentication.getAgentName(), authentication, input, output, type);
+			LsaType type, boolean activateQOS) {
+		super(authentication.getAgentName(), authentication, input, output, type, activateQOS);
 		this.agentName = authentication.getAgentName();
 		this.webServiceLink = webServiceLink;
 		this.output = output;

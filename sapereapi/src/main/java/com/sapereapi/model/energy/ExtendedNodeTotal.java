@@ -1,6 +1,8 @@
 package com.sapereapi.model.energy;
 
 import java.util.ArrayList;
+import java.util.Collections;
+import java.util.Comparator;
 import java.util.Date;
 import java.util.List;
 
@@ -83,6 +85,11 @@ public class ExtendedNodeTotal extends NodeTotal {
 
 	public void addMissingRequest(MissingRequest missingRequest) {
 		listConsumerMissingRequests.add(missingRequest);
+		Collections.sort(listConsumerMissingRequests,  new Comparator<MissingRequest>() {
+		    public int compare(MissingRequest mrq1, MissingRequest mrq2) {
+		        return -1*(mrq1.compareWarningDurationDescAndPower(mrq2));
+		    }
+		});
 	}
 
 	public List<MissingRequest> getListConsumerMissingRequests() {
@@ -109,5 +116,21 @@ public class ExtendedNodeTotal extends NodeTotal {
 			 return listWarningReq.get(0);
 		 }
 		 return null;
+	}
+
+	public void computeSumWarningPower() {
+		/*
+		Collections.sort(listConsumerMissingRequests,  new Comparator<MissingRequest>() {
+		    public int compare(MissingRequest mrq1, MissingRequest mrq2) {
+		        return -1*(mrq1.compareWarningDurationDescAndPower(mrq2));
+		    }
+		});
+		*/
+		sumWarningPower = 0;
+		for(MissingRequest missingRequest : listConsumerMissingRequests) {
+			if(sumWarningPower + missingRequest.getPower() <= available) {
+				sumWarningPower+=missingRequest.getPower();
+			}
+		}
 	}
 }

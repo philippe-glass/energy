@@ -4,17 +4,17 @@ import java.util.List;
 import org.springframework.web.bind.annotation.*;
 
 import com.sapereapi.agent.QueryAgent;
-import com.sapereapi.model.Query;
 import com.sapereapi.model.Sapere;
 import com.sapereapi.model.Service;
+import com.sapereapi.model.input.Query;
 
 @RestController
+@RequestMapping("/query")
 public class QueryController {
 
 	@PostMapping(value = "/addQuery")
 	public List<Service> addQuery(@RequestBody Query request) {
-		Sapere.getInstance().addQuery(request);
-		return Sapere.getInstance().getLsas();
+		return Sapere.getInstance().addQuery(request);
 	}
 
 	@GetMapping(value = "/getResult")

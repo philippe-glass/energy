@@ -76,7 +76,7 @@ public class NodeMarkovStates implements Serializable {
 	public NodeMarkovStates(PredictionContext predictionContext, String[] _variables, Date aDate, Double _maxTotalPower) {
 		super();
 		this.variables = _variables;
-		this.location = predictionContext.getLocation();
+		this.location = predictionContext.getMainServiceAddress();
 		this.scenario = predictionContext.getScenario();
 		this.stateDate = aDate;
 		maxTotalPower = _maxTotalPower;

@@ -9,27 +9,35 @@ public class MissingRequest {
 	public String getIssuer() {
 		return issuer;
 	}
+
 	public void setIssuer(String issuer) {
 		this.issuer = issuer;
 	}
+
 	public Double getPower() {
 		return power;
 	}
+
 	public void setPower(Double power) {
 		this.power = power;
 	}
+
 	public Boolean getHasWarning() {
 		return hasWarning;
 	}
+
 	public void setHasWarning(Boolean hasWarning) {
 		this.hasWarning = hasWarning;
 	}
+
 	public Integer getWarningDurationSec() {
 		return warningDurationSec;
 	}
+
 	public void setWarningDurationSec(Integer warningDurationSec) {
 		this.warningDurationSec = warningDurationSec;
 	}
+
 	public MissingRequest(String issuer, Double power, Boolean hasWarning, Integer warningDurationSec) {
 		super();
 		this.issuer = issuer;
@@ -37,13 +45,27 @@ public class MissingRequest {
 		this.hasWarning = hasWarning;
 		this.warningDurationSec = warningDurationSec;
 	}
+
 	@Override
 	public String toString() {
 		StringBuffer result = new StringBuffer();
 		result.append(issuer).append(" ").append(power).append("W");
-		if(warningDurationSec > 0) {
+		if (warningDurationSec > 0) {
 			result.append(", warningDurationSec : ").append(warningDurationSec);
 		}
 		return result.toString();
+	}
+
+	public int compareWarningDurationDescAndPower(MissingRequest other) {
+		if(other == null) {
+			return 1;
+		}
+		int compareWarningDuration = this.warningDurationSec - other.getWarningDurationSec();
+		if(compareWarningDuration == 0) {
+			double comparePower = 100*(this.power - other.getPower());
+			return (int) (comparePower);
+		} else {
+			return -1*compareWarningDuration;
+		}
 	}
 }

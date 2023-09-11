@@ -32,8 +32,8 @@ public class AgentTransport extends SapereAgent {
 	Random rand = new Random();
 	SapereLogger logger = SapereLogger.getInstance();
 
-	public AgentTransport(AgentAuthentication authentication, String[] input, String[] output, LsaType type) {
-		super(authentication.getAgentName(), authentication, input, output, type);
+	public AgentTransport(AgentAuthentication authentication, String[] input, String[] output, LsaType type, boolean enableQoS) {
+		super(authentication.getAgentName(), authentication, input, output, type, enableQoS);
 		this.input = input;
 		this.output = output;
 		selectedPropreties = new HashMap<>();

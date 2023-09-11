@@ -119,11 +119,11 @@ public class BasicProducerPolicy implements IProducerPolicy {
 	 * comaprePower; } } };
 	 */
 
-	private PricingTable iniSimplePricingTable(NodeContext nodeContext, Double rate) {
+	private PricingTable initSimplePricingTable(NodeContext nodeContext, Double rate) {
 		Date current = nodeContext.getCurrentDate();
 		Date end = UtilDates.shiftDateDays(current, 366 * 1000);
 		// Map<Integer, Double> simplePicingTable = new HashMap<Integer, Double>();
-		PricingTable pricingTable = new PricingTable();
+		PricingTable pricingTable = new PricingTable(nodeContext.getTimeShiftMS());
 		pricingTable.addPrice(current, end, rate);
 		return pricingTable;
 	}
@@ -136,7 +136,7 @@ public class BasicProducerPolicy implements IProducerPolicy {
 
 	public BasicProducerPolicy(NodeContext nodeContext, Double rate, int _requestSelectionPolicy) {
 		super();
-		this.defaultPricingTable = iniSimplePricingTable(nodeContext, rate);
+		this.defaultPricingTable = initSimplePricingTable(nodeContext, rate);
 		this.requestSelectionPolicy = _requestSelectionPolicy;
 	}
 

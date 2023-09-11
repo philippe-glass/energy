@@ -5,6 +5,8 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.math.BigDecimal;
 import java.math.BigInteger;
+import java.text.DecimalFormat;
+import java.text.ParseException;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
@@ -18,7 +20,6 @@ import java.util.Set;
 import java.util.StringTokenizer;
 
 import com.sapereapi.agent.energy.EnergyAgent;
-import com.sapereapi.log.AbstractLogger;
 import com.sapereapi.model.AgentState;
 import com.sapereapi.model.TimeSlot;
 import com.sapereapi.model.energy.ConfirmationItem;
@@ -34,6 +35,7 @@ import com.sapereapi.model.referential.EnvironmentalImpact;
 import com.sapereapi.model.referential.PriorityLevel;
 
 import Jama.Matrix;
+import eu.sapere.middleware.log.AbstractLogger;
 import eu.sapere.middleware.lsa.Lsa;
 import eu.sapere.middleware.lsa.SyntheticPropertyName;
 
@@ -42,7 +44,6 @@ public class SapereUtil {
 	public final static String CR = System.getProperty("line.separator"); // Cariage return
 	public final static String DOUBLE_QUOTE = "\"";
 	public final static String SINGLE_QUOTE = "'";
-
 
 	/**/
 	public static AgentState parseState(String sState) throws Exception {
@@ -206,7 +207,7 @@ public class SapereUtil {
 		return result;
 	}
 
-	public static String formaMapValues(Map<String, Double> mapValues) {
+	public static String formaMapValues(Map<String, Double> mapValues, DecimalFormat decFormat) {
 		if (mapValues == null) {
 			return "";
 		}
@@ -221,7 +222,7 @@ public class SapereUtil {
 		for (String key : listKeys) {
 			Double value = mapValues.get(key);
 			result.append(sep);
-			result.append(key).append("(").append(UtilDates.df.format(value)).append(")");
+			result.append(key).append("(").append(decFormat.format(value)).append(")");
 			sep = ",";
 		}
 		return result.toString();
@@ -275,6 +276,16 @@ public class SapereUtil {
 		} else if (oValue instanceof Double) {
 			Double doubleValue = (Double) oValue;
 			return doubleValue.doubleValue();
+		} else if (oValue instanceof String) {
+			String sValue = (String) oValue;
+			if(!"".equals(sValue)) {
+				try {
+					return Double.valueOf(sValue);
+				} catch (NumberFormatException e) {
+					// TODO Auto-generated catch block
+					e.printStackTrace();
+				}
+			}
 		}
 		return 0;
 	}
@@ -308,6 +319,9 @@ public class SapereUtil {
 		} else if (oValue instanceof Integer) {
 			Integer intValue = (Integer) oValue;
 			return intValue.intValue();
+		} else if (oValue instanceof String) {
+			String sValue = (String) oValue;
+			return Integer.valueOf(sValue);
 		}
 		return 0;
 	}
@@ -326,6 +340,9 @@ public class SapereUtil {
 		} else if (oValue instanceof BigInteger) {
 			BigInteger intValue = (BigInteger) oValue;
 			return intValue.longValue();
+		} else if (oValue instanceof String) {
+			String sValue = (String) oValue;
+			return Long.valueOf(sValue);
 		}
 		return 0;
 	}
@@ -343,6 +360,22 @@ public class SapereUtil {
 			return intValue.floatValue();
 		}
 		return 0;
+	}
+
+	public static Date getDateValue(Map<String, Object> row, String columnName, AbstractLogger logger) {
+		Object oValue = row.get(columnName);
+		if(oValue instanceof Date) {
+			Date dateValue = (Date) oValue;
+			return dateValue;
+		} else if (oValue instanceof String) {
+			String sValue = (String) oValue;
+			try {
+				return UtilDates.format_sql.parse(sValue);
+			} catch (ParseException e) {
+				logger.error(e);
+			}
+		}
+		return null;
 	}
 
 	public static DeviceCategory getDeviceCategoryValue(Map<String, Object> row, String columnName) {
@@ -437,6 +470,14 @@ public class SapereUtil {
 		if (agentName.endsWith("*")) {
 			int len = agentName.length();
 			return agentName.substring(0, len - 1);
+		} else {
+			return agentName;
+		}
+	}
+
+	public static String addStar(String agentName) {
+		if (!agentName.endsWith("*")) {
+			return (agentName+"*");
 		} else {
 			return agentName;
 		}
@@ -556,9 +597,10 @@ public class SapereUtil {
 
 	public static PricingTable auxComputeMapPricingTable(
 			 Map<String, Double> mapPowers
-			,Map<String, PricingTable> mapPricingTables) {
+			,Map<String, PricingTable> mapPricingTables
+			,long timeShiftMS) {
 		if(mapPricingTables.size() == 0) {
-			return new PricingTable();
+			return new PricingTable(timeShiftMS);
 		} else if(mapPricingTables.size() == 1) {
 			String producer = mapPricingTables.keySet().iterator().next();
 			return mapPricingTables.get(producer);
@@ -571,7 +613,7 @@ public class SapereUtil {
 				listOfListOfTimeSlots.add(nextPricingTable.getTimeSlots());
 			}
 			//List<TimeSlot> listTimeSlots = mergeTimeSlots(listOfListOfTimeSlots);
-			PricingTable result = new PricingTable();
+			PricingTable result = new PricingTable(timeShiftMS);
 			for(TimeSlot nextTimeSlot : listTimeSlots) {
 				Date beginDate = nextTimeSlot.getBeginDate();
 				Date endDate = nextTimeSlot.getEndDate();

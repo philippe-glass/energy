@@ -10,8 +10,6 @@ import java.util.Map;
 import java.util.Set;
 import java.util.TreeMap;
 
-import org.springframework.core.env.Environment;
-
 import com.sapereapi.log.SapereLogger;
 import com.sapereapi.model.NodeContext;
 import com.sapereapi.model.TimeSlot;
@@ -35,9 +33,10 @@ import com.sapereapi.util.SapereUtil;
 import com.sapereapi.util.UtilDates;
 
 import Jama.Matrix;
+import eu.sapere.middleware.node.NodeConfig;
 
 public class PredictionDbHelper {
-	private static Environment environment = null;
+	private static DBConfig dbConfig = null;
 	private static DBConnection dbConnection = null;
 	//private static DBConnection dbConnectionClemapData = null;
 	private static PredictionDbHelper instance = null;
@@ -47,8 +46,8 @@ public class PredictionDbHelper {
 	public final static String CLEMAPDATA_DBNAME = "clemap_data_light";
 
 
-	public static void init(Environment _environment) {
-		environment = _environment;
+	public static void init(DBConfig aDBConfig) {
+		dbConfig = aDBConfig;
 		// initialise db connection
 		instance = new PredictionDbHelper();
 	}
@@ -61,11 +60,7 @@ public class PredictionDbHelper {
 
 	public PredictionDbHelper() {
 		// initialise db connection
-		String url = environment.getProperty("spring.datasource.url");
-		String user = environment.getProperty("spring.datasource.username");
-		String password = environment.getProperty("spring.datasource.password");
-		dbConnection = new DBConnection(url, user, password);
-		//dbConnectionClemapData = new DBConnection("jdbc:mariadb://129.194.10.168/clemap_data", "import_clemap", "sql2537");
+		dbConnection = new DBConnection(dbConfig, logger);
 	}
 
 	public static String getSessionId() {
@@ -94,55 +89,69 @@ public class PredictionDbHelper {
 		if(!nodeTotal.hasActivity()) {
 			//return result;
 		}
+		boolean sqlite = dbConnection.useSQLLite();
+		String reqSeparator2 = DBConnection.getReqSeparator2();
 		String sessionId1 = getSessionId();
 		String sessionId2 = addSingleQuotes(sessionId1);
 		Long ctxId = nodeContext.getId();
 		String scenario = nodeContext.getScenario();
-		String location = nodeTotal.getLocation();
+		NodeConfig nodeConfig = nodeTotal.getNodeConfig();
 		Map<String, MarkovState> mapStates = nodeMarkovStates.getMapStates();
 		Map<String, Double> mapValues = nodeMarkovStates.getMapValues();
 		StringBuffer query1 = new StringBuffer();
 		String sqlDate1 = UtilDates.format_sql.format(nodeTotal.getDate());
 		String sqlDate2 = addSingleQuotes(sqlDate1);
 		// Clean existing data in state_history for the same dates
-		query1.append("DROP TEMPORARY TABLE IF EXISTS TmpCleanSH");
-		query1.append(CR).append("§");
-		query1.append("CREATE TEMPORARY TABLE TmpCleanSH AS")
+		query1.append(CR).append("DROP TEMPORARY TABLE IF EXISTS TmpCleanSH");
+		query1.append(reqSeparator2);
+		query1.append(CR).append("CREATE TEMPORARY TABLE TmpCleanSH AS")
 			.append(CR).append("SELECT id FROM state_history WHERE date BETWEEN ").append(sqlDate2).append(" AND DATE_ADD(").append(sqlDate2).append(", INTERVAL 1 HOUR)")
 			.append(CR).append(" AND id_context = ").append(ctxId)
 			.append(CR).append(" AND NOT id_session = ").append(sessionId2);
-		query1.append(CR).append("§");
-		query1.append("DROP TEMPORARY TABLE IF EXISTS TmpSH2");
-		query1.append(CR).append("§");
-		query1.append("CREATE TEMPORARY TABLE TmpSH2 AS "
+		query1.append(reqSeparator2);
+		query1.append(CR).append("DROP TEMPORARY TABLE IF EXISTS TmpSH2");
+		query1.append(reqSeparator2);
+		query1.append(CR).append("CREATE TEMPORARY TABLE TmpSH2 AS "
 				+ " SELECT sh.id FROM TmpCleanSH"
 				+ " JOIN state_history sh  on sh.id_last  = TmpCleanSH.id");
-		query1.append(CR).append("§");
-		query1.append("UPDATE TmpSH2"
+		query1.append(reqSeparator2);
+		query1.append(CR).append("UPDATE TmpSH2"
 				+ CR + " JOIN state_history sh ON sh.id = TmpSH2.id"
 				+ CR + " SET sh.id_last = NULL");
-		query1.append(CR).append("§");
-		query1.append("DROP TEMPORARY TABLE IF EXISTS TmpPrediction2");
-		query1.append(CR).append("§");
-		query1.append("CREATE TEMPORARY TABLE TmpPrediction2 AS "
+		query1.append(reqSeparator2);
+		query1.append(CR).append("DROP TEMPORARY TABLE IF EXISTS TmpPrediction2");
+		query1.append(reqSeparator2);
+		query1.append(CR).append("CREATE TEMPORARY TABLE TmpPrediction2 AS "
 				+ CR + " SELECT p.id FROM TmpCleanSH"
 				+ CR + " JOIN prediction p ON p.id_target_state_histo  = TmpCleanSH.id");
-		query1.append(CR).append("§");
-		query1.append("UPDATE TmpPrediction2"
+		query1.append(reqSeparator2);
+		query1.append(CR).append("UPDATE TmpPrediction2"
 				+ CR + " JOIN prediction p ON p.id = TmpPrediction2.id"
 				+ CR + " SET p.id_target_state_histo = NULL");
-		query1.append(CR).append("§");
-		query1.append("DELETE state_history FROM state_history WHERE id IN (SELECT id FROM TmpCleanSH)");
+		query1.append(reqSeparator2);
+		query1.append(CR).append("DELETE state_history FROM state_history WHERE id IN (SELECT id FROM TmpCleanSH)");
 		dbConnection.execUpdate(query1.toString());
 
 		// Insert data into state_history table
 		StringBuffer query2 = new StringBuffer();
-		query2.append("SET @date_last = (SELECT MAX(date) FROM state_history WHERE id_context = " + ctxId
-			+ " AND date < " + sqlDate2
-			+ " AND id_session = " + sessionId2
-			+ ")");
-		query2.append(CR).append("§");
-		query2.append(CR).append("INSERT INTO state_history(id_context,date,date_last,id_session,variable_name,location,scenario,state_idx,state_name,value,id_last) VALUES ");
+		if(sqlite) {
+			query2.append(DBConnection.generateQueryCreateVariableTable());
+			query2.append(reqSeparator2);
+			query2.append(CR).append("INSERT INTO _variables(name, date_value)")
+			.append(CR).append("SELECT 'date_last', MAX(date) "
+					+ CR + " FROM state_history WHERE id_context =" + ctxId
+					+ " AND date < " + sqlDate2
+					+ " AND id_session = " + sessionId2
+					+ "");
+		} else {
+			query2.append(CR).append("SET @date_last = (SELECT MAX(date) FROM state_history WHERE id_context = " + ctxId
+				+ " AND date < " + sqlDate2
+				+ " AND id_session = " + sessionId2
+				+ ")");
+		}
+		String varDateLast = sqlite? "(SELECT date_value FROM _variables WHERE name = 'date_last')" : "@date_last";
+		query2.append(reqSeparator2);
+		query2.append(CR).append("INSERT INTO state_history(id_context,date,date_last,id_session,variable_name,location,scenario,state_idx,state_name,value,id_last) VALUES ").append(CR);
 		boolean stateAdded = false;
 		for(String variable : nodeMarkovStates.getVariables()) {
 			if(mapStates.containsKey(variable)) {
@@ -154,33 +163,37 @@ public class PredictionDbHelper {
 				int stateIdx = state.getId() -1;
 				String stateName = "S"+ state.getId();
 				if(stateAdded) {
-					query2.append(", ");
+					query2.append(CR).append(", ");
 				}
 				query2.append("(")
 					.append(ctxId)
 					.append(",").append(sqlDate2)
-					.append(",@date_last")
+					.append(",").append(varDateLast)
 					.append(",").append(sessionId2)
 					.append(",").append(addSingleQuotes(variable))
-					.append(",").append(addSingleQuotes(location)).append(",").append(addSingleQuotes(scenario))
+					.append(",").append(addSingleQuotes(nodeConfig.getMainServiceAddress())).append(",").append(addSingleQuotes(scenario))
 					.append(",").append(stateIdx).append(",").append(addSingleQuotes(stateName))
 					.append(",").append(addQuotes(value))
 					.append(",").append("(SELECT lastSH.id FROM state_history AS lastSH WHERE lastSH.id_session = " + sessionId2
-											+ " AND lastSH.date = @date_last AND lastSH.variable_name = " + addSingleQuotes(variable) + " LIMIT 0,1)")
+											+ " AND lastSH.date = " + varDateLast + " AND lastSH.variable_name = " + addSingleQuotes(variable) + " LIMIT 0,1)")
 					.append(")");
 				stateAdded = true;
 			}
 		}
-		query2.append(CR).append(" ON DUPLICATE KEY UPDATE value = value");
-		query2.append(CR).append("§");
+		if(sqlite) {
+			query2.append(CR).append(" ON CONFLICT DO UPDATE SET value = value");
+		} else {
+			query2.append(CR).append(" ON DUPLICATE KEY UPDATE value = value");
+		}
+		query2.append(CR).append(reqSeparator2);
 		query2.append(CR).append("UPDATE state_history SET ")
 			.append(CR).append("    state_idx_last =  (SELECT MAX(last.state_idx) FROM state_history AS last WHERE last.id = state_history.id_last)" )
 			.append(CR).append("   ,state_name_last =  (SELECT MAX(last.state_name) FROM state_history AS last WHERE last.id = state_history.id_last)" )
 			.append(CR).append(" WHERE id_session = " + sessionId2 + " AND  date = " + sqlDate2 + " AND NOT id_last IS NULL");
-		query2.append(CR).append("§");
+		query2.append(CR).append(reqSeparator2);
 		query2.append(CR).append("UPDATE state_history SET ")
 		.append(CR).append("date_next =  " + sqlDate2)
-		.append(CR).append(" WHERE id_session = " + sessionId2 + " AND  date = @date_last");
+		.append(CR).append(" WHERE id_session = " + sessionId2 + " AND  date = " + varDateLast);
 /*
 		query2.append(CR).append("UPDATE state_history SET ")
 				.append(CR).append("date_next = (SELECT next_sh.date FROM state_history as next_sh")
@@ -313,7 +326,7 @@ public class PredictionDbHelper {
 			.append(CR).append(" FROM transition_matrix ")
 			.append(CR).append(" WHERE transition_matrix.id_time_window IN (").append(sIdsTimeWindows).append(")")
 			.append(CR).append(" 	AND variable_name IN (").append(sVariableNames).append(")")
-			.append(CR).append(" 	AND location = ").append(addSingleQuotes(predictionContext.getLocation()))
+			.append(CR).append(" 	AND location = ").append(addSingleQuotes(predictionContext.getMainServiceAddress()))
 			.append(CR).append(" 	AND scenario = ").append(addSingleQuotes(predictionContext.getScenario()))
 		;
 		loadQuery1.append(CR).append("§");
@@ -414,7 +427,7 @@ public class PredictionDbHelper {
 		String query1 = "SELECT sh.date "
 				+ CR + "FROM state_history sh "
 				+ CR + "JOIN state_history AS last ON last.id = sh.id_last"
-				+ CR + "WHERE sh.location = "+ addSingleQuotes(predictionContext.getLocation())
+				+ CR + "WHERE sh.location = "+ addSingleQuotes(predictionContext.getMainServiceAddress())
 				+ CR + " AND sh.scenario = " + addSingleQuotes(predictionContext.getScenario())
 				+ " AND sh.variable_name = " + addSingleQuotes(firstVariable)
 				+ " AND sh.date >= " + addSingleQuotes(sqlDateMin)
@@ -443,7 +456,7 @@ public class PredictionDbHelper {
 				+ CR + "SELECT sh.date "
 				+ CR + "FROM state_history sh "
 				+ CR + "JOIN state_history AS last ON last.id = sh.id_last"
-				+ CR + "WHERE sh.location = "+ addSingleQuotes(predictionContext.getLocation())
+				+ CR + "WHERE sh.location = "+ addSingleQuotes(predictionContext.getMainServiceAddress())
 				+ " AND sh.scenario = " + addSingleQuotes(predictionContext.getScenario())
 				+ " AND sh.variable_name = " + addSingleQuotes(firstVariable)
 				+ " AND UNIX_TIMESTAMP(sh.date) >= @ut_date - 300"
@@ -478,7 +491,7 @@ public class PredictionDbHelper {
 		String query = "SELECT sh.date, sh.variable_name, sh.value, last.value AS value_last "
 				+ CR + "FROM state_history sh "
 				+ CR + "JOIN state_history AS last ON last.id = sh.id_last"
-				+ CR + "WHERE sh.location = "+ addSingleQuotes(predictionContext.getLocation())
+				+ CR + "WHERE sh.location = "+ addSingleQuotes(predictionContext.getMainServiceAddress())
 				+ " AND sh.scenario = " + addSingleQuotes(predictionContext.getScenario())
 				+ CR + " AND sh.variable_name IN (" + variableFilter + ")"
 				+ CR + " AND sh.date IN (" + dateFilter + ")"
@@ -555,7 +568,7 @@ public class PredictionDbHelper {
 		MarkovTimeWindow timeWindow = nodeTransitionMatrices.getTimeWindow();
 		Integer timeWindowId = nodeTransitionMatrices.getTimeWindowId();
 		//TransitionMatrixScope scope = nodeTransitionMatrices.getScope();
-		String location = nodeTransitionMatrices.getLocation();
+		String location = nodeTransitionMatrices.getNodeConfig().getMainServiceAddress();
 		String scenario = nodeTransitionMatrices.getScenario();
 		if(timeWindowId>0) {
 			boolean refreshTransitionMatrixCells = false;
@@ -794,6 +807,7 @@ public class PredictionDbHelper {
 		Date maxDate = UtilDates.removeTime(targetTimeSLot.getEndDate());
 		int minHour = UtilDates.getHourOfDay(targetTimeSLot.getBeginDate());
 		int maxHour = UtilDates.getHourOfDay(targetTimeSLot.getEndDate());
+		long timeShiftMS = predictionContext.getTimeShiftMS();
 		Map<String, StatesStatistic> mapStateStatistics = retrieveStatesStatistics(predictionContext, computeDayFilter, computeDayFilter, minDate, maxDate, minHour, maxHour, null);
 		if(mapStateStatistics.size() == 0) {
 			return new ArrayList<>();
@@ -847,7 +861,7 @@ public class PredictionDbHelper {
 			MarkovState initialState = NodeMarkovStates.getById(1+initialStateIdx);
 			MarkovState actualState = NodeMarkovStates.getById(1+actualStateIdx);
 			//MarkovState predictedState = NodeMarkovStates.getById(1+predictedStateIdx);
-			PredictionResult predictionResult = new PredictionResult(initialDate, initialState, targetDate, variable, targetTW);
+			PredictionResult predictionResult = new PredictionResult(initialDate, initialState, targetDate, variable, targetTW, timeShiftMS);
 			predictionResult.setActualTargetState(actualState);
 			predictionResult.setPredictionId(predictionId);
 			predictionResult.setActualStatesStatistic(actualStatesStatistics);
@@ -918,7 +932,7 @@ public class PredictionDbHelper {
 					long horizonMinutes = Math.round(predictionResult.getTimeHorizonMinutes());
 					sqlInsertPrediction.append("INSERT INTO prediction SET variable_name=").append(addSingleQuotes(variableName))
 						.append(", id_context =").append(predictionCtx.getId())
-						.append(", location =").append(addSingleQuotes(predictionCtx.getLocation()))
+						.append(", location =").append(addSingleQuotes(predictionCtx.getMainServiceAddress()))
 						.append(", scenario =").append(addSingleQuotes(predictionCtx.getScenario()))
 						.append(", initial_date=").append(sqlInitialDate)
 						.append(", target_date=").append(addSingleQuotes(UtilDates.format_sql.format(targetDate)))
@@ -1113,7 +1127,7 @@ public class PredictionDbHelper {
 			,Integer maxHour
 			,String variableFilter) {
 		Long ctxId = predictionContext.getId();
-		String location = predictionContext.getLocation();
+		String location = predictionContext.getMainServiceAddress();
 		String scenario = predictionContext.getScenario();
 		//List<StatesStatistic> result = new ArrayList<StatesStatistic>();
 		String sqlMinCreationDate = minCreationDate==null ? "NULL" : addSingleQuotes(UtilDates.format_sql_day.format(minCreationDate));
@@ -1195,12 +1209,12 @@ public class PredictionDbHelper {
 			,Integer maxHour
 			,Boolean useCorrectionFilter
 			,String variableFilter
-			,List<String> fieldsToMerge
+			,String[] fieldsToMerge
 			) {
 		logger.info("computePredictionStatistics : begin");
 		consolidatePredictions(predictionContext);
 		Long ctxId = predictionContext.getId();
-		String location = predictionContext.getLocation();
+		String location = predictionContext.getMainServiceAddress();
 		String scenario = predictionContext.getScenario();
 		Map<String,PredictionStatistic> result = new HashMap<String, PredictionStatistic>();
 		String sqlMinComputeDate = (minComputeDate == null)? "NULL" : addSingleQuotes(UtilDates.format_sql_day.format(minComputeDate));
@@ -1220,12 +1234,14 @@ public class PredictionDbHelper {
 			.append(")")
 		;
 		dbConnection.execUpdate(query1.toString());
+		logger.info("query1 = " + query1);
 		// Retrieve states distribution
 		Map<String, StatesStatistic> mapStatesStatistics = retrieveStatesStatistics(predictionContext, minComputeDate, maxComputeDate, minTargetDate, maxTargetDate, minHour, maxHour, variableFilter);
 		String groupByClause = "compute_day, target_day, variable_name";
-		boolean mergeHorizons = fieldsToMerge.contains("horizon");
-		boolean mergeUseCorrections = fieldsToMerge.contains("useCorrection");
-		boolean mergeHour  = fieldsToMerge.contains("hour");
+		List<String> listFieldsToMerge = Arrays.asList(fieldsToMerge);
+		boolean mergeHorizons = listFieldsToMerge.contains("horizon");
+		boolean mergeUseCorrections =listFieldsToMerge.contains("useCorrection");
+		boolean mergeHour  = listFieldsToMerge.contains("hour");
 		if(!mergeHorizons) {
 			groupByClause = groupByClause+",horizon";
 		}
@@ -1253,7 +1269,9 @@ public class PredictionDbHelper {
 			.append(CR).append( "	,AVG(gini_index) AS gini_index")
 			.append(CR).append( "	,AVG(shannon_entropie) AS shannon_entropie")
 			.append(CR).append( "	,Count(*) as nb_results")
-			.append(CR).append( "	,(SELECT ID from transition_matrix tm WHERE tm.variable_name = TmpPredictionStatistic.variable_name AND id_time_window = TmpPredictionStatistic.id_initial_time_window ")
+			.append(CR).append( "	,(SELECT ID FROM transition_matrix tm WHERE tm.variable_name = TmpPredictionStatistic.variable_name"
+											+ CR + " AND tm.id_time_window = TmpPredictionStatistic.id_initial_time_window "
+											+ CR + " AND tm.location = TmpPredictionStatistic.location ")
 			.append(CR).append( "				AND tm.id_context = TmpPredictionStatistic.id_context) AS id_tm")
 			.append(CR).append( "	FROM TmpPredictionStatistic")
 			//.append(CR).append( "	WHERE date>=").append(addSingleQuotes( sqlMinDate))
@@ -1261,6 +1279,7 @@ public class PredictionDbHelper {
 			//.append(CR).append( "	ORDER BY rate_ok2, shannon_entropie DESC")
 			.append(CR).append( "	ORDER BY date_begin, variable_name, horizon")
 		;
+		//logger.info("query3 = " + query3);
 		List<Map<String, Object>> rows = dbConnection.executeSelect(query3.toString());
 		for(Map<String, Object> nextRow : rows) {
 			PredictionStatistic nextStatistic = new PredictionStatistic();

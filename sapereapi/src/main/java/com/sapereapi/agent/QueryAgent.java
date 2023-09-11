@@ -34,9 +34,8 @@ public class QueryAgent extends SapereAgent {
 	protected static SapereLogger logger = SapereLogger.getInstance();
 
 	public QueryAgent(String agentName, AgentAuthentication authentication, String[] subdescription, String[] propertiesName, Object[] values,
-			LsaType type) {
-
-		super(agentName, authentication, subdescription, propertiesName, type);
+			LsaType type, boolean activateQOS) {
+		super(agentName, authentication, subdescription, propertiesName, type, activateQOS);
 		initFields(agentName, subdescription, propertiesName, values, type);
 
 		setInitialLSA();

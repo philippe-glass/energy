@@ -14,6 +14,7 @@ import com.sapereapi.model.markov.MarkovState;
 import com.sapereapi.model.markov.MarkovTimeWindow;
 import com.sapereapi.model.markov.NodeMarkovTransitions;
 import com.sapereapi.model.markov.TransitionMatrixKey;
+import com.sapereapi.util.SapereUtil;
 import com.sapereapi.util.UtilDates;
 
 public class PredictionData implements Serializable {
@@ -345,8 +346,18 @@ public class PredictionData implements Serializable {
 
 	@Override
 	public String toString() {
-		return "PredictionData [scenario = " + context.getScenario() + ", initialDate=" + UtilDates.formatTimeOrDate(initialDate)
-				+ ", targetDate=" + UtilDates.formatTimeOrDate(getLastTargetDate()) + ", initialStates="
-				+ initialStates + ", mapResults=" + mapResults + "]";
+		long timeShiftMS = context.getTimeShiftMS();
+		StringBuffer result = new StringBuffer();
+		result.append("PredictionData [scenario = ").append(context.getScenario())
+			.append(" : ").append(UtilDates.formatTimeOrDate(initialDate, timeShiftMS))
+			.append(", initialStates=").append(initialStates);
+		result.append(SapereUtil.CR);
+		for(Map<Date, PredictionResult> nextTableResult : mapResults.values()) {
+			for(PredictionResult predResut : nextTableResult.values()) {
+				result.append(predResut);
+				result.append(SapereUtil.CR).append("");
+			}
+		}
+		return result.toString();
 	}
 }

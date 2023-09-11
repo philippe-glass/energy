@@ -190,9 +190,9 @@ public class Contract extends CompositeOffer implements IEnergyObject, Cloneable
 			result.append(" [merged] ");
 		}
 		if (!restricted) {
-			result.append(" : ").append(SapereUtil.formaMapValues(this.mapPower));
+			result.append(" : ").append(SapereUtil.formaMapValues(this.mapPower, UtilDates.df3));
 		}
-		result.append(" Sum W= " + UtilDates.df.format(this.getPower())).append(" From ")
+		result.append(" Sum W= " + UtilDates.df3.format(this.getPower())).append(" From ")
 				.append(beginDate==null?"" : UtilDates.format_time.format(this.beginDate))
 				.append(" To ")
 				.append(endDate==null?"" : UtilDates.format_time.format(this.endDate))
@@ -220,9 +220,8 @@ public class Contract extends CompositeOffer implements IEnergyObject, Cloneable
 		return false;
 	}
 
-	@Override
-	public Contract clone() {
-		CompositeOffer globalOffer = (CompositeOffer) super.clone();
+	public Contract copy(boolean copyIds) {
+		CompositeOffer globalOffer = (CompositeOffer) super.copy(copyIds);
 		Date cloneValidationDealine = (this.validationDeadline == null) ? null : new Date(validationDeadline.getTime());
 		Contract result = new Contract(globalOffer, cloneValidationDealine);
 		Set<String> copyAgreements = new HashSet<>();
@@ -236,6 +235,16 @@ public class Contract extends CompositeOffer implements IEnergyObject, Cloneable
 		}
 		result.setDisagreements(copyDisagreements);
 		return result;
+	}
+
+	@Override
+	public Contract clone() {
+		return copy(true);
+	}
+
+	@Override
+	public Contract copyForLSA() {
+		return copy(false);
 	}
 
 

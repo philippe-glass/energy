@@ -62,5 +62,7 @@ public interface IEnergyAgent {
 	void handleWarningChangeRequest(RegulationWarning warning);
 	void handleReschedule(RescheduleTable rescheduleTable);
 	void cleanExpiredData();
+	String getLocation();
+	String getNodeName();
 	IProducerPolicy getProducerPolicy();
 }

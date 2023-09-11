@@ -1,21 +1,30 @@
-version: "2"
+version: "3"
+
+
+volumes:
+  log:
+  db:
+  run_configs:
+
 services:
-  mongodb:
-    image: mongo:latest
-    container_name: "mongodb"
+  sqlite3:
+    image: keinos/sqlite3:latest
+    container_name: "sqlite3"
+    # ports:
+    # - 27017:27017
+  app1:
+    image: philippeglass1/coordination_platform:1
+    container_name: "node1"
     ports:
-    - 27017:27017
-  app:
-    image: houcembenmahfoudh/springbootapi:1
-    ports:
-    - 10009:10009
+    - 10001:10001
+    - 9191:9191
     restart:
       on-failure
+    volumes:
+    - log:/log
+    - db:/db
+    - run_configs:/run_configs
     links:
-    - mongodb
-  angular:
-    image: houcembenmahfoudh/angular:1
-    ports:
-    - 4200:80
-    links:
-    - app
+    - sqlite3
+
+ 

@@ -7,8 +7,9 @@ import com.sapereapi.model.Sapere;
 
 import eu.sapere.middleware.agent.AgentAuthentication;
 import eu.sapere.middleware.agent.SapereAgent;
+import eu.sapere.middleware.lsa.IPropertyObject;
 
-public abstract class ProtectedObject {
+public abstract class ProtectedObject implements IPropertyObject {
 	protected Set<AgentAuthentication> validAuthentications = new HashSet<AgentAuthentication>();
 
 	protected boolean checkAuthentication(AgentAuthentication authentication) {

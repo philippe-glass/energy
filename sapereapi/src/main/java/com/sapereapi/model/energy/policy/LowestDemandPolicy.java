@@ -3,7 +3,6 @@ package com.sapereapi.model.energy.policy;
 import java.util.Date;
 
 import com.sapereapi.agent.energy.EnergyAgent;
-import com.sapereapi.log.SapereLogger;
 import com.sapereapi.model.TimeSlot;
 import com.sapereapi.model.energy.PricingTable;
 import com.sapereapi.util.UtilDates;
@@ -32,7 +31,7 @@ public class LowestDemandPolicy extends BasicProducerPolicy {
 			double usedCurrent = ongoingContractsCurrent + waitingContractsCurrent + offersTotalCurrent;
 			if (producedCurrent > 0 && usedCurrent > 0) {
 				Date current = producerAgent.getCurrentDate();
-				PricingTable result = new PricingTable();
+				PricingTable result = new PricingTable(producerAgent.getTimeShiftMS());
 				for (TimeSlot nextTimeSlot : defaultPricingTable.getTimeSlots()) {
 					Date beginDate = nextTimeSlot.getBeginDate();
 					Date endDate = nextTimeSlot.getEndDate();

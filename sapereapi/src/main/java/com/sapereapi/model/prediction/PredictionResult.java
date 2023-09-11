@@ -2,13 +2,19 @@ package com.sapereapi.model.prediction;
 
 import java.io.Serializable;
 import java.util.ArrayList;
+import java.util.Collections;
+import java.util.Comparator;
 import java.util.Date;
+import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 
 import com.sapereapi.model.markov.MarkovState;
 import com.sapereapi.model.markov.MarkovTimeWindow;
 import com.sapereapi.model.markov.NodeMarkovStates;
 import com.sapereapi.model.markov.TransitionMatrixKey;
+import com.sapereapi.util.SapereUtil;
 import com.sapereapi.util.UtilDates;
 
 import Jama.Matrix;
@@ -26,8 +32,9 @@ public class PredictionResult implements Serializable {
 	private StatesStatistic actualStatesStatistic;
 	private MarkovTimeWindow targetTimeWindow;
 	private Long predictionId;
+	private Long timeShiftMS;
 
-	public PredictionResult(Date _initialDate, MarkovState _initialState, Date _targetDate, String _variable, MarkovTimeWindow _targetTimeWindow) {
+	public PredictionResult(Date _initialDate, MarkovState _initialState, Date _targetDate, String _variable, MarkovTimeWindow _targetTimeWindow, long _timeShiftMS) {
 		super();
 		this.initialDate = _initialDate;
 		this.targetDate = _targetDate;
@@ -35,6 +42,7 @@ public class PredictionResult implements Serializable {
 		this.initialState = _initialState;
 		this.targetTimeWindow = _targetTimeWindow;
 		this.stateProbabilities = new ArrayList<Double>();
+		this.timeShiftMS = _timeShiftMS;
 		this.predictionId = null;
 	}
 
@@ -233,18 +241,74 @@ public class PredictionResult implements Serializable {
 		return 1 - differential;
 	}
 
+	public Map<MarkovState, Double> getMapStateProba() {
+		Map<MarkovState, Double> simpleMap = new HashMap<MarkovState, Double>();
+		int stateIdx = 0;
+		for (double nextProba : stateProbabilities) {
+			MarkovState nextState = NodeMarkovStates.getStatesList().get(stateIdx);
+			simpleMap.put(nextState, nextProba);
+			stateIdx++;
+		}
+		return simpleMap;
+	}
+
+	public Map<MarkovState, Double> getSortedMapStateProba() {
+		Map<MarkovState, Double> simpleMap = getMapStateProba();
+		ArrayList<Map.Entry<MarkovState, Double>> arrayOfEntries = new ArrayList<Map.Entry<MarkovState, Double>>();
+		 for(Map.Entry<MarkovState, Double> e: simpleMap.entrySet()) {
+			arrayOfEntries.add(e);
+		}
+		Comparator<Map.Entry<MarkovState, Double>> valueComparator = new Comparator<Map.Entry<MarkovState, Double>>() {
+            @Override
+            public int compare(Map.Entry<MarkovState, Double> e1, Map.Entry<MarkovState, Double> e2) {
+                Double v1 = e1.getValue();
+                Double v2 = e2.getValue();
+                return v2.compareTo(v1);
+            }
+		};
+		Collections.sort(arrayOfEntries, valueComparator);
+		Map<MarkovState, Double> result = new LinkedHashMap<MarkovState, Double>();
+		for(Map.Entry<MarkovState, Double> e: arrayOfEntries) {
+			result.put(e.getKey(), e.getValue());
+			//System.out.println(e.getValue());
+		}
+		return result;
+	}
+
 	@Override
 	public String toString() {
 		StringBuffer result = new StringBuffer();
 		StringBuffer sStateProbabilities = new StringBuffer();
+		sStateProbabilities.append("[");
 		for (double nextProba : stateProbabilities) {
-			sStateProbabilities.append(UtilDates.df2.format(nextProba));
-			sStateProbabilities.append(",");
+			sStateProbabilities.append(UtilDates.df3.format(nextProba));
+			sStateProbabilities.append(";");
 		}
-		result.append("PredictionResult [initialDate=").append(UtilDates.format_date_time.format(initialDate))
-				.append(",targetDate=").append(UtilDates.format_date_time.format(targetDate)).append(", variable=")
-				.append(variable).append(", stateProbabilities=").append(sStateProbabilities)
-				.append(", radomTargetState=").append(radomTargetState).append("]");
+		sStateProbabilities.append("]");
+		StringBuffer sStateProbabilities2 = new StringBuffer();
+		sStateProbabilities2.append("[");
+		Map<MarkovState, Double> mapProba = getSortedMapStateProba();
+		for(MarkovState nextState : mapProba.keySet()) {
+			Double nextProba = mapProba.get(nextState);
+			double nextProba2 = SapereUtil.round(nextProba, 3);
+			if(nextProba2>0) {
+				sStateProbabilities2.append(nextState.getName()).append("=");
+				sStateProbabilities2.append(UtilDates.df.format(100*nextProba2)).append("%");
+				sStateProbabilities2.append("    ");
+			}
+		}
+		sStateProbabilities2.append("]");
+		double horizonMin = getTimeHorizonMinutes();
+		long horizonMin2 = Math.round(horizonMin);
+		result.append("PredictionResult [")
+				.append("'").append(variable).append("' : ")
+				.append("").append(UtilDates.formatTimeOrDate(initialDate, timeShiftMS)).append(" -> ")
+				//.append("").append(UtilDates.formatTimeOrDate(targetDate, timeShiftMS))
+				.append("[+").append(horizonMin2).append("min]")
+				//.append(", stateProbabilities=").append(sStateProbabilities)
+				.append(", stateProbabilities2=").append(sStateProbabilities2)
+				//.append(", radomTargetState=").append(radomTargetState)
+				.append("]");
 		return result.toString();
 	}
 }

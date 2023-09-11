@@ -12,13 +12,15 @@ import com.sapereapi.log.SapereLogger;
 import com.sapereapi.util.SapereUtil;
 import com.sapereapi.util.UtilDates;
 
+import eu.sapere.middleware.node.NodeConfig;
+
 public class NodeTotal implements Cloneable, Serializable{
 	private static final long serialVersionUID = 15078L;
 	protected Long id;
 	protected Long idLast;
 	protected Long idNext;
 	protected String sessionId;
-	protected String location;
+	protected NodeConfig nodeConfig;
 	protected int distance;
 	protected Double requested;
 	protected Double produced;
@@ -246,16 +248,16 @@ public class NodeTotal implements Cloneable, Serializable{
 		this.idNext = idNext;
 	}
 
-	public String getLocation() {
-		return location;
+	public NodeConfig getNodeConfig() {
+		return nodeConfig;
+	}
+
+	public void setNodeConfig(NodeConfig nodeConfig) {
+		this.nodeConfig = nodeConfig;
 	}
 
 	public int getDistance() {
 		return distance;
-	}
-
-	public void setLocation(String location) {
-		this.location = location;
 	}
 
 	public void setDistance(int distance) {
@@ -316,12 +318,12 @@ public class NodeTotal implements Cloneable, Serializable{
 	public String toString() {
 		StringBuffer result = new StringBuffer();
 		result.append("time ").append(UtilDates.format_time.format(this.date)).append(" requested:")
-				.append(UtilDates.df.format(this.requested))
-				.append(" produced:").append(UtilDates.df.format(this.produced))
-				.append(" provided:").append(UtilDates.df.format(this.provided))
-				.append(" consumed:").append(UtilDates.df.format(this.consumed))
-				.append(" available:").append(UtilDates.df.format(this.available))
-				.append(" missing:").append(UtilDates.df.format(this.missing));
+				.append(UtilDates.df3.format(this.requested))
+				.append(" produced:").append(UtilDates.df3.format(this.produced))
+				.append(" provided:").append(UtilDates.df3.format(this.provided))
+				.append(" consumed:").append(UtilDates.df3.format(this.consumed))
+				.append(" available:").append(UtilDates.df3.format(this.available))
+				.append(" missing:").append(UtilDates.df3.format(this.missing));
 		return result.toString();
 	}
 
@@ -335,7 +337,7 @@ public class NodeTotal implements Cloneable, Serializable{
 		result.setIdLast(idLast);
 		result.setIdNext(idNext);
 		result.setSessionId(sessionId);
-		result.setLocation(location);
+		result.setNodeConfig(nodeConfig.clone());
 		result.setDistance(distance);
 		result.setRequested(requested);
 		result.setProduced(produced);

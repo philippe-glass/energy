@@ -19,10 +19,12 @@ public class PricingTable implements Cloneable, Serializable {
 	private static final long serialVersionUID = 11175L;
 	// price in kWh by time slot
 	private Map<TimeSlot, Double> ratesTable = new HashMap<TimeSlot, Double>();
+	private long timeShiftMS = 0;
 
-	public PricingTable() {
+	public PricingTable(long _timeShiftMS) {
 		super();
 		this.ratesTable = new HashMap<>();
+		this.timeShiftMS = _timeShiftMS;
 	}
 
 	public Map<TimeSlot, Double> getRatesTable() {
@@ -33,7 +35,15 @@ public class PricingTable implements Cloneable, Serializable {
 		this.ratesTable = ratesTable;
 	}
 
-	public PricingTable(Date dateBegin, Date dateEnd, double rateKWH) {
+	public long getTimeShiftMS() {
+		return timeShiftMS;
+	}
+
+	public void setTimeShiftMS(long timeShiftMS) {
+		this.timeShiftMS = timeShiftMS;
+	}
+
+	public PricingTable(Date dateBegin, Date dateEnd, double rateKWH, long _timeShiftMS) {
 		super();
 		this.ratesTable = new HashMap<>();
 		addPrice(dateBegin, dateEnd, rateKWH);
@@ -87,7 +97,7 @@ public class PricingTable implements Cloneable, Serializable {
 						Double nextRate = getRate(nextBeginDate);
 						if(nextRate == null) {
 							SapereLogger.getInstance().error("addPrice : nextRate is null at "
-									+ UtilDates.formatTimeOrDate(nextBeginDate));
+									+ UtilDates.formatTimeOrDate(nextBeginDate, timeShiftMS));
 						} else {
 							newRatesTable.put(nexTimeSlot, nextRate);
 						}
@@ -129,7 +139,7 @@ public class PricingTable implements Cloneable, Serializable {
 		for (TimeSlot nextSlot : getTimeSlots()) {
 			//result.append(nextSlot);
 			result.append(sep);
-			result.append(UtilDates.formatTimeOrDate(nextSlot.getBeginDate()));
+			result.append(UtilDates.formatTimeOrDate(nextSlot.getBeginDate(), timeShiftMS));
 			result.append(" : ");
 			Object obj = ratesTable.get(nextSlot);
 			result.append(obj);
@@ -156,7 +166,7 @@ public class PricingTable implements Cloneable, Serializable {
 				// do nothing
 			} else if(nextSlot.getEndDate().before(minEndDate)) {
 				// do nothing
-				SapereLogger.getInstance().info("getLowestPriceTimeSlot endDate of " + nextSlot + " is before minEndDate " + UtilDates.formatTimeOrDate(minEndDate));
+				SapereLogger.getInstance().info("getLowestPriceTimeSlot endDate of " + nextSlot + " is before minEndDate " + UtilDates.formatTimeOrDate(minEndDate, timeShiftMS));
 			} else {
 				Double nextPrice = ratesTable.get(nextSlot);
 				if (lowestPrice == null || nextPrice.doubleValue() < lowestPrice.doubleValue()) {
@@ -169,7 +179,7 @@ public class PricingTable implements Cloneable, Serializable {
 	}
 
 	public PricingTable computeRise(double riseFactor) {
-		PricingTable result = new PricingTable();
+		PricingTable result = new PricingTable(timeShiftMS);
 		for (TimeSlot nextSlot : ratesTable.keySet()) {
 			double rate = riseFactor*ratesTable.get(nextSlot);
 			result.addPrice(nextSlot.getBeginDate(), nextSlot.getEndDate(), rate);
@@ -187,8 +197,16 @@ public class PricingTable implements Cloneable, Serializable {
 		return false;
 	}
 
+	public PricingTable copyForLSA() {
+		return copy(false);
+	}
+
 	public PricingTable clone() {
-		PricingTable result = new PricingTable();
+		return copy(true);
+	}
+
+	public PricingTable copy(boolean addIds) {
+		PricingTable result = new PricingTable(timeShiftMS);
 		for (TimeSlot nextSlot : ratesTable.keySet()) {
 			Double rate = ratesTable.get(nextSlot);
 			result.addPrice(nextSlot.getBeginDate(), nextSlot.getEndDate(), rate);

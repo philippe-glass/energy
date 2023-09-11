@@ -4,27 +4,82 @@ import java.text.DecimalFormat;
 import java.text.SimpleDateFormat;
 import java.util.Calendar;
 import java.util.Date;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Random;
+import java.util.TimeZone;
 
 public class UtilDates {
-	public final static SimpleDateFormat format_date_time = new SimpleDateFormat("yyyyMMdd HH:mm:ss");
-	public final static SimpleDateFormat format_time = new SimpleDateFormat("HH:mm:ss");
-	public final static SimpleDateFormat format_sql = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss");
-	public final static SimpleDateFormat format_sql_day = new SimpleDateFormat("yyyy-MM-dd");
-	public final static SimpleDateFormat format_day = new SimpleDateFormat("yyyyMMdd");
-	public final static SimpleDateFormat format_sessionid = new SimpleDateFormat("yyyyMMdd_HHmmss");
+	public static TimeZone timezone = TimeZone.getTimeZone("GMT");
+	public static SimpleDateFormat format_date_time = new SimpleDateFormat("yyyyMMdd HH:mm:ss");
+	public static SimpleDateFormat format_time = new SimpleDateFormat("HH:mm:ss");
+	public static SimpleDateFormat format_sql = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss");
+	public static SimpleDateFormat format_sql_day = new SimpleDateFormat("yyyy-MM-dd");
+	public static SimpleDateFormat format_day = new SimpleDateFormat("yyyyMMdd");
+	public static SimpleDateFormat format_sessionid = new SimpleDateFormat("yyyyMMdd_HHmmss");
+	public static SimpleDateFormat format_json_datetime_prev = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss");
+	public static SimpleDateFormat format_json_datetime = new SimpleDateFormat("yyyy-MM-dd HH:mm:ssZ");
+
+	static {
+		format_json_datetime.setTimeZone(TimeZone.getTimeZone("Europe/Zurich"));
+		/*
+		format_json_datetime.setTimeZone(TimeZone.getTimeZone("GMT"));
+		String test1 = format_json_datetime.format(new Date());
+		String test = "2021-09-04 14:08:00+0000";
+		try {
+			Date testDate = format_json_datetime.parse(test);
+		} catch (ParseException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}*/
+	}
+
+	public static TimeZone getTimezone() {
+		return timezone;
+	}
+
+	public static void setTimezone(TimeZone _timezone) {
+		timezone = _timezone;
+		format_date_time.setTimeZone(timezone);
+		format_time.setTimeZone(timezone);
+		format_sql.setTimeZone(timezone);
+		format_sql_day.setTimeZone(timezone);
+		format_day.setTimeZone(timezone);
+		format_sessionid.setTimeZone(timezone);
+		format_json_datetime_prev.setTimeZone(timezone);
+		format_json_datetime.setTimeZone(timezone);
+		Date date = new Date();
+		String sDate = format_json_datetime.format(date);
+		System.out.print(sDate);
+	}
+
 	public final static String CR = System.getProperty("line.separator"); // Cariage return
 
 	public final static DecimalFormat df = new DecimalFormat("#.##");
 	public final static DecimalFormat df2 = new DecimalFormat("#.#####");
+	public final static DecimalFormat df3 = new DecimalFormat("#.###");
 
 	public final static int MS_IN_MINUTE = 1000 * 60;
 	public final static int MS_IN_HOUR = 1000 * 60 * 60;
+	public final static int MS_IN_DAY = 1000 * 60 * 60 * 24;
 
 	public static boolean activateDateShift = true;
 
+	private static boolean shiftTimeZones = true;
+	public static Map<String,String> mapMonth = new HashMap<>();
+	static {
+		String[] list_months = {"Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"};
+		int monthIdx = 1;
+		for(String month : list_months) {
+			String smonth = ""+monthIdx;
+			if(smonth.length()<2) {
+				smonth = "0"+smonth;
+			}
+			mapMonth.put(month, smonth);
+			monthIdx++;
+		}
+	}
 
 	public static String getCurrentTimeStr() {
 		Date current = new Date();
@@ -47,15 +102,27 @@ public class UtilDates {
 	}
 
 	public static Date getNewDate(Map<Integer, Integer> dateShift) {
-		if (dateShift.isEmpty()) {
-			return new Date();
-		}
+		/*
+		Calendar calendar = Calendar.getInstance();
+		Date bidon1 = calendar.getTime();
+		calendar.add(Calendar.DAY_OF_MONTH, -187);
+		Date bidon2 = calendar.getTime();
+		*/
+		long timeShiftMS = computeTimeShiftMS(dateShift);
+		return getNewDate(timeShiftMS);
+	}
+
+	public static long computeTimeZoneShift(Date date1, Date date2) {
 		Calendar aCalandar = Calendar.getInstance();
-		for (Integer field : dateShift.keySet()) {
-			Integer shift = dateShift.get(field);
-			aCalandar.add(field, shift);
-		}
-		return aCalandar.getTime();
+		TimeZone shiftedTimeZone = aCalandar.getTimeZone();
+		long tzOffset1 = shiftedTimeZone.getOffset(date1.getTime());
+		long tzOffset2 = shiftedTimeZone.getOffset(date2.getTime());
+		return tzOffset1 - tzOffset2;
+	}
+
+	public static long computeTimeShiftMS(Date date1, Date date2) {
+		long tzShift = computeTimeZoneShift(date1, date2);
+		return date1.getTime() - date2.getTime() +  tzShift;
 	}
 
 	public static long computeTimeShiftMS(Map<Integer, Integer> dateShift) {
@@ -66,10 +133,23 @@ public class UtilDates {
 			return 0;
 		}
 		Calendar aCalandar = Calendar.getInstance();
+		Date testCurrent = aCalandar.getTime();
+		TimeZone currentTimeZone = aCalandar.getTimeZone();
+		long tzOffset1 = currentTimeZone.getOffset(testCurrent.getTime());
+		long tzOffset1H = tzOffset1/3600000;
 		long current = aCalandar.getTimeInMillis();
 		for (Integer field : dateShift.keySet()) {
 			Integer shift = dateShift.get(field);
 			aCalandar.add(field, shift);
+		}
+		Date testShiftedDate = aCalandar.getTime();
+		TimeZone shiftedTimeZone = aCalandar.getTimeZone();
+		long tzOffset2 = shiftedTimeZone.getOffset(testShiftedDate.getTime());
+		long tzOffset2H = tzOffset2/3600000;
+		long deltaHour = tzOffset2H - tzOffset1H;
+		if(deltaHour != 0 && shiftTimeZones) {
+			int deltaHourInt = (int) deltaHour;
+			aCalandar.add(Calendar.HOUR, -1*deltaHourInt);
 		}
 		return aCalandar.getTimeInMillis() - current;
 	}
@@ -94,11 +174,11 @@ public class UtilDates {
 		}
 	}
 
-	public static String formatTimeOrDate(Date aDate) {
+	public static String formatTimeOrDate(Date aDate, long timeShiftMS) {
 		if (aDate == null) {
 			return "";
 		}
-		String currentDay = format_day.format(new Date());
+		String currentDay = format_day.format(getNewDate(timeShiftMS));
 		if (currentDay.equals(format_day.format(aDate))) {
 			return format_time.format(aDate);
 		} else {
@@ -190,7 +270,7 @@ public class UtilDates {
 
 
 	/**
-	 * Shifts the given Date to the same time at the next sconds. This uses the
+	 * Shifts the given Date to the same time at the next seconds. This uses the
 	 * current time zone.
 	 */
 	public static Date shiftDateSec(Date d, double nbSeconds) {

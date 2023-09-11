@@ -28,8 +28,8 @@ public class ServiceAgent extends SapereAgent {
 	private String[] input;
 	private static SapereLogger logger = SapereLogger.getInstance();
 
-	public ServiceAgent(AgentAuthentication authentication, String[] input, String[] output, LsaType type) {
-		super(authentication.getAgentName(), authentication, input, output, type);
+	public ServiceAgent(AgentAuthentication authentication, String[] input, String[] output, LsaType type, boolean activateQOS) {
+		super(authentication.getAgentName(), authentication, input, output, type, activateQOS);
 		this.agentName = authentication.getAgentName();
 		this.output = output;
 		this.input= input;

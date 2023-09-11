@@ -176,6 +176,7 @@ public class PredictionHelper {
 		int nbStates = NodeMarkovStates.getNbOfStates();
 		Matrix predictionRow = new Matrix(1, nbStates);
 		predictionRow.set(0, stateIdx, 1);
+		long timeShiftMS = prediction.getContext().getTimeShiftMS();
 		double checkSum = getSum(predictionRow);
 		// logger.info("prediction testSum=" + checkSum);
 		for (PredictionStep nextStep : prediction.getListSteps()) {
@@ -213,7 +214,7 @@ public class PredictionHelper {
 			for (Date nextTargetDate : prediction.getTargetDatesWithoutResult(variable)) {
 				if (nextStep.isInSlot(nextTargetDate)) {
 					PredictionResult result = new PredictionResult(prediction.getInitialDate(), initalState,
-							nextTargetDate, variable, nextStep.getMarkovTimeWindow());
+							nextTargetDate, variable, nextStep.getMarkovTimeWindow(), timeShiftMS);
 					result.setStateProbabilities(predictionRow);
 					prediction.setResult(variable, nextTargetDate, result);
 				}
@@ -222,7 +223,7 @@ public class PredictionHelper {
 		Date lastTargetDate = prediction.getLastTargetDate();
 		if (!prediction.hasResult(variable, lastTargetDate)) {
 			PredictionResult result = new PredictionResult(prediction.getInitialDate(), initalState, lastTargetDate,
-					variable, prediction.getLastStep().getMarkovTimeWindow());
+					variable, prediction.getLastStep().getMarkovTimeWindow(), timeShiftMS);
 			result.setStateProbabilities(predictionRow);
 			prediction.setResult(variable, lastTargetDate, result);
 		}
@@ -256,7 +257,7 @@ public class PredictionHelper {
 			Date lastTargetDate = prediction.getLastTargetDate();
 			List<PredictionStep> listSteps = computePredictionSteps(prediction.getInitialDate(), lastTargetDate);
 			prediction.setListSteps(listSteps);
-			String location = predictionContext.getLocation();
+			String location = predictionContext.getMainServiceAddress();
 			if (isLocal) {
 				prediction.setInitialContent(initialTransitions);
 			} else {
@@ -292,9 +293,8 @@ public class PredictionHelper {
 		return prediction;
 	}
 
-	public static PredictionContext generateNeightborContext(PredictionContext localContext, String neighborLocation) {
+	public static PredictionContext generateNeightborContext(PredictionContext localContext) {
 		PredictionContext neighborContext = localContext.clone();
-		neighborContext.setLocation(neighborLocation);
 		Map<Integer, Map<String, TransitionMatrixKey>> mapTransitionMatrixKeys = EnergyDbHelper.loadMapNodeTransitionMatrixKeys(neighborContext);
 		neighborContext.setMapTransitionMatrixKeys(mapTransitionMatrixKeys);
 		return neighborContext;
@@ -304,9 +304,15 @@ public class PredictionHelper {
 			String[] variables, boolean useCorrections) {
 		NodeMarkovTransitions initialTransitions = PredictionDbHelper.loadClosestMarkovTransition(predictionContext,
 				initDate, variables, maxTotalPower);
+		if(initialTransitions == null) {
+			PredictionData emptyPrediction = new PredictionData(predictionContext, useCorrections);
+			emptyPrediction.addError("No state arround " + UtilDates.format_sql.format(initDate)
+			 + " for the scenario " + predictionContext.getScenario() );
+			return emptyPrediction;
+		}
 		Map<String, NodeMarkovTransitions> mapNeighborhoodMarkovTransitions = new HashMap<String, NodeMarkovTransitions>();
 		for (String neighborLocation : NodeManager.instance().getNetworkDeliveryManager().getNeighbours()) {
-			PredictionContext neighborContext = generateNeightborContext(predictionContext, neighborLocation);
+			PredictionContext neighborContext = generateNeightborContext(predictionContext);
 			NodeMarkovTransitions neighborInitialTransitions = PredictionDbHelper
 					.loadClosestMarkovTransition(neighborContext, initDate, variables, maxTotalPower);
 			if (neighborInitialTransitions != null) {
@@ -368,7 +374,7 @@ public class PredictionHelper {
 			,Integer maxHour
 			,Boolean useCorrectionFilter
 			,String variableName
-			,List<String> fieldsToMerge
+			,String[] fieldsToMerge
 			) {
 		Map<String,PredictionStatistic> mapStatistics = PredictionDbHelper.computePredictionStatistics(
 				predictionContext, minCreationDate, maxCreationDate, minTargetDate, maxTargetDate, minHour, maxHour, useCorrectionFilter, variableName, fieldsToMerge);
@@ -539,7 +545,7 @@ public class PredictionHelper {
 		// idem for neighbor nodes
 		Map<String, Map<Date, NodeMarkovTransitions>> mapNeighborhoodAllTransitions = new HashMap<>();
 		for (String neighborLocation : NodeManager.instance().getNetworkDeliveryManager().getNeighbours()) {
-			PredictionContext neighborContext = generateNeightborContext(predictionContext, neighborLocation);
+			PredictionContext neighborContext = generateNeightborContext(predictionContext);
 			Map<Date, NodeMarkovTransitions> mapTransitionNeightbour = PredictionDbHelper.loadMapMarkovTransition(
 					neighborContext, new TimeSlot(firstInitDate, targetDateSlot.getEndDate()), variables,
 					maxTotalPower);
@@ -551,7 +557,7 @@ public class PredictionHelper {
 		if("".equals(variableName)) {
 			result.addError("The variable name has not been entered");
 		} else if(mapAllTransition.size()==0) {
-			result.addError("No state found during the requested time slot");
+			result.addError("No state found during the requested time slot for the scenario " + predictionContext.getScenario());
 		}
 		List<Date> listStateDates = new ArrayList<>();
 		for (Date aDate : mapAllTransition.keySet()) {

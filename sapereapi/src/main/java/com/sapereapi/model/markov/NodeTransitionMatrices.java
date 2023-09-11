@@ -14,13 +14,14 @@ import com.sapereapi.util.UtilDates;
 import Jama.Matrix;
 import eu.sapere.middleware.agent.AgentAuthentication;
 import eu.sapere.middleware.lsa.values.IAggregateable;
+import eu.sapere.middleware.node.NodeConfig;
 
 public class NodeTransitionMatrices implements Serializable, IAggregateable {
 	private static final long serialVersionUID = 447701L;
 	public final static String CR = System.getProperty("line.separator"); // Carriage return
 	private String learningAgentName = null;
 	protected String variables[] = {};
-	protected String location;
+	protected NodeConfig nodeConfig;
 	protected String scenario;
 	protected MarkovTimeWindow timeWindow;
 	protected Map<String, TransitionMatrix> mapMatrices = new HashMap<String, TransitionMatrix>();
@@ -84,18 +85,18 @@ public class NodeTransitionMatrices implements Serializable, IAggregateable {
 		this.learningAgentName = predictionContext.getLearningAgentName();
 		this.variables = _variables;
 		this.timeWindow = aTimeWindow;
-		this.location = predictionContext.getLocation();
+		this.nodeConfig = predictionContext.getNodeConfig();
 		this.scenario = predictionContext.getScenario();
 		//this.useCorrections = predictionContext.isUseCorrections();
 		reset(predictionContext);
 	}
 
-	public String getLocation() {
-		return location;
+	public NodeConfig getNodeConfig() {
+		return nodeConfig;
 	}
 
-	public void setLocation(String location) {
-		this.location = location;
+	public void setNodeConfig(NodeConfig nodeConfig) {
+		this.nodeConfig = nodeConfig;
 	}
 
 	public String getScenario() {
@@ -229,7 +230,7 @@ public class NodeTransitionMatrices implements Serializable, IAggregateable {
 			String sep = "";
 			for (int colIdx = 0; colIdx < aMatrix.getColumnDimension(); colIdx++) {
 				result.append(sep);
-				result.append(UtilDates.df.format(aMatrix.get(rowIdx, colIdx)));
+				result.append(UtilDates.df3.format(aMatrix.get(rowIdx, colIdx)));
 				sep = " ";
 			}
 			result.append(CR);
@@ -293,9 +294,14 @@ public class NodeTransitionMatrices implements Serializable, IAggregateable {
 			result.append("time ").append(UtilDates.format_time.format(this.computeDate));
 			result.append(CR).append("");
 			for (String variable : mapMatrices.keySet()) {
-				TransitionMatrix trMatrix = mapMatrices.get(variable);
-				result.append(CR).append(variable).append(":").append(CR)
-						.append(trMatrix);
+				//if(true || "missing".equals(variable)) {
+					TransitionMatrix trMatrix = mapMatrices.get(variable);
+					//trMatrix.refreshNormalizedMatrix();
+					result.append(CR).append(variable)
+						.append(" (").append(trMatrix.getNbOfObservations()).append(" obs")
+						.append(", ").append(trMatrix.getNbOfCorrections()).append(" corr")
+						.append(") :").append(CR).append(trMatrix);
+				//}
 			}
 			result.append(CR).append("normalized matrices");
 		}
@@ -338,6 +344,7 @@ public class NodeTransitionMatrices implements Serializable, IAggregateable {
 			result.setComputeDate(new Date());
 			result.setScenario(scenario);
 			result.setVariables(variables);
+			result.setNodeConfig(nodeConfig);
 			for(String variable : mapMatrices.keySet()) {
 				TransitionMatrix transitionMatrix =  mapMatrices.get(variable);
 				List<IAggregateable> listTransitionMatrix = new ArrayList<>();

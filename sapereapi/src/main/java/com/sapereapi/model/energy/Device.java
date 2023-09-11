@@ -2,6 +2,7 @@ package com.sapereapi.model.energy;
 
 import java.util.Set;
 
+import com.sapereapi.model.Sapere;
 import com.sapereapi.model.referential.DeviceCategory;
 import com.sapereapi.model.referential.EnvironmentalImpact;
 import com.sapereapi.model.referential.PhaseNumber;
@@ -138,18 +139,18 @@ public class Device {
 		StringBuffer result = new StringBuffer();
 		result.append(properties.getName());
 		result.append("(").append(properties.getCategory()).append(")");
-		result.append(" W: ").append(UtilDates.df.format(powerMin)).append("-").append(UtilDates.df.format(powerMax));
+		result.append(" W: ").append(UtilDates.df3.format(powerMin)).append("-").append(UtilDates.df3.format(powerMax));
 		if (currentPower > 0) {
-			result.append(" current : ").append(SapereUtil.round(currentPower, 2));
+			result.append(" current : ").append(SapereUtil.round(currentPower, Sapere.NB_DEC_POWER));
 		}
 		return result.toString();
 	}
 
 	public String toString2() {
 		StringBuffer result = new StringBuffer();
-		result.append(" W: ").append(UtilDates.df.format(powerMin)).append("-").append(UtilDates.df.format(powerMax));
+		result.append(" W: ").append(UtilDates.df3.format(powerMin)).append("-").append(UtilDates.df3.format(powerMax));
 		if (currentPower > 0) {
-			result.append(" (current = ").append(UtilDates.df.format(currentPower)).append(")  ");
+			result.append(" (current = ").append(UtilDates.df3.format(currentPower)).append(")  ");
 		}
 		result.append("  ").append(properties.getName());
 		// result.append(" (").append(category).append(")");

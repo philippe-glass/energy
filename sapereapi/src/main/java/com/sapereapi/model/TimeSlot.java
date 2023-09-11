@@ -8,6 +8,10 @@ public class TimeSlot {
 	private Date beginDate;
 	private Date endDate;
 
+	public TimeSlot() {
+		super();
+	}
+
 	public Date getBeginDate() {
 		return beginDate;
 	}

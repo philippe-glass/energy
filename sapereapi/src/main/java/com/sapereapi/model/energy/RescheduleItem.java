@@ -75,10 +75,10 @@ public class RescheduleItem {
 	public String toString() {
 		StringBuffer result = new StringBuffer("Reschedule ");
 		result.append(this.agentName).append("(");
-		result.append(UtilDates.df.format(power)).append("W) from ");
-		result.append(UtilDates.formatTimeOrDate(stopBegin));
+		result.append(UtilDates.df3.format(power)).append("W) from ");
+		result.append(UtilDates.formatTimeOrDate(stopBegin, timeShiftMS));
 		result.append(" to ");
-		result.append(UtilDates.formatTimeOrDate(stopEnd));
+		result.append(UtilDates.formatTimeOrDate(stopEnd, timeShiftMS));
 		return result.toString();
 		/*
 		return "RescheduleItem [agentName=" + agentName + ", stopBegin=" + stopBegin + ", stopEnd=" +   stopEnd

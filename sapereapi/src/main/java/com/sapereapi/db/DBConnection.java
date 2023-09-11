@@ -12,28 +12,22 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-import com.sapereapi.log.SapereLogger;
 import com.sapereapi.util.UtilDates;
 
+import eu.sapere.middleware.log.AbstractLogger;
+
 public class DBConnection {
-	static final String JDBC_DRIVER = "org.mariadb.jdbc.Driver";
 	public final static String CR = System.getProperty("line.separator");	// Cariage return
-	private static SapereLogger logger = SapereLogger.getInstance();
+	private static AbstractLogger logger = null;
 	private static int debugLevel = 0;
 	private static int slowQueryThresholdMS = 500;
-	private String url = "";//"jdbc:mariadb://localhost/energy";
 	private static String sessionId = null;
+	private static String reqSeparator = "§";
+	private static String reqSeparator2 = CR + "§";
 
 	// Database credentials
-	// static String user = "root";
-	// static String password = "maria123";
-
-	// Database credentials
-	static String user = "";//"learning_agent";
-	static String password = "";//"sql2537";
-
+	static DBConfig dbConfig = null;
 	static Connection connection = null;
-	static Statement stmt = null;
 
 	static {
 		sessionId = UtilDates.generateSessionId();
@@ -45,28 +39,44 @@ public class DBConnection {
 	 * @param _user
 	 * @param _password
 	 */
-	public DBConnection(String _url, String _user, String _password) {
+	public DBConnection(DBConfig aDBConfig, AbstractLogger _aLogger) {
 		super();
-		url = _url;
-		user = _user;
-		password = _password;
+		dbConfig = aDBConfig;
+		logger = _aLogger;
 		try {
-			connection = DriverManager.getConnection(url, user, password);
+			Class.forName(dbConfig.getDriverClassName());
+			logger.info("Connecting to " + dbConfig.getUrl() + " database...");
+			connection = DriverManager.getConnection(dbConfig.getUrl(), dbConfig.getUser(), dbConfig.getPassword());
+			logger.info("Connected database " + dbConfig.getUrl() + " successfully...");
 		} catch (SQLException e) {
 			logger.error(e);
+		} catch (ClassNotFoundException e) {
+			logger.error(e);
+		}
+		if(useSQLLite()) {
+			reqSeparator = ";";
+			reqSeparator2 = CR + reqSeparator;
 		}
 	}
 
 	public  void init() throws SQLException, ClassNotFoundException {
 		if (connection == null) {
-			// STEP 2: Register JDBC driver
-			Class.forName("org.mariadb.jdbc.Driver");
+			// STEP 1: Register JDBC driver
+			Class.forName(dbConfig.getDriverClassName());
 
-			// STEP 3: Open a connection
-			logger.info("Connecting to a selected database...");
-			connection = DriverManager.getConnection(url, user, password);
-			logger.info("Connected database successfully...");
+			// STEP 2: Open a connection
+			logger.info("Connecting to " + dbConfig.getUrl() + " database [2]...");
+			connection = DriverManager.getConnection(dbConfig.getUrl(), dbConfig.getUser(), dbConfig.getPassword());
+			logger.info("Connected database successfully [2]...");
 		}
+	}
+
+	public static String getReqSeparator() {
+		return reqSeparator;
+	}
+
+	public static String getReqSeparator2() {
+		return reqSeparator2;
 	}
 
 	public int getDebugLevel() {
@@ -92,38 +102,47 @@ public class DBConnection {
 	public  long execUpdate(String queries) {
 		long result = 0;
 		long timeBefore = new Date().getTime();
+		String currentQuery = null;
 		try {
 			init();
-
-			// STEP 4: Execute a query
-			if(debugLevel>0) {
-				logger.info("execUpdate ...");
-			}
-			Statement stmt2 = connection.createStatement();
-			String[] array_query = queries.split("§");
+		} catch (Throwable e1) {
+			logger.error(e1);
+		}
+		// STEP 4: Execute a query
+		if(debugLevel>0) {
+			logger.info("execUpdate ...");
+		}
+		Statement stmt = null;
+		try {
+			stmt = connection.createStatement();
+			String[] array_query = queries.split(reqSeparator);
 			for (String nextQuery : array_query) {
-				result = stmt2.executeUpdate(nextQuery, PreparedStatement.RETURN_GENERATED_KEYS);
+				currentQuery = nextQuery;
+				result = stmt.executeUpdate(nextQuery, PreparedStatement.RETURN_GENERATED_KEYS);
 			}
 			if (result > 0) {
-				ResultSet generatedKeys = stmt2.getGeneratedKeys();
+				ResultSet generatedKeys = stmt.getGeneratedKeys();
 				if (generatedKeys.next()) {
 					result = generatedKeys.getLong(1);
 				}
 			}
 			if(debugLevel>0) {
-				logger.info("--- Execute SQL query : \r\n" + queries);
+				logger.info("--- Execute SQL query : \r\n" + currentQuery);
 			}
 		} catch (SQLException se) {
 			// Handle errors for JDBC
-			//se.printStackTrace();
-			logger.error(se);
-			logger.error("SQL Error executing query : \r\n" + queries);
+			logger.error("SQL Error executing query : \r\n" + currentQuery + "\r\n" + se);
 			result = -1;
 		} catch (Exception e) {
 			// Handle errors for Class.forName
-			//e.printStackTrace();
 			logger.error(e);
 			result = -1;
+		} finally {
+			try {
+				stmt.close();
+			} catch (SQLException e) {
+				logger.error(e);
+			}
 		}
 		long timeAfter = new Date().getTime();
 		long duration = timeAfter -timeBefore ;
@@ -144,27 +163,33 @@ public class DBConnection {
 	public  List<Map<String, Object>> executeSelect(String queries) {
 		try {
 			init();
-		} catch (ClassNotFoundException e1) {
-			logger.error(e1);
-		} catch (SQLException e1) {
+		} catch (Throwable e1) {
 			logger.error(e1);
 		}
 		long timeBefore = new Date().getTime();
+		Statement stmt = null;
 		try {
 			stmt = connection.createStatement();
 			if(debugLevel>0) {
 				// logger.info("--- Execute SQL query : \r\n" + queries);
 			}
-			String[] array_query = queries.split("§");
+			String[] array_query = queries.split(reqSeparator);
 			ResultSet rs = null;
+			int queryIndex = 1;
 			for (String nextQuery : array_query) {
+				boolean isLast = (array_query.length ==  queryIndex);
 				Date before = new Date();
-				rs = stmt.executeQuery(nextQuery);
+				if(isLast) {
+					rs = stmt.executeQuery(nextQuery);
+				} else {
+					stmt.executeUpdate(nextQuery);
+				}
 				if(debugLevel>0) {
 					Date after = new Date();
 					long requestTime = after.getTime() - before.getTime();
 					logger.info("--- Execute SQL query : (" + requestTime + " MS) " + CR + nextQuery );
 				}
+				queryIndex++;
 			}
 			// ResultSet rs = stmt.executeQuery(queries);
 			int columnCount = rs.getMetaData().getColumnCount();
@@ -197,18 +222,18 @@ public class DBConnection {
 			return result;
 		} catch (SQLException e) {
 			logger.error(e);
+		} finally {
+			try {
+				stmt.close();
+			} catch (SQLException e) {
+				logger.error(e);
+			}
 		}
 		return null;
 	}
 
 	public static void closeConnection() {
 		// finally block used to close resources
-		try {
-			if (stmt != null) {
-				connection.close();
-			}
-		} catch (SQLException se) {
-		} // do nothing
 		try {
 			if (connection != null) {
 				connection.close();
@@ -218,6 +243,10 @@ public class DBConnection {
 			logger.error(se);
 		} // end
 	}
+
+	public boolean useSQLLite() {
+		return dbConfig.getDriverClassName().contains("sqlite");
+	}
 /*
 	public static void main(String[] args) {
 		execUpdate("INSERT INTO energy.history(date, learning_agent, location) "
@@ -225,4 +254,57 @@ public class DBConnection {
 		closeConnection();
 	}// end main
 	*/
+
+	public static String aux_affectationsToSql( Map<String, String> affectation) {
+		String sep = "";
+		StringBuffer query = new StringBuffer();
+		for(String field : affectation.keySet()) {
+			String value = affectation.get(field);
+			query.append(CR).append(sep).append(" ").append(field).append(" = ").append(value);
+			sep = ",";
+		}
+		return query.toString();
+	}
+
+	public String generateInsertQuery(String tableName, Map<String, String> defaultAffectation) {
+		Map<String, String> conflictAffectation = new HashMap<String,String>();
+		return generateInsertQuery(tableName, defaultAffectation, conflictAffectation);
+	}
+
+	public String generateInsertQuery(String tableName, Map<String, String> defaultAffectation, Map<String, String> confictAffectation) {
+		StringBuffer query = new StringBuffer();
+		if(useSQLLite()) {
+			query.append("INSERT INTO ").append(tableName)
+				.append(" (").append(String.join(",", defaultAffectation.keySet())).append(") VALUES ");
+			query.append(CR);
+			List<String> values = new ArrayList<>();
+			for(String field : defaultAffectation.keySet()) {
+				values.add(defaultAffectation.get(field));
+			}
+			query.append("(").append(String.join(",", values)).append(")");
+			if(confictAffectation.size() > 0) {
+				query.append(CR).append(" ON CONFLICT DO UPDATE SET ");
+				query.append(aux_affectationsToSql(confictAffectation));
+			}
+		} else {
+			query.append("INSERT INTO ").append(tableName).append(" SET");
+			query.append(aux_affectationsToSql(defaultAffectation));
+			if(confictAffectation.size() > 0) {
+				query.append(CR).append(" ON DUPLICATE KEY UPDATE ");
+				query.append(aux_affectationsToSql(confictAffectation));
+			}
+		}
+		return query.toString();
+	}
+
+	public static String generateQueryCreateVariableTable() {
+		StringBuffer query = new StringBuffer();
+		query.append("DROP TABLE IF EXISTS _variables").append(reqSeparator2);
+		query.append(CR).append("CREATE TEMPORARY TABLE _variables("
+				+ "	name TEXT PRIMARY KEY"
+				+ ", dec_value DECIMAL"
+				+ ", int_value INTEGER"
+				+ ", date_value DATETIME)");
+		return query.toString();
+	}
 }

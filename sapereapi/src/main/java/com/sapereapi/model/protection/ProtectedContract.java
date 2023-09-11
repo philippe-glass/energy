@@ -5,6 +5,7 @@ import java.util.ArrayList;
 import java.util.Date;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 
 import com.sapereapi.agent.energy.EnergyAgent;
@@ -20,7 +21,9 @@ import com.sapereapi.model.referential.AgentType;
 
 import eu.sapere.middleware.agent.AgentAuthentication;
 import eu.sapere.middleware.agent.SapereAgent;
+import eu.sapere.middleware.lsa.Lsa;
 import eu.sapere.middleware.lsa.values.IAggregateable;
+import eu.sapere.middleware.node.NodeConfig;
 
 public class ProtectedContract extends ProtectedObject implements Serializable, IAggregateable {
 	private static final long serialVersionUID = 5L;
@@ -99,7 +102,7 @@ public class ProtectedContract extends ProtectedObject implements Serializable, 
 		return contract.getConsumerAgent();
 	}
 
-	public String getConsumerLocation() {
+	public NodeConfig getConsumerLocation() {
 		return contract.getConsumerLocation();
 	}
 
@@ -181,6 +184,11 @@ public class ProtectedContract extends ProtectedObject implements Serializable, 
 
 	public ProtectedContract clone() {
 		Contract contractClone = contract.clone();
+		return new ProtectedContract(contractClone);
+	}
+
+	public ProtectedContract copyForLSA() {
+		Contract contractClone = contract.copyForLSA();
 		return new ProtectedContract(contractClone);
 	}
 
@@ -289,5 +297,20 @@ public class ProtectedContract extends ProtectedObject implements Serializable, 
 			return new ProtectedContract(resultContract);
 		}
 		return null;
+	}
+
+	@Override
+	public void completeContent(Lsa bondedLsa, Map<String, NodeConfig> mapNodeLocation) {
+		if(contract != null) {
+			contract.completeContent(bondedLsa, mapNodeLocation);
+		}
+	}
+
+	@Override
+	public List<NodeConfig> retrieveInvolvedLocations() {
+		if(contract != null) {
+			return contract.retrieveInvolvedLocations();
+		}
+		return new ArrayList<NodeConfig>();
 	}
 }

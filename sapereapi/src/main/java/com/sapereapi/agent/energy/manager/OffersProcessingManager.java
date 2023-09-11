@@ -121,6 +121,9 @@ public class OffersProcessingManager {
 		globalOffer = new CompositeOffer(missing);
 		for (SingleOffer nextOffer : offerList) {
 			this.globalOffer.addSingleOffer(nextOffer);
+			if(!this.globalOffer.checkLocationId()) {
+				logger.error("generateGlobalOffer : for debug locationid is null");
+			}
 		}
 		return globalOffer;
 	}
@@ -155,7 +158,7 @@ public class OffersProcessingManager {
 			for(SingleOffer offer : this.tableSingleOffers.values()) {
 				offerTotal+=offer.getPower();
 			}
-			logger.warning(msgTag + " received total :" + UtilDates.df.format(offerTotal)
+			logger.warning(msgTag + " received total :" + UtilDates.df3.format(offerTotal)
 				+ " received content : "+ this.tableSingleOffers.values());
 		}
 	}

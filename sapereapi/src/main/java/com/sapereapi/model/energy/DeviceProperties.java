@@ -167,6 +167,15 @@ public class DeviceProperties implements Cloneable, Serializable {
 
 	@Override
 	public DeviceProperties clone() {
+		return copy(true);
+	}
+
+	//@Override
+	public DeviceProperties copyForLSA() {
+		return copy(false);
+	}
+
+	public DeviceProperties copy(boolean addIds) {
 		DeviceProperties result = new DeviceProperties(name, category, environmentalImpact, isProducer);
 		result.setPriorityLevel(priorityLevel);
 		result.setProducer(isProducer);
@@ -176,5 +185,4 @@ public class DeviceProperties implements Cloneable, Serializable {
 		// result.setRunningAgentName(runningAgentName.clone);
 		return result;
 	}
-
 }

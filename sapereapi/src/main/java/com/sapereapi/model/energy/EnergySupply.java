@@ -1,8 +1,10 @@
 package com.sapereapi.model.energy;
 
 import java.io.Serializable;
+import java.util.ArrayList;
 import java.util.Date;
 import java.util.List;
+import java.util.Map;
 
 import com.sapereapi.log.SapereLogger;
 import com.sapereapi.model.TimeSlot;
@@ -11,12 +13,14 @@ import com.sapereapi.util.SapereUtil;
 import com.sapereapi.util.UtilDates;
 
 import eu.sapere.middleware.agent.AgentAuthentication;
+import eu.sapere.middleware.lsa.Lsa;
 import eu.sapere.middleware.lsa.values.IAggregateable;
+import eu.sapere.middleware.node.NodeConfig;
 
 public class EnergySupply implements IEnergyObject, Cloneable, Serializable {
 	private static final long serialVersionUID = 1L;
 	protected String issuer;
-	protected String issuerLocation;
+	protected NodeConfig issuerLocation;
 	protected int issuerDistance;
 	protected Double power; 	// current electric power in watts
 	protected Double powerMin;	// minimal electric power in watts
@@ -40,12 +44,16 @@ public class EnergySupply implements IEnergyObject, Cloneable, Serializable {
 		this.issuer = issuer;
 	}
 
-	public String getIssuerLocation() {
+	public NodeConfig getIssuerLocation() {
 		return issuerLocation;
 	}
 
-	public void setIssuerLocation(String issuerLocation) {
+	public void setIssuerLocation(NodeConfig issuerLocation) {
 		this.issuerLocation = issuerLocation;
+	}
+
+	public boolean isIssuerLocal() {
+		return (0 == issuerDistance);
 	}
 
 	public Double getPower() {
@@ -218,18 +226,19 @@ public class EnergySupply implements IEnergyObject, Cloneable, Serializable {
 		return UtilDates.getNewDate(timeShiftMS);
 	}
 
-	public EnergySupply(String _issuer, String _issuerLocation, Boolean _isComplementary, Double _power, Double _powerMin, Double _powerMax,Date beginDate, Date endDate,
+	public EnergySupply(String _issuer, NodeConfig _issuerLocation, Integer _issuerDistance
+			, Boolean _isComplementary, Double _power, Double _powerMin, Double _powerMax,Date beginDate, Date endDate,
 			DeviceProperties _deviceProperties, PricingTable _pricingTable, Long _timeShiftMS) {
 		super();
 		this.issuer = _issuer;
 		this.issuerLocation = _issuerLocation;
+		this.issuerDistance = _issuerDistance;
 		this.power = _power;
 		this.powerMin = (_powerMin==null || _powerMin==0.0)? _power : _powerMin;
 		this.powerMax = (_powerMax==null || _powerMax==0.0)? _power : _powerMax;
 		this.beginDate = beginDate;
 		this.endDate = endDate;
 		this.deviceProperties = _deviceProperties;
-		//this.isComplementary = Boolean.FALSE;
 		this.isComplementary = _isComplementary;
 		this.timeShiftMS = _timeShiftMS;
 		this.pricingTable = _pricingTable;
@@ -242,7 +251,9 @@ public class EnergySupply implements IEnergyObject, Cloneable, Serializable {
 
 	public void checkDates() throws Exception {
 		if(this.beginDate.after(endDate)) {
-			throw new Exception("EnergySupply checkDates " + this.issuer + " : beginDate " + UtilDates.formatTimeOrDate(beginDate) + " is after " + UtilDates.formatTimeOrDate(endDate));
+			throw new Exception("EnergySupply checkDates " + this.issuer
+						+ " : beginDate " + UtilDates.formatTimeOrDate(beginDate, timeShiftMS)
+						+ " is after " + UtilDates.formatTimeOrDate(endDate, timeShiftMS));
 		}
 	}
 
@@ -324,34 +335,46 @@ public class EnergySupply implements IEnergyObject, Cloneable, Serializable {
 			result.append(" [COMPLEMENTARY] ");
 		}
 		result.append(":");
-		result.append(UtilDates.df.format(power)).append(" W from ");
-		result.append(UtilDates.formatTimeOrDate(beginDate));
+		result.append(UtilDates.df3.format(power)).append(" W from ");
+		result.append(UtilDates.formatTimeOrDate(beginDate, timeShiftMS));
 		result.append(" to ");
-		result.append(UtilDates.formatTimeOrDate(endDate));
+		result.append(UtilDates.formatTimeOrDate(endDate, timeShiftMS));
 		if(this.disabled) {
 			result.append("# DISABLED #");
 		}
 		return result.toString();
 	}
 
-	@Override
-	public EnergySupply clone() {
-		PricingTable copyPricingTable = pricingTable==null ? null : pricingTable.clone();
-		DeviceProperties cloneDeviceProperties = deviceProperties.clone();
-		EnergySupply result = new EnergySupply(issuer, issuerLocation, isComplementary, power,powerMin, powerMax
+	public EnergySupply copy(boolean copyIds) {
+		PricingTable copyPricingTable = pricingTable==null ? null : pricingTable.copy(copyIds);
+		DeviceProperties cloneDeviceProperties = deviceProperties.copy(copyIds);
+		NodeConfig copyNodeConfig = issuerLocation.copy(copyIds);
+		EnergySupply result = new EnergySupply(issuer, copyNodeConfig
+				, issuerDistance
+				, isComplementary, power,powerMin, powerMax
 				,beginDate == null ? null : new Date(beginDate.getTime())
 				,endDate == null ? null : new Date(endDate.getTime())
 				,cloneDeviceProperties, copyPricingTable, timeShiftMS);
-		result.setEventId(eventId);
-		//result.setIsComplementary(isComplementary);
-		result.setIssuerDistance(issuerDistance);
+		if(copyIds) {
+			result.setEventId(eventId);
+		}
 		return result;
+	}
+
+	@Override
+	public EnergySupply clone() {
+		return copy(true);
+	}
+
+	@Override
+	public EnergySupply copyForLSA() {
+		return copy(false);
 	}
 
 	public EnergyRequest generateRequest() {
 		// Create energy request with the default values
 		double _delayToleranceMinutes = UtilDates.computeDurationMinutes(getBeginDate(), getEndDate());
-		EnergyRequest request = new EnergyRequest(issuer, issuerLocation, isComplementary, power, powerMin, powerMax, beginDate, endDate
+		EnergyRequest request = new EnergyRequest(issuer, issuerLocation, issuerDistance, isComplementary, power, powerMin, powerMax, beginDate, endDate
 				, _delayToleranceMinutes, PriorityLevel.LOW, deviceProperties, pricingTable, timeShiftMS);
 		//request.setIsComplementary(isComplementary);
 		return request;
@@ -384,5 +407,36 @@ public class EnergySupply implements IEnergyObject, Cloneable, Serializable {
 	public EnergySupply aggregate(String operator, List<IAggregateable> listObjects, AgentAuthentication agentAuthentication) {
 		// TODO Auto-generated method stub
 		return null;
+	}
+
+	/*
+	public void completeLocationId(Map<String, NodeConfig> mapNeighborNodeConfigs) {
+		if(issuerLocation.getId() == null) {
+			String nodeName = issuerLocation.getName();
+			NodeConfig correctionNodeConfig = mapNeighborNodeConfigs.get(nodeName);
+			issuerLocation.setId(correctionNodeConfig.getId());
+		}
+	}*/
+
+	public boolean checkLocationId() {
+		return (issuerLocation.getId() != null);
+	}
+
+	@Override
+	public void completeContent(Lsa bondedLsa, Map<String, NodeConfig> mapNodeLocation) {
+		if(issuerLocation.getId()==null && mapNodeLocation.containsKey(issuerLocation.getName())) {
+			issuerLocation.completeContent(bondedLsa, mapNodeLocation);
+		}
+		NodeConfig bondedLsaLocation = bondedLsa.getAgentAuthentication().getNodeLocation();
+		if(issuerLocation.getName().equals(bondedLsaLocation.getName())) {
+			issuerDistance = bondedLsa.getSourceDistance();
+		}
+	}
+
+	@Override
+	public List<NodeConfig> retrieveInvolvedLocations() {
+		List<NodeConfig> result = new ArrayList<>();
+		result.add(issuerLocation);
+		return result;
 	}
 }

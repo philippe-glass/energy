@@ -1,6 +1,8 @@
 package com.sapereapi.model.protection;
 
 import java.io.Serializable;
+import java.util.List;
+import java.util.Map;
 
 import com.sapereapi.exception.PermissionException;
 import com.sapereapi.model.energy.ConfirmationItem;
@@ -9,6 +11,8 @@ import com.sapereapi.model.referential.AgentType;
 
 import eu.sapere.middleware.agent.AgentAuthentication;
 import eu.sapere.middleware.agent.SapereAgent;
+import eu.sapere.middleware.lsa.Lsa;
+import eu.sapere.middleware.node.NodeConfig;
 
 public class ProtectedConfirmationTable extends ProtectedObject implements Serializable {
 	private static final long serialVersionUID = 2L;
@@ -98,13 +102,29 @@ public class ProtectedConfirmationTable extends ProtectedObject implements Seria
 		return confirmationTable.getConfirmationItem(consumerAgent.getAgentName(), isComplementary);
 	}
 
+	/* */
 	public ProtectedConfirmationTable clone() {
 		ConfirmationTable confirmationTableClone = confirmationTable.clone();
+		return new ProtectedConfirmationTable(confirmationTableClone);
+	}
+
+	public ProtectedConfirmationTable copyForLSA() {
+		ConfirmationTable confirmationTableClone = confirmationTable.copyForLSA();
 		return new ProtectedConfirmationTable(confirmationTableClone);
 	}
 
 	@Override
 	public String toString() {
 		return "ProtectedConfirmationTable " + confirmationTable ;
+	}
+
+	@Override
+	public void completeContent(Lsa bondedLsa, Map<String, NodeConfig> mapNodeLocation) {
+		confirmationTable.completeContent(bondedLsa, mapNodeLocation);
+	}
+
+	@Override
+	public List<NodeConfig> retrieveInvolvedLocations() {
+		return confirmationTable.retrieveInvolvedLocations();
 	}
 }

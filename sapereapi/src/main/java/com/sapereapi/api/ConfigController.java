@@ -1,101 +1,62 @@
 package com.sapereapi.api;
 
-import java.util.ArrayList;
 import java.util.List;
-import java.util.Random;
-import java.util.Set;
 
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.core.env.Environment;
 import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
-import com.sapereapi.log.SapereLogger;
-import com.sapereapi.model.Config;
+import com.sapereapi.db.EnergyDbHelper;
 import com.sapereapi.model.Generate;
+import com.sapereapi.model.NodeContext;
 import com.sapereapi.model.Sapere;
-import com.sapereapi.model.Service;
 import com.sapereapi.model.Simulation;
+import com.sapereapi.model.input.NeighboursUpdateRequest;
 
-import eu.sapere.middleware.node.NodeManager;
+import eu.sapere.middleware.node.NodeConfig;
 
 @RestController
 @RequestMapping("/config")
-public class ConfigController {
-
+public class ConfigController  {
 	@Autowired
-	private ConfigRepository repository;
+	private Environment environment;
 
-	@GetMapping(path = "/")
-	public Iterable<Config> getAllConfig() {
-		return repository.findAll();
+	@GetMapping(path = "/allNodeConfigs")
+	public List<NodeConfig> allNodeConfigs() {
+		return Sapere.getInstance().retrieveAllNodeConfigs();
 	}
 
-	@GetMapping(value = "/{name}")
-	public Config getById(@PathVariable(value = "name") String name) {
-		return repository.findConfigByname(name);
+	@GetMapping(path = "/nodeContext")
+	public NodeContext nodeContext() {
+		return Sapere.getNodeContext();
 	}
 
-	@GetMapping(path = "/neighbours")
-	public Set<String> getNeighbours() {
-		List<Config> config = repository.findAll();
-		return config.get(0).getNeighbours();
+	@PostMapping(path = "/updateNeighbours")
+	public NodeContext updateNeighbours(@RequestBody NeighboursUpdateRequest request) {
+		return Sapere.getInstance().updateNeighbours(request);
 	}
 
-	@PostMapping(path = "/update")
-	public String updateConfig(@RequestBody Config config) {
-		repository.deleteAll();
-		repository.save(config);
-		Sapere.getInstance().initNodeManager(repository);
-		return config.getName();
+	@PostMapping(path = "/addNodeConfig")
+	public NodeConfig addNodeConfig(@RequestBody NodeConfig nodeConfig) {
+		return EnergyDbHelper.registerNodeConfig(nodeConfig);
 	}
 
 	@PostMapping(path = "/addServiceSim")
-	public String updateAgents(@RequestBody Simulation simulation) {
-		SapereLogger.getInstance().info("Simulation updated");
-		int size = Sapere.getInstance().nodeManager.getSpace().getAllLsa().size();
-		for (int i = size; i < size + simulation.getNumber(); i++) {
-			Service service = new Service("s" + i, simulation.getInput(), simulation.getOutput(), "", "");
-			Sapere.getInstance().addServiceGeneric(service);
-		}
-		return "ok";
+	public String addServiceSim(@RequestBody Simulation simulation) {
+		return Sapere.getInstance().updateAgents(simulation);
 	}
 
 	@PostMapping(path = "/setnodename")
-	public String nodename(String nodename) {
-		NodeManager.setConfiguration(nodename, NodeManager.getLocalIP(), NodeManager.getLocalPort());
-		//Sapere.getInstance().nodeManager.nodeName = nodename;
-		return "ok";
+	public String setnodename(String nodename) {
+		return Sapere.getInstance().updateNodename(nodename);
 	}
 
 	@PostMapping(path = "/generateSim")
-	public String generateSimulation(@RequestBody Generate generate) {
-		int number = generate.getNumber();
-		String set = generate.getSet();
-		String[] alph = set.split("-");
-		if (alph.length == 2) {
-			int size = Sapere.getInstance().nodeManager.getSpace().getAllLsa().size();
-			List<String> alphabetSet = new ArrayList<String>();
-			for (char c = alph[0].charAt(0); c <= alph[1].charAt(0); c++) {
-				alphabetSet.add(Character.toString(c));
-			}
-			Random rand = new Random();	
-			for (int j = size; j < size+number; j++) {
-				int input = rand.nextInt(alphabetSet.size());
-				
-				int output = input;
-				while(output==input)
-					output = rand.nextInt(alphabetSet.size()-1);
-				
-				Service service = new Service("s" + j, new String[] {alphabetSet.get(input)}, new String[] {alphabetSet.get(output)}, "", "");
-				Sapere.getInstance().addServiceGeneric(service);
-				Sapere.startService(service.getName());
-			}
-			return "ok";
-		} else
-			return "set error";
+	public String generateSim(@RequestBody Generate generate) {
+		return Sapere.getInstance().generateSimulation(generate);
 	}
 }

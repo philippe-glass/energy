@@ -11,7 +11,6 @@ import java.util.Set;
 
 import com.sapereapi.agent.energy.EnergyAgent;
 import com.sapereapi.db.EnergyDbHelper;
-import com.sapereapi.log.AbstractLogger;
 import com.sapereapi.log.SapereLogger;
 import com.sapereapi.model.Sapere;
 import com.sapereapi.model.energy.ConfirmationItem;
@@ -23,7 +22,9 @@ import com.sapereapi.model.energy.SingleOffer;
 import com.sapereapi.util.SapereUtil;
 import com.sapereapi.util.UtilDates;
 
+import eu.sapere.middleware.log.AbstractLogger;
 import eu.sapere.middleware.lsa.Property;
+import eu.sapere.middleware.node.NodeConfig;
 
 public class ConsumersProcessingTable {
 	private Map<String, IEnergyObject> tableConsumersProcessing = null;
@@ -91,7 +92,7 @@ public class ConsumersProcessingTable {
 	public void removeConsumer(String consumer, String logTag) {
 		String objClass = "";
 		if(this.activateLogOnOperations && tableConsumersProcessing.containsKey(consumer)) {
-			objClass = "" + tableConsumersProcessing.get(consumer).getClass();
+			objClass = "" + tableConsumersProcessing.get(consumer).getClass().getSimpleName();
 		}
 		addLogOperation(consumer, "remove object " + objClass + " " + logTag);
 		tableConsumersProcessing.remove(consumer);
@@ -241,8 +242,8 @@ public class ConsumersProcessingTable {
 		PowerSlot power = new PowerSlot();
 		for (ReducedContract contract : getValidContracts()) {
 			if (!contract.hasExpired()) {
-				String consumerLocation = contract.getConsumerLocation();
-				if(location==null || location.equals(consumerLocation)) {
+				NodeConfig consumerLocation = contract.getConsumerLocation();
+				if(location==null || location.equals(consumerLocation.getMainServiceAddress())) {
 					power.add(contract.getForcastProducerPowerSlot(aDate));
 				} else {
 					logger.info("For debug : location not found");
@@ -256,8 +257,8 @@ public class ConsumersProcessingTable {
 		PowerSlot power = new PowerSlot();
 		for (ReducedContract contract : getValidContracts()) {
 			if (!contract.hasExpired()) {
-				String consumerLocation = contract.getConsumerLocation();
-				if(location==null || location.equals(consumerLocation)) {
+				NodeConfig consumerLocation = contract.getConsumerLocation();
+				if(location==null || location.equals(consumerLocation.getMainServiceAddress())) {
 					power.add(contract.getProducerPowerSlot());
 				} else {
 					logger.info("For debug : location not found");
@@ -380,7 +381,6 @@ public class ConsumersProcessingTable {
 		try {
 			if(!this.hasConsumer(consumer)) {
 				request.setAux_expiryDate(getCurrentDate());
-				request.setIssuerDistance(Sapere.getInstance().getDistance(request.getIssuerLocation(), request.getIssuerDistance()));
 				if(request.getIssuerDistance() > 0) {
 					// id from an external database : DO NOT USE IT (constraint integrity)
 					request.setEventId(null);

@@ -4,14 +4,18 @@ import java.util.Date;
 
 import com.sapereapi.model.TimeSlot;
 
+import eu.sapere.middleware.lsa.IPropertyObject;
 import eu.sapere.middleware.lsa.values.IAggregateable;
+import eu.sapere.middleware.node.NodeConfig;
 
-public interface IEnergyObject extends IAggregateable {
+public interface IEnergyObject extends IAggregateable , IPropertyObject {
 	public String getIssuer();
 
-	public String getIssuerLocation();
+	public NodeConfig getIssuerLocation();
 
 	public int getIssuerDistance();
+
+	public boolean isIssuerLocal();
 
 	public Date getBeginDate();
 

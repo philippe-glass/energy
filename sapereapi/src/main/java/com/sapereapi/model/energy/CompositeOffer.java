@@ -9,14 +9,17 @@ import java.util.Map;
 import java.util.Set;
 
 import com.sapereapi.exception.UnauthorizedModificationException;
-import com.sapereapi.log.AbstractLogger;
 import com.sapereapi.log.SapereLogger;
+import com.sapereapi.model.Sapere;
 import com.sapereapi.model.TimeSlot;
 import com.sapereapi.util.SapereUtil;
 import com.sapereapi.util.UtilDates;
 
 import eu.sapere.middleware.agent.AgentAuthentication;
+import eu.sapere.middleware.log.AbstractLogger;
+import eu.sapere.middleware.lsa.Lsa;
 import eu.sapere.middleware.lsa.values.IAggregateable;
+import eu.sapere.middleware.node.NodeConfig;
 
 public class CompositeOffer implements IEnergyObject, Cloneable, Serializable {
 	private static final long serialVersionUID = 10L;
@@ -29,7 +32,7 @@ public class CompositeOffer implements IEnergyObject, Cloneable, Serializable {
 	protected Map<String, Double> mapPower;
 	protected Map<String, Double> mapPowerMax;
 	protected Map<String, Double> mapPowerMin;
-	protected Map<String, String> mapLocation;
+	protected Map<String, NodeConfig> mapLocation;
 	protected Map<String, PricingTable> mapPricingTable;
 	protected List<Long> singleOffersIds = new ArrayList<Long>();	// TODO put in a map by node. ids can only be used in the same node
 	protected boolean isMerged = false;
@@ -40,7 +43,7 @@ public class CompositeOffer implements IEnergyObject, Cloneable, Serializable {
 		this.mapPower = new HashMap<String, Double>();
 		this.mapPowerMax = new HashMap<String, Double>();
 		this.mapPowerMin = new HashMap<String, Double>();
-		this.mapLocation = new HashMap<String, String>();
+		this.mapLocation = new HashMap<String, NodeConfig>();
 		this.mapPricingTable = new HashMap<String, PricingTable>();
 		this.singleOffersIds =  new ArrayList<Long>();
 	}
@@ -59,7 +62,7 @@ public class CompositeOffer implements IEnergyObject, Cloneable, Serializable {
 		this.mapPower = new HashMap<String, Double>();
 		this.mapPowerMax = new HashMap<String, Double>();
 		this.mapPowerMin = new HashMap<String, Double>();
-		this.mapLocation = new HashMap<String, String>();
+		this.mapLocation = new HashMap<String, NodeConfig>();
 		//String consumerLoc = aConsumerAgent.getAuthentication().getAgentLocation();
 		this.mapLocation.put(consumerAgent, request.getIssuerLocation());
 		this.singleOffersIds =  new ArrayList<Long>();
@@ -117,11 +120,11 @@ public class CompositeOffer implements IEnergyObject, Cloneable, Serializable {
 		this.mapPowerMin = mapPowerMin;
 	}
 
-	public Map<String, String> getMapLocation() {
+	public Map<String, NodeConfig> getMapLocation() {
 		return mapLocation;
 	}
 
-	public void setMapLocation(Map<String, String> mapLocation) {
+	public void setMapLocation(Map<String, NodeConfig> mapLocation) {
 		this.mapLocation = mapLocation;
 	}
 
@@ -151,7 +154,11 @@ public class CompositeOffer implements IEnergyObject, Cloneable, Serializable {
 		return request.getIssuerDistance();
 	}
 
-	public String getIssuerLocation() {
+	public boolean isIssuerLocal() {
+		return request.isIssuerLocal();
+	}
+
+	public NodeConfig getIssuerLocation() {
 		return request.getIssuerLocation();
 	}
 
@@ -206,7 +213,7 @@ public class CompositeOffer implements IEnergyObject, Cloneable, Serializable {
 					mapPowerMin.put(producer, addPowerMin);
 					mapPowerMax.put(producer, addedPowerMax);
 					mapLocation.put(producer, singleOffer.getIssuerLocation());
-					if(singleOffer.getId()>0) {
+					if(singleOffer.getId() != null && singleOffer.getId()>0) {
 						singleOffersIds.add(singleOffer.getId());
 					}
 				}
@@ -218,9 +225,9 @@ public class CompositeOffer implements IEnergyObject, Cloneable, Serializable {
 		return consumerAgent;
 	}
 
-	public String getConsumerLocation() {
+	public NodeConfig getConsumerLocation() {
 		if(request==null) {
-			return "";
+			return null;
 		}
 		return request.getIssuerLocation();
 	}
@@ -243,6 +250,10 @@ public class CompositeOffer implements IEnergyObject, Cloneable, Serializable {
 		}
 		Date current = getCurrentDate();
 		return current.after(this.endDate);
+	}
+
+	public boolean hasSingleOffersIds() {
+		return this.singleOffersIds.size() > 0;
 	}
 
 	public List<Long> getSingleOffersIds() {
@@ -282,7 +293,7 @@ public class CompositeOffer implements IEnergyObject, Cloneable, Serializable {
 	}
 
 	protected PricingTable auxComputeTotalPricingTable() {
-		return SapereUtil.auxComputeMapPricingTable(mapPower, mapPricingTable);
+		return SapereUtil.auxComputeMapPricingTable(mapPower, mapPricingTable, timeShiftMS);
 	}
 
 	protected Double auxComputeTotalPower(String locationFilter) {
@@ -290,8 +301,8 @@ public class CompositeOffer implements IEnergyObject, Cloneable, Serializable {
 		for (String nextAgent : this.mapPower.keySet()) {
 			double nextPower = mapPower.get(nextAgent);
 			if(locationFilter!=null) {
-				String nextLocation = mapLocation.get(nextAgent);
-				if(locationFilter.equals(nextLocation) && mapPower.containsKey(nextAgent)) {
+				NodeConfig nextLocation = mapLocation.get(nextAgent);
+				if(locationFilter.equals(nextLocation.getMainServiceAddress()) && mapPower.containsKey(nextAgent)) {
 					result += nextPower;
 				}
 			} else {
@@ -306,8 +317,8 @@ public class CompositeOffer implements IEnergyObject, Cloneable, Serializable {
 		for (String nextAgent : this.mapPowerMin.keySet()) {
 			double nextPowerMin = mapPowerMin.get(nextAgent);
 			if(locationFilter!=null) {
-				String nextLocation = mapLocation.get(nextAgent);
-				if(locationFilter.equals(nextLocation) && mapPowerMin.containsKey(nextAgent)) {
+				NodeConfig nextLocation = mapLocation.get(nextAgent);
+				if(locationFilter.equals(nextLocation.getMainServiceAddress()) && mapPowerMin.containsKey(nextAgent)) {
 					result += nextPowerMin;
 				}
 			} else {
@@ -322,8 +333,8 @@ public class CompositeOffer implements IEnergyObject, Cloneable, Serializable {
 		for (String nextAgent : this.mapPowerMax.keySet()) {
 			double nextPowerMax = mapPowerMax.get(nextAgent);
 			if(locationFilter!=null) {
-				String nextLocation = mapLocation.get(nextAgent);
-				if(locationFilter.equals(nextLocation) && mapPowerMax.containsKey(nextAgent)) {
+				NodeConfig nextLocation = mapLocation.get(nextAgent);
+				if(locationFilter.equals(nextLocation.getMainServiceAddress()) && mapPowerMax.containsKey(nextAgent)) {
 					result += nextPowerMax;
 				}
 			} else {
@@ -356,7 +367,7 @@ public class CompositeOffer implements IEnergyObject, Cloneable, Serializable {
 		if (!hasExpired()) {
 			return auxComputeTotalPricingTable();
 		}
-		return new PricingTable();
+		return new PricingTable(timeShiftMS);
 	}
 
 	public Double getPowerMin() {
@@ -473,7 +484,7 @@ public class CompositeOffer implements IEnergyObject, Cloneable, Serializable {
 		return UtilDates.getNewDate(timeShiftMS);
 	}
 
-	public String getLocationFromAgent(String agent) {
+	public NodeConfig getLocationFromAgent(String agent) {
 		return this.mapLocation.get(agent);
 	}
 
@@ -502,11 +513,10 @@ public class CompositeOffer implements IEnergyObject, Cloneable, Serializable {
 		return result.toString();
 	}
 
-	@Override
-	public CompositeOffer clone() {
+	public CompositeOffer copy(boolean copyIds) {
 		CompositeOffer result = new CompositeOffer();
 		result.setConsumerAgent(consumerAgent);
-		result.setRequest(request.clone());
+		result.setRequest(request.copy(copyIds));
 		result.setBeginDate(new Date(beginDate.getTime()));
 		result.setEndDate(new Date(endDate.getTime()));
 		if(consumerDeviceProperties!=null) {
@@ -526,10 +536,23 @@ public class CompositeOffer implements IEnergyObject, Cloneable, Serializable {
 		// clone of mapPowerMax table
 		result.setMapPowerMax(cloneMapPowerMax());
 
-		HashMap<String, String> mapLocation = new HashMap<>();
-		mapLocation.putAll(this.mapLocation);
-		result.setMapLocation(mapLocation);
+		HashMap<String, NodeConfig> mapLocationCopy = new HashMap<>();
+		for(String key : mapLocation.keySet()) {
+			NodeConfig location = mapLocation.get(key);
+			mapLocationCopy.put(key, location.copy(copyIds));
+		}
+		result.setMapLocation(mapLocationCopy);
 		return result;
+	}
+
+	@Override
+	public CompositeOffer clone() {
+		return copy(true);
+	}
+
+	@Override
+	public CompositeOffer copyForLSA() {
+		return copy(false);
 	}
 
 	@Override
@@ -594,12 +617,14 @@ public class CompositeOffer implements IEnergyObject, Cloneable, Serializable {
 			return true;
 		} else {
 			throw new UnauthorizedModificationException("requested power " + UtilDates.df2.format(newRequest.getPower())
+				+ " [agent " + newRequest.getIssuer() + "]"
 				+ " higher than the max limit " +  UtilDates.df2.format(maxPower));
 		}
 	}
 
 	public boolean modifyRequest(EnergyRequest newRequest, EnergyRequest complementaryRequest, AbstractLogger logger) throws Exception{
 		if(canModify(newRequest, complementaryRequest)) {
+			logger.info("modifyRequest begin : initial gap = " + this.computeGap());
 			EnergyRequest newRequest2 = newRequest.clone();
 			logger.info("CompositeOffer.modifyRequest newRequest = " + newRequest2 + ", complementaryRequest = " + complementaryRequest);
 			CompositeOffer oldContract = this.clone();
@@ -615,18 +640,12 @@ public class CompositeOffer implements IEnergyObject, Cloneable, Serializable {
 
 	// TODO : return true if the minPower/maxPower has been changed
 	public void modifyPower(double totalPowerToSet, AbstractLogger logger) {
+		double initialGap = this.computeGap();
 		double currentTotalPower = this.getPower();
 		double currentTotalPowerMax = this.getPowerMax();
 		double currentTotalPowerMin = this.getPowerMin();
 		double currentTotalPowerMargin = this.getPowerMargin();
-		/*
-		try {
-			// TO DELETE
-			this.checkPowers();
-		} catch (Exception e) {
-			logger.error(e);
-		}*/
-		if(Math.abs(totalPowerToSet - currentTotalPower ) < 0.001) {
+		if(Math.abs(totalPowerToSet - currentTotalPower ) <= 0.0001) {
 			// Nothing to do
 		} else if (totalPowerToSet <= currentTotalPowerMax) {
 			Map<String, Double> cloneMapPowerMax = cloneMapPowerMax();
@@ -647,38 +666,20 @@ public class CompositeOffer implements IEnergyObject, Cloneable, Serializable {
 				} else { // powerToSet < currentPower
 					newPower1 = discountFactor * this.mapPower.get(producer);
 				}
-				double newPower = SapereUtil.round(newPower1,2);
+				double newPower = SapereUtil.round(newPower1, Sapere.NB_DEC_POWER);
 				if(useMinCondition) {
 					newPower = Math.max(minValue, newPower);	// the power to set cannot be lower than the min value
 				}
 				newPower = Math.min(maxValue, newPower);	// the power to set cannot be higher than the max value
 				mapPower.put(producer, newPower);
 			}
-			if(Math.abs(getPower() - totalPowerToSet)>1.001) {
-				logger.warning("modifyPower STEP1 : did not manage to set the target value " + totalPowerToSet);
+			if(Math.abs(getPower() - totalPowerToSet) >= 0.0001) {
+				logger.warning("modifyPower STEP1 : did not manage to set the target value " + totalPowerToSet + " gap=" + this.computeGap());
+				Map<String, Double> usedMpaPowerMin = useMinCondition? cloneMapPowerMin() : new HashMap<>();
+				SapereUtil.adjustMapValues(mapPower, totalPowerToSet, usedMpaPowerMin, cloneMapPowerMax, logger);
 			}
-			/*
-			try {
-				// TO DELETE
-				if(useMinCondition) {
-					this.checkPowers();
-				}
-			} catch (Exception e) {
-				logger.error(e);
-			}*/
-			Map<String, Double> usedMpaPowerMin = useMinCondition? cloneMapPowerMin() : new HashMap<>();
-			SapereUtil.adjustMapValues(mapPower, totalPowerToSet, usedMpaPowerMin, cloneMapPowerMax, logger);
-			/*
-			try {
-				// TO DELETE
-				if(useMinCondition) {
-					this.checkPowers();
-				}
-			} catch (Exception e) {
-				logger.error(e);
-			}*/
-			if(Math.abs(getPower() - totalPowerToSet)>1.001) {
-				logger.error("modifyPower STEP2 : did not manage to set the target value " + totalPowerToSet);
+			if(Math.abs(getPower() - totalPowerToSet) >= 0.001) {
+				logger.error("modifyPower STEP2 : did not manage to set the target value " + totalPowerToSet + ", gap = " + this.computeGap());
 			}
 			if(!useMinCondition || getPower() < currentTotalPowerMin) {
 				// Update power min and max for each producer
@@ -697,6 +698,9 @@ public class CompositeOffer implements IEnergyObject, Cloneable, Serializable {
 			this.checkPowers();
 		} catch (Exception e) {
 			logger.error(e);
+		}
+		if (this.hasGap()) {
+			logger.error("modifyPower end : gap found : " + this.computeGap() + " , gap before = " + initialGap);
 		}
 	}
 
@@ -733,6 +737,12 @@ public class CompositeOffer implements IEnergyObject, Cloneable, Serializable {
 		if(!this.getIssuer().equals(otherContract.getIssuer())) {
 			throw new Exception("CompositeOffer.merge : the contract to add must have the same isser");
 		}
+		if(this.hasGap()) {
+			throw new Exception("CompositeOffer.merge : the contract to merge has a gap of " + this.computeGap());
+		}
+		if(otherContract.hasGap()) {
+			throw new Exception("CompositeOffer.merge : the contract to add has a gap of " + this.computeGap());
+		}
 		return true;
 	}
 
@@ -750,10 +760,10 @@ public class CompositeOffer implements IEnergyObject, Cloneable, Serializable {
 			this.mapPowerMin =  SapereUtil.mergeMapStrDouble(this.mapPowerMin, otherContract.getMapPowerMin());
 			this.mapPowerMax = SapereUtil.mergeMapStrDouble(this.mapPowerMax, otherContract.getMapPowerMax());
 			for(String producer : otherContract.getMapLocation().keySet()) {
-				String otherLocation = otherContract.getMapLocation().get(producer);
+				NodeConfig otherLocation = otherContract.getMapLocation().get(producer);
 				if(mapLocation.containsKey(producer)) {
 					// check if the locations are equal
-					String location = mapLocation.get(producer);
+					NodeConfig location = mapLocation.get(producer);
 					if(!location.equals(otherLocation)) {
 						throw new Exception("CompositeOffer.merge : the contract to add must have the same location for the producer " + producer);
 					}
@@ -762,6 +772,12 @@ public class CompositeOffer implements IEnergyObject, Cloneable, Serializable {
 				}
 			}
 			singleOffersIds.addAll(otherContract.getSingleOffersIds());
+			PowerSlot reqPower = new PowerSlot(this.request.getPower(), this.request.getPowerMin(), this.request.getPowerMax());
+			PowerSlot otherReqPower = otherContract.getRequest().getPowerSlot();
+			reqPower.add(otherReqPower);
+			this.request.setPower(reqPower.getCurrent() );
+			this.request.setPowerMin(reqPower.getMin());
+			this.request.setPowerMax(reqPower.getMax());
 			this.isMerged = true;
 		}
 		return isMerged;
@@ -776,6 +792,55 @@ public class CompositeOffer implements IEnergyObject, Cloneable, Serializable {
 				if(result == null || result.getPower() < nextCompOffer.getPower()) {
 					result = nextCompOffer;
 				}
+			}
+		}
+		return result;
+	}
+/*
+	public void completeLocationId(Map<String, NodeConfig> mapNeighborNodeConfigs) {
+		this.request.completeLocationId(mapNeighborNodeConfigs);
+		for(NodeConfig nodeLocation : mapLocation.values()) {
+			if(nodeLocation.getId() == null) {
+				String nodeName = nodeLocation.getName();
+				if(mapNeighborNodeConfigs.containsKey(nodeName)) {
+					NodeConfig correctionNodeConfig = mapNeighborNodeConfigs.get(nodeName);
+					nodeLocation.setId(correctionNodeConfig.getId());
+				}
+			}
+		}
+	}
+*/
+
+	public boolean checkLocationId() {
+		if(!request.checkLocationId()) {
+			return false;
+		}
+		for(NodeConfig nodeLocation : mapLocation.values()) {
+			if(nodeLocation.getId() == null) {
+				return false;
+			}
+		}
+		return true;
+	}
+
+	@Override
+	public void completeContent(Lsa bondedLsa, Map<String, NodeConfig> mapNodeLocation) {
+		request.completeContent(bondedLsa, mapNodeLocation);
+		for(String key : mapLocation.keySet()) {
+			NodeConfig nodeConfig = mapLocation.get(key);
+			if(nodeConfig.getId() == null && mapNodeLocation.containsKey(nodeConfig.getName())) {
+				nodeConfig.completeContent(bondedLsa, mapNodeLocation);
+			}
+		}
+	}
+
+	@Override
+	public List<NodeConfig> retrieveInvolvedLocations() {
+		List<NodeConfig> result = request.retrieveInvolvedLocations();
+		for(String key : mapLocation.keySet()) {
+			NodeConfig nodeConfig = mapLocation.get(key);
+			if(result.contains(nodeConfig))  {
+				result.add(nodeConfig);
 			}
 		}
 		return result;

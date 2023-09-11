@@ -3,6 +3,8 @@ package com.sapereapi.model.referential;
 import java.util.ArrayList;
 import java.util.List;
 
+import com.sapereapi.model.energy.OptionItem;
+
 import eu.sapere.middleware.lsa.Lsa;
 
 public enum AgentType {
@@ -14,7 +16,8 @@ public enum AgentType {
 	,BLOOD_SEARCH("BloodSearch","BloodSearch")
 	,TRANSPORT("Transport","Transport")
 	,WEB_SERVICE("WebService","WebService")
-	,GENERIC_SERVICE("GenericSercice","GenericSercice")
+	,GENERIC_SERVICE("GenericService","GenericService")
+	,GENERIC_QUERY("GenericQuery","GenericQuery")
 ;
 	private String label;
 	private String preffix;
@@ -30,6 +33,16 @@ public enum AgentType {
 
 	public String getPreffix() {
 		return preffix;
+	}
+
+	public static AgentType getByName(String name) {
+		String name2 = (name == null) ? "" : name;
+		for (AgentType deviceCategory : AgentType.values()) {
+			if (deviceCategory.name().equals(name2)) {
+				return deviceCategory;
+			}
+		}
+		return null;
 	}
 
 	public static AgentType getByLabel(String label) {
@@ -62,6 +75,18 @@ public enum AgentType {
 		List<AgentType> result = new ArrayList<AgentType>();
 		for (AgentType pLevel : AgentType.values()) {
 			result.add(pLevel);
+		}
+		return result;
+	}
+
+	public OptionItem getOptionItem() {
+		return new OptionItem(this.name(), label);
+	}
+
+	public static List<OptionItem> getOptionList() {
+		List<OptionItem> result = new ArrayList<OptionItem>();
+		for (AgentType item : AgentType.values()) {
+			result.add(item.getOptionItem());
 		}
 		return result;
 	}

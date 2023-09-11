@@ -7,6 +7,8 @@ import com.sapereapi.log.SapereLogger;
 import com.sapereapi.util.SapereUtil;
 import com.sapereapi.util.UtilDates;
 
+import eu.sapere.middleware.node.NodeConfig;
+
 /**
  * Contract informaitons with the reduced visibility of a producer agent
  * 
@@ -122,15 +124,15 @@ public class ReducedContract extends EnergySupply implements IEnergyObject {
 		return request.getIssuer();
 	}
 
-	public String getConsumerLocation() {
+	public NodeConfig getConsumerLocation() {
 		if (request == null) {
-			return "";
+			return null;
 		}
 		return request.getIssuerLocation();
 	}
 
 	public ReducedContract(EnergyRequest _request, EnergySupply supply, Date _validationDeadline) {
-		super(supply.getIssuer(), supply.getIssuerLocation(), _request.isComplementary(), supply.getPower(), supply.getPowerMin(),
+		super(supply.getIssuer(), supply.getIssuerLocation(), supply.getIssuerDistance(), _request.isComplementary(), supply.getPower(), supply.getPowerMin(),
 				supply.getPowerMax(), supply.getBeginDate(), supply.getEndDate(), supply.getDeviceProperties(),
 				supply.getPricingTable(), supply.getTimeShiftMS());
 		this.request = _request;
@@ -150,15 +152,26 @@ public class ReducedContract extends EnergySupply implements IEnergyObject {
 		return new PowerSlot(power, powerMin, powerMax);
 	}
 
-	public ReducedContract clone() {
+	/**/
+	public ReducedContract copy(boolean copyIds) {
 		PricingTable clonePricingTable = pricingTable == null ? null : pricingTable.clone();
-		EnergySupply cloneSupply = new EnergySupply(issuer, issuerLocation, isComplementary, power, powerMin, powerMax, beginDate,
+		EnergySupply cloneSupply = new EnergySupply(issuer, issuerLocation, issuerDistance, isComplementary, power, powerMin, powerMax, beginDate,
 				endDate, deviceProperties, clonePricingTable, timeShiftMS);
-		ReducedContract result = new ReducedContract(request.clone(), cloneSupply, validationDeadline);
+		ReducedContract result = new ReducedContract(request.copy(copyIds), cloneSupply, validationDeadline);
 		result.setAgreements(SapereUtil.cloneSetStr(agreements));
 		result.setDisagreements(SapereUtil.cloneSetStr(disagreements));
 		result.setMerged(isMerged);
 		return result;
+	}
+
+	@Override
+	public ReducedContract copyForLSA() {
+		return copy(false);
+	}
+
+	@Override
+	public ReducedContract clone() {
+		return copy(true);
 	}
 
 	public void addProducerAgreement(boolean isOk) {

@@ -29,8 +29,8 @@ public class AgentBloodSearch extends SapereAgent {
 	Random rand = new Random();
 	private static SapereLogger logger = SapereLogger.getInstance();
 
-	public AgentBloodSearch(AgentAuthentication authentication, String[] input, String[] output, LsaType type) {
-		super(authentication.getAgentName(), authentication, input, output, type);
+	public AgentBloodSearch(AgentAuthentication authentication, String[] input, String[] output, LsaType type, boolean enableQoS) {
+		super(authentication.getAgentName(), authentication, input, output, type, enableQoS);
 		this.input = input;
 		this.output = output;
 	}

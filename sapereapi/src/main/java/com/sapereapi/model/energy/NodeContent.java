@@ -11,25 +11,39 @@ import java.util.Map;
 import com.sapereapi.agent.energy.ConsumerAgent;
 import com.sapereapi.agent.energy.ProducerAgent;
 import com.sapereapi.log.SapereLogger;
+import com.sapereapi.model.energy.input.AgentFilter;
 import com.sapereapi.model.referential.AgentType;
 import com.sapereapi.model.referential.DeviceCategory;
 import com.sapereapi.model.referential.PriorityLevel;
 import com.sapereapi.util.UtilDates;
 
+import eu.sapere.middleware.node.NodeConfig;
+
 public class NodeContent {
-	private AgentFilter filter;
-	private List<AgentForm> consumers;
-	private List<AgentForm> producers;
-	private List<OptionItem> listPriorityLevel;
-	private List<OptionItem> listDeviceCategoryConsumer;
-	private List<OptionItem> listDeviceCategoryProducer;
-	private List<OptionItem> listYesNo;
-	private NodeTotal total;
-	private List<String> warnings;
-	private List<String> errors;
-	private boolean noFilter = true;
-	private Long timeShiftMS = null;
-;
+	protected NodeConfig nodeConfig;
+	protected AgentFilter filter;
+	protected List<AgentForm> consumers;
+	protected List<AgentForm> producers;
+	protected List<OptionItem> listAgentType;
+	protected List<OptionItem> listPriorityLevel;
+	protected List<OptionItem> listDeviceCategoryConsumer;
+	protected List<OptionItem> listDeviceCategoryProducer;
+	protected List<OptionItem> listYesNo;
+	protected Map<String, NodeConfig> mapNeighborNodes;
+	protected NodeTotal total;
+	protected List<String> warnings;
+	protected List<String> errors;
+	protected boolean noFilter = true;
+	protected Long timeShiftMS = null;
+
+	public NodeConfig getNodeConfig() {
+		return nodeConfig;
+	}
+
+	public void setNodeConfig(NodeConfig nodeConfig) {
+		this.nodeConfig = nodeConfig;
+	}
+
 	public List<AgentForm> getConsumers() {
 		return consumers;
 	}
@@ -44,6 +58,14 @@ public class NodeContent {
 
 	public void setProducers(List<AgentForm> producers) {
 		this.producers = producers;
+	}
+
+	public List<OptionItem> getListAgentType() {
+		return listAgentType;
+	}
+
+	public void setListAgentType(List<OptionItem> listAgentTypes) {
+		this.listAgentType = listAgentTypes;
 	}
 
 	public List<OptionItem> getListPriorityLevel() {
@@ -72,6 +94,14 @@ public class NodeContent {
 
 	public NodeTotal getTotal() {
 		return total;
+	}
+
+	public Map<String, NodeConfig> getMapNeighborNodes() {
+		return mapNeighborNodes;
+	}
+
+	public void setMapNeighborNodes(Map<String, NodeConfig> mapNeighborNodes) {
+		this.mapNeighborNodes = mapNeighborNodes;
 	}
 
 	public void setTotal(NodeTotal total) {
@@ -134,8 +164,9 @@ public class NodeContent {
 		return consumerNames;
 	}
 
-	public NodeContent(AgentFilter filter, long _timeShiftMS) {
+	public NodeContent(NodeConfig _nodeConfig, AgentFilter filter, long _timeShiftMS) {
 		super();
+		nodeConfig = _nodeConfig;
 		consumers = new ArrayList<AgentForm>();
 		producers = new ArrayList<AgentForm>();
 		errors = new ArrayList<String>();
@@ -145,6 +176,10 @@ public class NodeContent {
 		listPriorityLevel = PriorityLevel.getOptionList();
 		listDeviceCategoryConsumer = DeviceCategory.getOptionList(false);
 		listDeviceCategoryProducer = DeviceCategory.getOptionList(true);
+		listAgentType = new ArrayList<OptionItem>();
+		listAgentType.add(AgentType.CONSUMER.getOptionItem());
+		listAgentType.add(AgentType.PRODUCER.getOptionItem());
+		mapNeighborNodes = new HashMap<String, NodeConfig>();
 		listYesNo = new ArrayList<OptionItem>();
 		listYesNo.add(new OptionItem("", " "));
 		listYesNo.add(new OptionItem("YES", "Yes"));
@@ -153,14 +188,14 @@ public class NodeContent {
 	}
 
 	// AgentForm comparator : by id
-	private final Comparator<AgentForm> agentComparator = new Comparator<AgentForm>() {
+	protected final Comparator<AgentForm> agentComparator = new Comparator<AgentForm>() {
 		public int compare(AgentForm o1, AgentForm o2) {
 			return o1.compareTo(o2);
 		}
 	};
 
-	public void addConsumer(ConsumerAgent consumer, boolean isInSapce) {
-		AgentForm newConsumer = new AgentForm(consumer, isInSapce);
+	public void addConsumer(ConsumerAgent consumer, boolean isInSapce, int distance) {
+		AgentForm newConsumer = new AgentForm(consumer, isInSapce, distance);
 		this.consumers.add(newConsumer);
 	}
 
@@ -168,8 +203,8 @@ public class NodeContent {
 		this.consumers.add(newConsumer);
 	}
 
-	public void addProducer(ProducerAgent producer, boolean isInSapce) {
-		AgentForm newProducer = new AgentForm(producer, isInSapce);
+	public void addProducer(ProducerAgent producer, boolean isInSapce,int distance) {
+		AgentForm newProducer = new AgentForm(producer, isInSapce, distance);
 		this.producers.add(newProducer);
 	}
 
@@ -433,15 +468,17 @@ public class NodeContent {
 					}
 					for (String consumerName : producer.getWaitingContractsConsumers()) {
 						AgentForm consumer = this.getConsumer(consumerName);
-						if(noFilter || filteredConsumers.contains(consumerName)) {
-							if (consumer.getIsSatisfied()) {
-								// Add warning
-								Double totalWaiting = producer.getWaitingContractsPower().getCurrent();
-								String warningMsg = "The valided contract of " + consumerName
-										+ " is still in waiting status in " + producer.getAgentName() + " LSA.";
-								warningMsg += "(Sum power:" + UtilDates.df.format(totalWaiting) + ")";
-								if (!warnings.contains(warningMsg)) {
-									warnings.add(warningMsg);
+						if(consumer != null && consumer.isLocal()) {
+							if(noFilter || filteredConsumers.contains(consumerName)) {
+								if (consumer.getIsSatisfied()) {
+									// Add warning
+									Double totalWaiting = producer.getWaitingContractsPower().getCurrent();
+									String warningMsg = "The valided contract of " + consumerName
+											+ " is still in waiting status in " + producer.getAgentName() + " LSA.";
+									warningMsg += "(Sum power:" + UtilDates.df3.format(totalWaiting) + ")";
+									if (!warnings.contains(warningMsg)) {
+										warnings.add(warningMsg);
+									}
 								}
 							}
 						}
@@ -450,13 +487,13 @@ public class NodeContent {
 						if(noFilter || filteredConsumers.contains(consumerName)) {
 							AgentForm consumer = this.getConsumer(consumerName);
 							double consumerContribution = producer.getOngoingContractsRepartition().get(consumerName).getCurrent();
-							if (consumer!=null && !consumer.getIsSatisfied()) {
+							if (consumer!=null && !consumer.getIsSatisfied() && consumer.isLocal()) {
 								double consumerContractTotal = consumer.getOngoingContractsTotal().getCurrent();
 								// Add warning
 								if(consumerContractTotal==0) {
 									String warningMsg = "The contract of " + consumerName + " is already valid in "
 											+ producer.getAgentName() + " lsa but not valid in " + consumerName + " lsa.";
-									warningMsg += " (Contribution : " + UtilDates.df.format(consumerContribution) + ")";
+									warningMsg += " (Contribution : " + UtilDates.df3.format(consumerContribution) + ")";
 									if (!warnings.contains(warningMsg)) {
 										warnings.add(warningMsg);
 									}
@@ -473,8 +510,8 @@ public class NodeContent {
 					double totalContract = consumer.getOngoingContractsTotal().getCurrent();
 					double requestPower = consumer.getEnergyRequest().getPower();
 					if( totalContract>0 && Math.abs( totalContract - requestPower) >= 0.001) {
-						String warningMsg = "The total supplied to " + consumerName + " (" + UtilDates.df.format(totalContract) + " W)"
-								+ " does not correspond to the requested power : " + UtilDates.df.format(requestPower) + " W.";
+						String warningMsg = "The total supplied to " + consumerName + " (" + UtilDates.df3.format(totalContract) + " W)"
+								+ " does not correspond to the requested power : " + UtilDates.df3.format(requestPower) + " W.";
 						if (!warnings.contains(warningMsg)) {
 							warnings.add(warningMsg);
 						}
@@ -491,9 +528,9 @@ public class NodeContent {
 								double gap = Math.abs( providedLsaProducer - providedLsaConsumer);
 								if(gap >= 0.001) {
 									String warningMsg = "The power supplied by " + producerName  + " to " + consumerName
-											+ " has differents value in consumer lsa (" + UtilDates.df.format(providedLsaConsumer) + " W) " 
-											+ " and in producer lsa (" + UtilDates.df.format(providedLsaProducer) + " W. )" 
-											+ " gap = " + UtilDates.df.format(gap);
+											+ " has differents value in consumer lsa (" + UtilDates.df3.format(providedLsaConsumer) + " W) " 
+											+ " and in producer lsa (" + UtilDates.df3.format(providedLsaProducer) + " W. )" 
+											+ " gap = " + UtilDates.df3.format(gap);
 									if (!warnings.contains(warningMsg)) {
 										warnings.add(warningMsg);
 									}
@@ -524,9 +561,9 @@ public class NodeContent {
 			if(noFilter) {
 				double delta = Math.abs(consumedLocally - providedLocally);
 				if (Math.abs(consumedLocally) >0 && Math.abs(providedLocally) > 0 && delta >= 0.01) {
-					errors.add("Total locally consumed power " + UtilDates.df.format(consumedLocally)
-							+ " is not equals to the total power locally provided by producers : " + UtilDates.df.format(providedLocally)
-							+ " gap=" + UtilDates.df.format(delta));
+					errors.add("Total locally consumed power " + UtilDates.df3.format(consumedLocally)
+							+ " is not equals to the total power locally provided by producers : " + UtilDates.df3.format(providedLocally)
+							+ " gap=" + UtilDates.df3.format(delta));
 				} else {
 					// errors.add("OK");
 				}
@@ -535,24 +572,6 @@ public class NodeContent {
 			SapereLogger.getInstance().error(e);
 			e.printStackTrace();
 		}
-	}
-
-	public void merge(NodeContent otherContent) {
-		for(AgentForm consumer : otherContent.getConsumers()) {
-			// each agent name should be unique
-			if(getAgent(consumer.getAgentName())==null) {
-				this.consumers.add(consumer);
-			} else {
-				// TODO send an exception ?
-			}
-		}
-		for(AgentForm producer : otherContent.getProducers()) {
-			if(getAgent(producer.getAgentName())==null) {
-				this.producers.add(producer);
-			}
-		}
-		// refresh all totals
-		computeTotal();
 	}
 
 	public Date getCurrentDate() {

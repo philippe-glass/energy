@@ -6,6 +6,8 @@ import java.util.Date;
 import com.sapereapi.model.referential.PriorityLevel;
 import com.sapereapi.util.UtilDates;
 
+import eu.sapere.middleware.node.NodeConfig;
+
 public class EnergyRequest extends EnergySupply implements IEnergyObject, Serializable {
 	private static final long serialVersionUID = 14567L;
 	private PriorityLevel priorityLevel;
@@ -14,9 +16,10 @@ public class EnergyRequest extends EnergySupply implements IEnergyObject, Serial
 	private Date warningDate = null;
 	private Date refreshDate = null;
 
-	public EnergyRequest(String issuer, String _location, Boolean _isComplementary, Double _power, Double _powerMin, Double _powerMax, Date beginDate, Date endDate, Double _delayToleranceMinutes,
+	public EnergyRequest(String issuer, NodeConfig _location, Integer _issuerDistance
+			, Boolean _isComplementary, Double _power, Double _powerMin, Double _powerMax, Date beginDate, Date endDate, Double _delayToleranceMinutes,
 			PriorityLevel _priority, DeviceProperties deviceProperties, PricingTable pricingTable, long timeShiftMS) {
-		super(issuer, _location, _isComplementary, _power, _powerMin, _powerMax, beginDate, endDate, deviceProperties, pricingTable, timeShiftMS);
+		super(issuer, _location, _issuerDistance, _isComplementary, _power, _powerMin, _powerMax, beginDate, endDate, deviceProperties, pricingTable, timeShiftMS);
 		this.delayToleranceMinutes = _delayToleranceMinutes;
 		this.priorityLevel = _priority;
 		this.aux_expiryDate = getCurrentDate();
@@ -164,9 +167,11 @@ public class EnergyRequest extends EnergySupply implements IEnergyObject, Serial
 	}
 
 	@Override
-	public EnergyRequest clone() {
-		EnergySupply supply = super.clone();
-		EnergyRequest clone = new EnergyRequest(supply.getIssuer(), supply.getIssuerLocation()
+	public EnergyRequest copy(boolean addIds) {
+		EnergySupply supply = super.copy(addIds);
+		EnergyRequest copy = new EnergyRequest(supply.getIssuer()
+				, supply.getIssuerLocation().copy(addIds)
+				, supply.getIssuerDistance()
 				, supply.getIsComplementary()
 				, supply.getPower(), supply.getPowerMin(), supply.getPowerMax()
 				, supply.getBeginDate()==null? null : new Date(supply.getBeginDate().getTime())
@@ -177,12 +182,24 @@ public class EnergyRequest extends EnergySupply implements IEnergyObject, Serial
 				, this.pricingTable==null ? null : this.pricingTable.clone()
 				, this.timeShiftMS
 				);
-		clone.setEventId(eventId);
-		clone.setRefreshDate(new Date(refreshDate.getTime()));
-		if(warningDate!=null) {
-			clone.setWarningDate(new Date(warningDate.getTime()));
+		if(addIds) {
+			copy.setEventId(eventId);
 		}
-		clone.setIsComplementary(Boolean.valueOf(isComplementary.booleanValue()));
-		return clone;
+		copy.setRefreshDate(new Date(refreshDate.getTime()));
+		if(warningDate!=null) {
+			copy.setWarningDate(new Date(warningDate.getTime()));
+		}
+		copy.setIsComplementary(Boolean.valueOf(isComplementary.booleanValue()));
+		return copy;
 	}
+
+	@Override
+	public EnergyRequest copyForLSA() {
+		return copy(false);
+	}
+
+	@Override
+	public EnergyRequest clone() {
+		return copy(true);
+	}/**/
 }

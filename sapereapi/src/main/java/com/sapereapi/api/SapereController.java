@@ -5,6 +5,7 @@ import java.util.Map;
 
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
@@ -14,6 +15,7 @@ import com.sapereapi.model.Sapere;
 import com.sapereapi.model.Service;
 
 @RestController
+@RequestMapping("/sapere")
 public class SapereController {
 
 	@GetMapping(value = "/startSapere")
@@ -24,25 +26,23 @@ public class SapereController {
 
 	@GetMapping(value = "/diffuse")
 	public String diffuseLsa(@RequestParam String name, @RequestParam int hops) {
-		Sapere.getInstance().diffuseLsa(name, hops);
-		return Sapere.getInstance().getLsa(name);
+		return Sapere.getInstance().diffuseLsa(name, hops);
 	}
-	
+
 	@GetMapping(value = "/info")
 	public String getInfo() {
 		return Sapere.getInstance().getInfo();
 	}
-	
+
 	@GetMapping(value = "/lsasList")
 	public List<Service> getLsaList() {
 		return Sapere.getInstance().getServices();
 	}
-	
+
 	@GetMapping(value = "/node")
 	public List<String> getNodes() {
 		return Sapere.getInstance().getNodes();
 	}
-
 
 	@GetMapping(value = "/lsas")
 	public List<String> getLsas() {
@@ -63,5 +63,4 @@ public class SapereController {
     public String getLsa(@PathVariable String name) {
         return Sapere.getInstance().getLsa(name);
     }
-
 }

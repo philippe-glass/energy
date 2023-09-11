@@ -2,10 +2,15 @@ package com.sapereapi.model.energy;
 
 import java.io.Serializable;
 import java.util.Date;
+import java.util.List;
+import java.util.Map;
 
 import com.sapereapi.log.SapereLogger;
 import com.sapereapi.model.referential.PriorityLevel;
 import com.sapereapi.util.UtilDates;
+
+import eu.sapere.middleware.lsa.Lsa;
+import eu.sapere.middleware.node.NodeConfig;
 
 public class SingleOffer extends EnergySupply implements IEnergyObject, Cloneable, Serializable {
 	private static final long serialVersionUID = 17L;
@@ -28,7 +33,8 @@ public class SingleOffer extends EnergySupply implements IEnergyObject, Cloneabl
 
 	public SingleOffer(String producerAgent, EnergySupply energySupply,
 			int _validityDurationSeconds, EnergyRequest _request) {
-		super(producerAgent, energySupply.getIssuerLocation(), _request.isComplementary(), energySupply.getPower(), energySupply.getPowerMin(), energySupply.getPowerMax()
+		super(producerAgent, energySupply.getIssuerLocation(), energySupply.getIssuerDistance()
+				, _request.isComplementary(), energySupply.getPower(), energySupply.getPowerMin(), energySupply.getPowerMax()
 				, energySupply.getBeginDate(), energySupply.getEndDate(), energySupply.getDeviceProperties()
 				, energySupply.getPricingTable()
 				, energySupply.getTimeShiftMS());
@@ -266,7 +272,7 @@ public class SingleOffer extends EnergySupply implements IEnergyObject, Cloneabl
 	@Override
 	public String toString() {
 		return "[" + this.id + "] "  + this.producerAgent + "->" + this.getConsumerAgent() + " at " +  UtilDates.format_time.format(creationTime) + " until " + UtilDates.format_time.format(deadline)
-				+ " W = " + UtilDates.df.format(this.power) + " from "
+				+ " W = " + UtilDates.df3.format(this.power) + " from "
 				+ UtilDates.format_time.format(beginDate) + " to "	+ UtilDates.format_time.format(endDate)
 				+ " (" + UtilDates.df.format(this.getTimeCoverRate()) + ")"
 				+ (acquitted!=null && this.acquitted? " acquitted " : "### NOT ACQUITTED ###")
@@ -276,29 +282,60 @@ public class SingleOffer extends EnergySupply implements IEnergyObject, Cloneabl
 				;
 	}
 
-	@Override
-	public SingleOffer clone() {
-		EnergySupply supplyClone = super.clone();
-		EnergyRequest requestClone = this.request.clone();
-		SingleOffer clone = new SingleOffer(new String(producerAgent), supplyClone, 0, requestClone);
+	public SingleOffer copy(boolean copyIds) {
+		EnergySupply supplyClone = super.copy(copyIds);
+		EnergyRequest requestClone = this.request.copy(copyIds);
+		SingleOffer copy = new SingleOffer(new String(producerAgent), supplyClone, 0, requestClone);
 		if(deadline!=null) {
-			clone.setDeadline(new Date(this.deadline.getTime()));
+			copy.setDeadline(new Date(this.deadline.getTime()));
 		}
 		if(creationTime!=null) {
-			clone.setCreationTime(new Date(this.creationTime.getTime()));
+			copy.setCreationTime(new Date(this.creationTime.getTime()));
 		}
 		if(contractTime!=null) {
-			clone.setContractTime(new Date(this.contractTime.getTime()));
+			copy.setContractTime(new Date(this.contractTime.getTime()));
 		}
-		clone.setIsComplementary(this.isComplementary);
-		clone.setId(this.id);
-		clone.setAcquitted(this.acquitted);
-		clone.setUsed(this.used);
-		clone.setContractEventId(this.contractEventId);
-		clone.setLog(this.log);
-		clone.setLog2(this.log2);
-		clone.setLogCancel(this.logCancel);
-		clone.setTimeShiftMS(this.timeShiftMS);
-		return clone;
+		copy.setIsComplementary(this.isComplementary);
+		if(copyIds) {
+			copy.setId(this.id);
+		}
+		copy.setAcquitted(this.acquitted);
+		copy.setUsed(this.used);
+		copy.setContractEventId(this.contractEventId);
+		copy.setLog(this.log);
+		copy.setLog2(this.log2);
+		copy.setLogCancel(this.logCancel);
+		copy.setTimeShiftMS(this.timeShiftMS);
+		return copy;
+	}
+
+	@Override
+	public SingleOffer clone() {
+		return copy(true);
+	}
+
+	public SingleOffer copyForLSA() {
+		return copy(false);
+	}
+
+	@Override
+	public void completeContent(Lsa bondedLsa, Map<String, NodeConfig> mapNodeLocation) {
+		super.completeContent(bondedLsa, mapNodeLocation);
+		if(request != null) {
+			request.completeContent(bondedLsa, mapNodeLocation);
+		}
+	}
+
+	@Override
+	public List<NodeConfig> retrieveInvolvedLocations() {
+		List<NodeConfig> result= super.retrieveInvolvedLocations();
+		if(request != null) {
+			for(NodeConfig nodeConfig : request.retrieveInvolvedLocations()) {
+				if(!result.contains(nodeConfig)) {
+					result.add(nodeConfig);
+				}
+			}
+		}
+		return result;
 	}
 }

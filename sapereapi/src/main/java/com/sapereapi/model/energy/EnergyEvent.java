@@ -3,12 +3,12 @@ package com.sapereapi.model.energy;
 import java.io.Serializable;
 import java.util.Date;
 
-import com.sapereapi.agent.energy.EnergyAgent;
-import com.sapereapi.model.TimeSlot;
 import com.sapereapi.model.referential.EventMainCategory;
 import com.sapereapi.model.referential.EventObjectType;
 import com.sapereapi.model.referential.EventType;
 import com.sapereapi.model.referential.WarningType;
+
+import eu.sapere.middleware.node.NodeConfig;
 
 public class EnergyEvent extends EnergySupply implements Cloneable, Serializable {
 	private static final long serialVersionUID = 14408L;
@@ -97,39 +97,17 @@ public class EnergyEvent extends EnergySupply implements Cloneable, Serializable
 		this.pricingTable = pricingTable;
 	}
 
-	public EnergyEvent(EventType type, String _agent, String _location, Boolean _isComplementary, Double _power, Double _powerMin, Double _powerMax, Date beginDate, Date endDate, DeviceProperties deviceProperties, PricingTable pricingTable, String _comment, long timeShiftMS) {
-		super(_agent, _location, _isComplementary, _power, _powerMin, _powerMax, beginDate, endDate, deviceProperties, pricingTable, timeShiftMS);
+	public EnergyEvent(EventType type, String _agent, NodeConfig _location, Integer _issuerDistance, Boolean _isComplementary, Double _power, Double _powerMin, Double _powerMax, Date beginDate, Date endDate, DeviceProperties deviceProperties, PricingTable pricingTable, String _comment, long timeShiftMS) {
+		super(_agent, _location, _issuerDistance, _isComplementary, _power, _powerMin, _powerMax, beginDate, endDate, deviceProperties, pricingTable, timeShiftMS);
 		this.type = type;
-		this.isComplementary = _isComplementary;
-		this.power = _power;
-		this.beginDate = beginDate;
-		this.endDate = endDate;
 		this.comment = _comment;
 	}
 
 	public EnergyEvent(EventType type, EnergySupply energySupply, String _comment) {
-		super(energySupply.getIssuer(), energySupply.getIssuerLocation(), energySupply.getIsComplementary(), energySupply.getPower(), energySupply.getPowerMin(), energySupply.getPowerMax() ,energySupply.getBeginDate(), energySupply.getEndDate(), energySupply.getDeviceProperties(), energySupply.getPricingTable(), energySupply.getTimeShiftMS());
-		this.type = type;
-		this.isComplementary = energySupply.isComplementary();
-		this.comment = _comment;
-	}
-
-	public EnergyEvent(EventType type, EnergyAgent agent, Boolean _isComplementary, PowerSlot powerSlot, TimeSlot timteSlot, String _comment) {
-		super(agent.getAgentName()
-			,agent.getAuthentication().getAgentLocation()
-			, _isComplementary
-			, powerSlot.getCurrent()
-			, powerSlot.getMin(), powerSlot.getMax()
-			, timteSlot.getBeginDate(), timteSlot.getEndDate()
-			, agent.getEnergySupply().getDeviceProperties()
-			, agent.getEnergySupply().getPricingTable()
-			, agent.getTimeShiftMS()
-			);
+		super(energySupply.getIssuer(), energySupply.getIssuerLocation(), energySupply.getIssuerDistance()
+				, energySupply.getIsComplementary(), energySupply.getPower(), energySupply.getPowerMin(), energySupply.getPowerMax() ,energySupply.getBeginDate(), energySupply.getEndDate(), energySupply.getDeviceProperties(), energySupply.getPricingTable(), energySupply.getTimeShiftMS());
 		this.type = type;
 		this.comment = _comment;
-		//this.power = _power;
-		//this.beginDate = beginDate;
-		//this.endDate = endDate;
 	}
 
 	public String getKey() {
@@ -176,16 +154,33 @@ public class EnergyEvent extends EnergySupply implements Cloneable, Serializable
 		return result.toString();
 	}
 
-	@Override
 	public EnergyEvent clone() {
 		EnergySupply supply = super.clone();
 		EventType type2 = EventType.getByLabel(this.type.getLabel());
-		EnergyEvent clone = new EnergyEvent(type2, supply, comment);
-		clone.setId(id);
+		EnergyEvent copy = new EnergyEvent(type2, supply, comment);
+		copy.setId(id);
 		if(powerUpateSlot!=null) {
-			clone.setPowerUpateSlot(powerUpateSlot);
+			copy.setPowerUpateSlot(powerUpateSlot);
 		}
-		return clone;
+		return copy;
+	}
+
+	@Override
+	public EnergyEvent copyForLSA() {
+		return copy(false);
+	}
+
+	public EnergyEvent copy(boolean copyIds) {
+		EnergySupply supply = super.copy(copyIds);
+		EventType type2 = EventType.getByLabel(this.type.getLabel());
+		EnergyEvent copy = new EnergyEvent(type2, supply, comment);
+		if(copyIds) {
+			copy.setId(id);
+		}
+		if(powerUpateSlot!=null) {
+			copy.setPowerUpateSlot(powerUpateSlot);
+		}
+		return copy;
 	}
 
 	public PowerSlot getPowerUpateSlot() {

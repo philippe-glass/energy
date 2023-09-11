@@ -274,22 +274,25 @@ public class TransitionMatrix implements Serializable, IAggregateable {
 		// Matrix aMatrixNorm = normalize(aMatrix);
 		StringBuffer result = new StringBuffer();
 		result.append("[");
+		String sep1="";
 		for (int rowIdx = 0; rowIdx < aMatrix.getRowDimension(); rowIdx++) {
+			result.append(sep1);
 			result.append("[");
-			String sep = "";
+			String cellSeparator = "";
 			for (int colIdx = 0; colIdx < aMatrix.getColumnDimension(); colIdx++) {
 				double value = aMatrix.get(rowIdx, colIdx);
 				if(true || value >0 ) {
-					result.append(sep);
+					result.append(cellSeparator);
 					//MarkovState sIn = NodeMarkovStates.getById(1+rowIdx);
 					//MarkovState sMut =  NodeMarkovStates.getById(1+colIdx);
 					//result.append(sIn).append("->").append(sMut).append(":");
-					result.append(UtilDates.df.format(value));
-					sep = " ";
+					result.append(UtilDates.df3.format(value));
+					cellSeparator = "   ";
 				}
 			}
 			result.append("]");
-			result.append(CR);
+			sep1 = CR;
+			//result.append(CR);
 		}
 		result.append("]");
 		return result.toString();
@@ -340,7 +343,7 @@ public class TransitionMatrix implements Serializable, IAggregateable {
 	@Override
 	public String toString() {
 		StringBuffer result = new StringBuffer();
-		result.append("{");
+		//result.append("{");
 		if (computeDate != null) {
 			if(key != null) {
 				//result.append("variable ").append(key.getVariable());
@@ -351,10 +354,18 @@ public class TransitionMatrix implements Serializable, IAggregateable {
 			result.append(CR).append("cumulative corrections : ").append(matrix2str(this.allCorrectionsMatrix));
 			result.append(CR).append("normalized matrices without corrections : ").append(matrix2str(this.normalizedMatrix1));
 			*/
-			result.append(CR).append("").append("normMatrix : ").append(matrix2str(this.normalizedMatrix2));
+			result.append("")
+				//.append("(").append("normMatrix) : ")
+				.append(matrix2str(this.normalizedMatrix2));
+			/*
+			result.append(CR).append("Obs matrix:").append(CR)
+				.append(matrix2str(this.allObsMatrix));
+			result.append(CR).append("Corr matrix:").append(CR)
+			.append(matrix2str(this.allCorrectionsMatrix));
+			*/
 
 		}
-		result.append("}");
+		//result.append("}");
 		return result.toString();
 	}
 
@@ -434,6 +445,7 @@ public class TransitionMatrix implements Serializable, IAggregateable {
 	@Override
 	public TransitionMatrix aggregate(String operator, List<IAggregateable> listObjects,
 			AgentAuthentication agentAuthentication) {
+		int debugLevel = 0;
 		if("avg".equals(operator)) {
 			TransitionMatrix result = new TransitionMatrix();
 			result.reset();
@@ -460,14 +472,18 @@ public class TransitionMatrix implements Serializable, IAggregateable {
 				int i = 0;
 				for(Matrix nextMatrix : listAllObsMatrix) {
 					i++;
-					SapereLogger.getInstance().info("TransitionMatrix.aggregate for debug : nextMatrix (" + i +") = "
+					if(debugLevel >= 10) {
+						SapereLogger.getInstance().info("TransitionMatrix.aggregate for debug : nextMatrix (" + i +") = "
 							+ matrix2str(nextMatrix));
+					}
 				}
-				SapereLogger.getInstance().info("TransitionMatrix.aggregate for debug : nbMatrix = "
+				if(debugLevel >= 10) {
+					SapereLogger.getInstance().info("TransitionMatrix.aggregate for debug : nbMatrix = "
 						+ listAllObsMatrix.size()
 						+ ", sumMatrix = "
 						+ matrix2str(sumMatrix)
 						);
+				}
 			}
 			result.setKey(new TransitionMatrixKey(null, null, lastKey.getVariable(), lastKey.getTimeWindow()));
 			result.setIterObsMatrix(auxComputeSumMatrix(listIterObsMatrix));// auxComputeAvgMatrix

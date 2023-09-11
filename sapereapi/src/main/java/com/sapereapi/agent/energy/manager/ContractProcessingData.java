@@ -103,8 +103,9 @@ public class ContractProcessingData {
 	}
 
 	private EnergyEvent auxCreateEvent(EventType type, EnergyAgent consumerAgent, TimeSlot timeSlot, String comment) {
-		EnergyEvent result = new EnergyEvent(type, consumerAgent, isComplementary, currentContract.getPowerSlot(), timeSlot, comment);
-		//result.setIsComplementary(isComplementary);
+		EnergyEvent result = new EnergyEvent(type, consumerAgent.getEnergySupply(), comment);
+		result.setBeginDate(timeSlot.getBeginDate());
+		result.setEndDate(timeSlot.getEndDate());
 		return result;
 	}
 
@@ -183,6 +184,9 @@ public class ContractProcessingData {
 
 	public EnergyEvent generateUpdateEvent(EnergyAgent consumerAgent, WarningType warningType) {
 		if (startEvent != null && currentContract != null) {
+			if(!currentContract.checkLocationId())  {
+				logger.error("generateUpdateEvent contract isseur has no location id");
+			}
 			EnergyEvent originStartEvent = startEvent.clone();
 			startEvent = auxCreateEvent(EventType.CONTRACT_UPDATE, consumerAgent, currentContract.getTimeSlot(), "");
 			startEvent.setOriginEvent(originStartEvent);
@@ -379,6 +383,9 @@ public class ContractProcessingData {
 		boolean result = false;
 		if(currentContract!=null) {
 			result = currentContract.merge(otherContract);
+			if(currentContract.hasGap()) {
+				logger.error("mergeContract currentContract has gap after merge : " + currentContract);
+			}
 			generateUpdateEvent(consumerAgent, WarningType.CONTRACT_MERGE);
 		}
 		return result;
