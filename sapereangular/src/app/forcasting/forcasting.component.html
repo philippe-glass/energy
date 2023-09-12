@@ -23,7 +23,8 @@
                     </select>
                 </label>
                 <br>
-                <label class="txt_warning_high"> (between {{sInterval}})</label>
+                <label> min date: <b>{{sInterval["min"]}}</b> <br>
+                        max date: <b>{{sInterval["max"]}}</b></label>
                 &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
                 <br><br>
                 <label>samplingNb:<input size="5" class="form-text" name="forcastingRequest.samplingNb"   [(ngModel)]="forcastingRequest.samplingNb"></label>
@@ -36,7 +37,8 @@
         <b>{{inputError}}</b>
     </div>
     <div *ngIf="nbValues">
-        <h3>Forcasting result: horizon = {{forcastingRequest.time}} + 1H</h3>
+        <h3>Forcasting result:</h3> <!-- horizon = {{forcastingRequest.time}} + 1H =   -->
+        horizon = {{forcastingResult.horizon.substring(0,16)}} (GMT)
         <table class="table table-hover">
             <thead>
                 <tr>
@@ -54,7 +56,7 @@
                 </tr>
                 <tr>
                     <th><b>Forcast</b></th>
-                    <td *ngFor="let value of forcastingResult.predicetedValues"> {{value}}</td>
+                    <td *ngFor="let value of forcastingResult.predicetedValues"> {{fnum3(value)}}</td>
                 </tr>
                 <tr>
                     <th><b>Real values</b></th>

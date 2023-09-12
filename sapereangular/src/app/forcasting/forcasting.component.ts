@@ -3,7 +3,7 @@ import { HttpClient } from '@angular/common/http';
 import { ConstantsService } from '../common/services/constants.service';
 import { fnum2,fnum3, precise_round, formatTime, formatDate, formatTime2, timeYYYYMMDDHMtoDate, formatTimeWindow
   , getDefaultInitTime, getDefaultHour, getDefaulInitDay, getDefaultTargetTime, getDefaultTargetDay
-  , getDefaultTime, getDefaultTime2, timeHMtoDate, toogleDisplay, format2D
+  , getDefaultTime, getDefaultTime2, timeHMtoDate, toogleDisplay, format2D, fnum
  } from '../common/util.js';
 @Component({
   selector: 'app-lsas',
@@ -15,7 +15,7 @@ export class ForcastingComponent implements OnInit {
   private forcastingResult = {};
   private forcastingRef = {};
   private nbValues = 0;
-  private sInterval = "";
+  private sInterval = {"min":"", "max":""};
   private inputError = "";
 
   constructor(private httpClient: HttpClient,private _constant: ConstantsService) {
@@ -24,14 +24,16 @@ export class ForcastingComponent implements OnInit {
     this.forcastingRequest.year = ""+a_date.getFullYear();
     this.forcastingRequest.month = format2D(1+a_date.getMonth());
     this.forcastingRequest.day =  format2D(a_date.getDate());
-    console.log("constructor")
+    console.log("forcasting page constructor");
     this.httpClient.get(this._constant.baseAppUrl+'energy/getEndUserForcastingRef').
     subscribe(result => {
       this.forcastingRef = result;
       console.log("forcastingRef = ", this.forcastingRef);
       this.forcastingRequest.time = this.forcastingRef["defaultTime"];
       var interval = this.forcastingRef["datesInterval"];
-      this.sInterval = "" + (interval["beginDate"]).substring(0,16) + " and " +  interval["endDate"].substring(0,16);
+      var smin = (interval["beginDate"]).substring(0,16);
+      var smax = (interval["endDate"]).substring(0,16);
+      this.sInterval = {"min": smin, "max" : smax};
       this.forcastingRef["minDate"] = new Date(interval["beginDate"]);
       this.forcastingRef["maxDate"] = new Date(interval["endDate"]);
       console.log(this.sInterval, this.forcastingRef["minDate"], this.forcastingRef["maxDate"]);
@@ -46,9 +48,9 @@ export class ForcastingComponent implements OnInit {
     var timestamp = new Date(s_timestamp);
     this.inputError = "";
     if(timestamp < this.forcastingRef["minDate"]) {
-      this.inputError = "Input error : the date entered is before " + this.forcastingRef["datesInterval"]["beginDate"];
+      this.inputError = "Input error : the date entered is before the min date " + this.forcastingRef["datesInterval"]["beginDate"];
     } else if (timestamp > this.forcastingRef["maxDate"]) {
-      this.inputError = "Input error : the date entered is after " + this.forcastingRef["datesInterval"]["endDate"];
+      this.inputError = "Input error : the date entered is after the max date " + this.forcastingRef["datesInterval"]["endDate"];
     } else {
       var test2 = {
         "timestamp": "2021-10-27 21:15:00+0000",
@@ -64,11 +66,20 @@ export class ForcastingComponent implements OnInit {
         console.log(result);
         this.forcastingResult = result;
         this.nbValues = (this.forcastingResult["predicetedValues"]).length;
-        console.log("forcastingResult = ", this.forcastingResult);
+        var nbTimestamps = (this.forcastingResult["timestamps"]).length;
+        this.forcastingResult["horizon"] = "";
+        if(nbTimestamps > 0) {
+          this.forcastingResult["horizon"] = this.forcastingResult["timestamps"][(nbTimestamps-1)];
+        }
+        console.log("forcastingResult = ", this.forcastingResult, this.forcastingResult["timestamps"], nbTimestamps, this.forcastingResult["horizon"]);
       });
     }
   }
 
   ngOnInit() {
+  }
+
+  fnum3(num, displayZero=false) {
+    return fnum3(num, displayZero);
   }
 }
