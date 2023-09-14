@@ -39,6 +39,10 @@
     <div *ngIf="nbValues">
         <h3>Forcasting result:</h3> <!-- horizon = {{forcastingRequest.time}} + 1H =   -->
         horizon = {{forcastingResult.horizon.substring(0,16)}} (GMT)
+        <div *ngIf="nbValues == 4">
+            <br>MSE = {{fnum5(forcastingResult.errorMSE)}}
+            <br>RMSE =  {{fnum5(forcastingResult.errorRMSE)}}
+        </div>
         <table class="table table-hover">
             <thead>
                 <tr>
@@ -60,7 +64,7 @@
                 </tr>
                 <tr>
                     <th><b>Real values</b></th>
-                    <td *ngFor="let value of forcastingResult.realValues"> {{value}}</td>
+                    <td *ngFor="let value of forcastingResult.realValues"> {{fnum3(value)}}</td>
                 </tr>
             </tbody>
         </table>

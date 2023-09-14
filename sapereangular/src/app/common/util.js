@@ -54,12 +54,13 @@ export function fnum2(num, displayZero=false ) {
   return fnum(num, 2, displayZero);
 }
 
-
-
 export function fnum3(num, displayZero=false ) {
   return fnum(num, 3, displayZero);
 }
 
+export function fnum5(num, displayZero=false ) {
+  return fnum(num, 5, displayZero);
+}
 
 export function formatDate(date) {
     var day = date.getDate();

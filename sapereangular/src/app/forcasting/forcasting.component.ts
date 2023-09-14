@@ -1,7 +1,7 @@
 import { Component, OnInit } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { ConstantsService } from '../common/services/constants.service';
-import { fnum2,fnum3, precise_round, formatTime, formatDate, formatTime2, timeYYYYMMDDHMtoDate, formatTimeWindow
+import { fnum2,fnum3, fnum5, precise_round, formatTime, formatDate, formatTime2, timeYYYYMMDDHMtoDate, formatTimeWindow
   , getDefaultInitTime, getDefaultHour, getDefaulInitDay, getDefaultTargetTime, getDefaultTargetDay
   , getDefaultTime, getDefaultTime2, timeHMtoDate, toogleDisplay, format2D, fnum
  } from '../common/util.js';
@@ -68,6 +68,19 @@ export class ForcastingComponent implements OnInit {
         this.nbValues = (this.forcastingResult["predicetedValues"]).length;
         var nbTimestamps = (this.forcastingResult["timestamps"]).length;
         this.forcastingResult["horizon"] = "";
+        this.forcastingResult["errorMSE"] = 0;
+        this.forcastingResult["errorRMSE"] = 0;
+        var mse1 = 0;
+        if (this.nbValues == 4) {
+          for (var valIdx = 0; valIdx < this.nbValues; valIdx++) {
+            var delta = this.forcastingResult["predicetedValues"][valIdx] - this.forcastingResult["realValues"][valIdx];
+            console.log(delta);
+            mse1+= delta*delta;
+          }
+          var mse = mse1/this.nbValues;
+          this.forcastingResult["errorMSE"] = mse;
+          this.forcastingResult["errorRMSE"] = Math.sqrt( mse);
+        }
         if(nbTimestamps > 0) {
           this.forcastingResult["horizon"] = this.forcastingResult["timestamps"][(nbTimestamps-1)];
         }
@@ -81,5 +94,10 @@ export class ForcastingComponent implements OnInit {
 
   fnum3(num, displayZero=false) {
     return fnum3(num, displayZero);
+  }
+
+  fnum5(num, displayZero=false) {
+    var result1 = fnum5(num, displayZero);
+    return result1.replace(" ", "");
   }
 }
