@@ -1,6 +1,5 @@
 package com.sapereapi.model.protection;
 
-import java.io.Serializable;
 import java.util.List;
 import java.util.Map;
 
@@ -11,10 +10,11 @@ import com.sapereapi.model.referential.AgentType;
 
 import eu.sapere.middleware.agent.AgentAuthentication;
 import eu.sapere.middleware.agent.SapereAgent;
+import eu.sapere.middleware.log.AbstractLogger;
 import eu.sapere.middleware.lsa.Lsa;
-import eu.sapere.middleware.node.NodeConfig;
+import eu.sapere.middleware.node.NodeLocation;
 
-public class ProtectedConfirmationTable extends ProtectedObject implements Serializable {
+public class ProtectedConfirmationTable extends ProtectedObject {
 	private static final long serialVersionUID = 2L;
 	private ConfirmationTable confirmationTable = null;
 
@@ -35,8 +35,8 @@ public class ProtectedConfirmationTable extends ProtectedObject implements Seria
 
 	@Override
 	boolean checkAccessAsProducer(AgentAuthentication authentication) {
-		if (AgentType.PRODUCER.getLabel().equals(authentication.getAgentType())
-				&& confirmationTable.hasIssuer(authentication.getAgentName())) {
+		boolean agentTypeOK = AgentType.PROSUMER.name().equals(authentication.getAgentType());
+		if (agentTypeOK && confirmationTable.hasIssuer(authentication.getAgentName())) {
 			return checkAuthentication(authentication);
 		}
 		return false;
@@ -44,8 +44,8 @@ public class ProtectedConfirmationTable extends ProtectedObject implements Seria
 
 	@Override
 	boolean checkAccessAsConsumer(AgentAuthentication authentication) {
-		if (AgentType.CONSUMER.getLabel().equals(authentication.getAgentType())
-				&& confirmationTable.hasReceiver(authentication.getAgentName())) {
+		boolean agentTypeOK = AgentType.PROSUMER.name().equals(authentication.getAgentType());
+		if (agentTypeOK && confirmationTable.hasReceiver(authentication.getAgentName())) {
 			return checkAuthentication(authentication);
 		}
 		return false;
@@ -108,8 +108,8 @@ public class ProtectedConfirmationTable extends ProtectedObject implements Seria
 		return new ProtectedConfirmationTable(confirmationTableClone);
 	}
 
-	public ProtectedConfirmationTable copyForLSA() {
-		ConfirmationTable confirmationTableClone = confirmationTable.copyForLSA();
+	public ProtectedConfirmationTable copyForLSA(AbstractLogger logger) {
+		ConfirmationTable confirmationTableClone = confirmationTable.copyForLSA(logger);
 		return new ProtectedConfirmationTable(confirmationTableClone);
 	}
 
@@ -119,12 +119,14 @@ public class ProtectedConfirmationTable extends ProtectedObject implements Seria
 	}
 
 	@Override
-	public void completeContent(Lsa bondedLsa, Map<String, NodeConfig> mapNodeLocation) {
-		confirmationTable.completeContent(bondedLsa, mapNodeLocation);
+	public void completeInvolvedLocations(Lsa bondedLsa, Map<String, NodeLocation> mapNodeLocation, AbstractLogger logger) {
+		confirmationTable.completeInvolvedLocations(bondedLsa, mapNodeLocation, logger);
 	}
 
 	@Override
-	public List<NodeConfig> retrieveInvolvedLocations() {
+	public List<NodeLocation> retrieveInvolvedLocations() {
 		return confirmationTable.retrieveInvolvedLocations();
 	}
+
+
 }

@@ -6,18 +6,16 @@ import java.util.List;
 import com.sapereapi.log.SapereLogger;
 import com.sapereapi.model.LsaForm;
 import com.sapereapi.model.Sapere;
+import com.sapereapi.model.ServerConfig;
 import com.sapereapi.model.Service;
-
-import eu.sapere.middleware.node.NodeConfig;
 
 public class SapereHandler extends AbstractHandler {
 
-	public SapereHandler(String uri, NodeConfig nodeConfig, List<NodeConfig> _defaultNeighbours) {
+	public SapereHandler(String uri, ServerConfig _serverConfig) {
 		super();
 		this.uri = uri;
-		this.nodeConfig = nodeConfig;
 		this.handlerTable = new HashMap<>();
-		this.defaultNeighbours = _defaultNeighbours;
+		this.serverConfig = _serverConfig;
 		initHandlerTable();
 		logger.info("end init EnergyHandler");
 	}

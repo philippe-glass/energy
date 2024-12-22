@@ -10,6 +10,7 @@ public enum WarningType {
 	, GENERAL_INTERRUPTION("General interruption", 30)
 	, CHANGE_REQUEST("Change request", 3)
 	, CONTRACT_MERGE("Contract merge", 5)
+	, BATTERY_USAGE("Battery usage", 3)
 	;
 
 	private String label;
@@ -26,15 +27,5 @@ public enum WarningType {
 
 	public int getValiditySeconds() {
 		return validitySeconds;
-	}
-
-	public static WarningType getByLabel(String label) {
-		String label2 = (label == null) ? "" : label;
-		for (WarningType warningType : WarningType.values()) {
-			if (warningType.getLabel().equals(label2)) {
-				return warningType;
-			}
-		}
-		return null;
 	}
 }

@@ -1,17 +1,19 @@
 package com.sapereapi.model.energy;
 
-import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Hashtable;
 import java.util.List;
 import java.util.Map;
 
+import com.sapereapi.log.SapereLogger;
+
+import eu.sapere.middleware.log.AbstractLogger;
 import eu.sapere.middleware.lsa.IPropertyObject;
 import eu.sapere.middleware.lsa.Lsa;
-import eu.sapere.middleware.node.NodeConfig;
+import eu.sapere.middleware.node.NodeLocation;
 
-public class ConfirmationTable implements Serializable , IPropertyObject {
+public class ConfirmationTable implements IPropertyObject {
 	private static final long serialVersionUID = 3L;
 	private String issuer = null;
 	//protected Boolean isComplementary = Boolean.FALSE;
@@ -106,11 +108,26 @@ public class ConfirmationTable implements Serializable , IPropertyObject {
 
 	@Override
 	public String toString() {
-		return issuer + "   " + table.toString();
+		StringBuffer result = new StringBuffer();
+		result.append(issuer).append("   ");
+		for(String receiver : table.keySet()) {
+			Map<Boolean, ConfirmationItem> mapConfirmationItems =  table.get(receiver);
+			if(mapConfirmationItems.size() > 0) {
+				result.append(",").append(receiver).append(":");
+				for(Boolean bIsComplentary : mapConfirmationItems.keySet()) {
+					if(bIsComplentary) {
+						result.append("(complementary)");
+					}
+					ConfirmationItem item = mapConfirmationItems.get(bIsComplentary);
+					result.append(item);
+				}
+			}
+		}
+		return result.toString();
 	}
 
 	@Override
-	public ConfirmationTable copyForLSA() {
+	public ConfirmationTable copyForLSA(AbstractLogger logger) {
 		ConfirmationTable result = new ConfirmationTable(this.issuer);
 		for(String receiver : table.keySet()) {
 			Map<Boolean, ConfirmationItem> mapConfirmationItems =  table.get(receiver);
@@ -124,15 +141,15 @@ public class ConfirmationTable implements Serializable , IPropertyObject {
 
 	@Override
 	public ConfirmationTable clone() {
-		return copyForLSA();
+		return copyForLSA(SapereLogger.getInstance());
 	}
 
 	@Override
-	public void completeContent(Lsa bondedLsa, Map<String, NodeConfig> mapNodeLocation) {
+	public void completeInvolvedLocations(Lsa bondedLsa, Map<String, NodeLocation> mapNodeLocation, AbstractLogger logger) {
 	}
 
 	@Override
-	public List<NodeConfig> retrieveInvolvedLocations() {
-		return new ArrayList<NodeConfig>();
+	public List<NodeLocation> retrieveInvolvedLocations() {
+		return new ArrayList<NodeLocation>();
 	}
 }

@@ -1,22 +1,30 @@
 package com.sapereapi.agent.energy;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.Date;
-import java.util.HashMap;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import java.util.TreeMap;
 
 import com.sapereapi.agent.energy.manager.ConsumersProcessingMangager;
 import com.sapereapi.db.EnergyDbHelper;
 import com.sapereapi.exception.DoublonException;
+import com.sapereapi.model.HandlingException;
+import com.sapereapi.model.NodeContext;
 import com.sapereapi.model.energy.EnergyEvent;
 import com.sapereapi.model.energy.EnergyEventTable;
-import com.sapereapi.model.energy.EnergySupply;
-import com.sapereapi.model.energy.NodeTotal;
+import com.sapereapi.model.energy.EnergyFlow;
+import com.sapereapi.model.energy.EnergyStorage;
 import com.sapereapi.model.energy.PowerSlot;
 import com.sapereapi.model.energy.RegulationWarning;
-import com.sapereapi.model.energy.RescheduleItem;
-import com.sapereapi.model.energy.RescheduleTable;
+import com.sapereapi.model.energy.award.AwardItem;
+import com.sapereapi.model.energy.node.NodeTotal;
+import com.sapereapi.model.energy.reschedule.RescheduleItem;
+import com.sapereapi.model.energy.reschedule.RescheduleTable;
+import com.sapereapi.model.referential.EventMainCategory;
+import com.sapereapi.model.referential.EventObjectType;
 import com.sapereapi.model.referential.EventType;
 import com.sapereapi.model.referential.WarningType;
 import com.sapereapi.util.SapereUtil;
@@ -24,156 +32,210 @@ import com.sapereapi.util.UtilDates;
 
 import eu.sapere.middleware.agent.AgentAuthentication;
 import eu.sapere.middleware.lsa.Lsa;
+import eu.sapere.middleware.lsa.LsaType;
 import eu.sapere.middleware.lsa.Property;
 import eu.sapere.middleware.lsa.SyntheticPropertyName;
-import eu.sapere.middleware.node.NodeConfig;
-import eu.sapere.middleware.node.NodeManager;
 import eu.sapere.middleware.node.notifier.event.DecayedEvent;
-import eu.sapere.middleware.node.notifier.event.PropagationEvent;
+import eu.sapere.middleware.node.notifier.event.SpreadingEvent;
 
 public abstract class EnergyAgent extends MicroGridAgent implements IEnergyAgent {
 	protected int id;
 	protected EnergyEvent waitingStartEvent = null;
-	protected EnergyEvent startEvent = null;
-	protected EnergyEvent expiryEvent = null;
-	protected EnergyEvent stopEvent = null;
+	protected Map<Date, EnergyEvent> mapLastEvents = new TreeMap<Date, EnergyEvent>(Collections.reverseOrder());
 	private static final long serialVersionUID = 1L;
-	protected List<Property> propertiesToPost = new ArrayList<Property>();
 	protected boolean firstDecay = true;
 	protected int eventDecay = 0;
 	protected List<RegulationWarning> receivedWarnings = new ArrayList<RegulationWarning>();
-	protected Map<String, Lsa> tableChosenLsa = null;
-	protected NodeConfig nodeConfig = NodeManager.getNodeConfig();
-	protected String[] lsaInputTags;
-	protected String[] lsaOutputTags;
 	public final static int DISABLED_DURATION_MINUTES = 5;
 	public final static int DISABLED_SHORT_DURATION_SEC = 5;
 	protected NodeTotal lastNodeTotal = null;
 	protected Date timeLastDecay = null;
-	protected long timeShiftMS = 0;
+	protected AwardItem award = null;
+	protected EnergyStorage storage = null;
 
-	public EnergyAgent(int _id, String name, AgentAuthentication authentication, String[] _lsaInputTags,
-			String[] _lsaOutputTags, EnergySupply energySupply) {
-		super(name, authentication, _lsaInputTags, _lsaOutputTags);
-		initCommonFields(_id, authentication, energySupply, _lsaInputTags, _lsaOutputTags);
+	public EnergyAgent(int _id, String name, AgentAuthentication authentication, String[]lsaInputTags,
+			String[] lsaOutputTags, NodeContext nodeContext) {
+		super(name, authentication, lsaInputTags, lsaOutputTags, nodeContext);
+		initCommonFields(_id, authentication, nodeContext);
 	}
 
-	public void initCommonFields(int _id, AgentAuthentication _authentication, EnergySupply _energySupply,
-			String[] _lsaInputTags, String[] _lsaOutputTags) {
+	public void initCommonFields(int _id, AgentAuthentication authentication, NodeContext nodeContext) {
 		setEpsilon(0); // No greedy policy
-		super.initSGAgent(this.agentName, _authentication, _lsaInputTags, _lsaOutputTags);
+		super.initSGAgent(this.agentName, authentication, nodeContext);
 		id = _id;
-		this.lsaInputTags = _lsaInputTags;
-		this.lsaOutputTags = _lsaOutputTags;
-		this.tableChosenLsa = new HashMap<String, Lsa>();
 		this.debugLevel = 0;
-		this.timeShiftMS = _energySupply.getTimeShiftMS();
-		// logger.info("ProducerAgent : lsa = " + lsa.toVisualString());
+		// logger.info("EnergyAgent : lsa = " + lsa.toVisualString());
+	}
+
+	public EnergyEvent getLastEvent() {
+		if(mapLastEvents.size() > 0) {
+			return mapLastEvents.values().iterator().next();
+		}
+		return null;
+	}
+
+	public EnergyEvent getLastEvent(EventMainCategory evtCategory) {
+		EnergyEvent lastEvent = getLastEvent();
+		if (lastEvent != null && evtCategory != null) {
+			boolean categoryMatches = evtCategory.equals(lastEvent.getType().getMainCategory());
+			if (categoryMatches) {
+				return lastEvent;
+			}
+		}
+		return null;
+	}
+
+	public EnergyEvent getLastEvent(EventMainCategory[] evtCategories) {
+		EnergyEvent lastEvent = getLastEvent();
+		if (lastEvent != null && evtCategories.length > 0) {
+			for (EventMainCategory evtCategory : evtCategories) {
+				boolean categoryMatches = evtCategory.equals(lastEvent.getType().getMainCategory());
+				if (categoryMatches) {
+					return lastEvent;
+				}
+			}
+		}
+		return null;
 	}
 
 	public EnergyEvent getStartEvent() {
-		return startEvent;
+		EventMainCategory[] evtCategories = { EventMainCategory.START, EventMainCategory.UPDATE , EventMainCategory.SWITCH };
+		return getLastEvent(evtCategories);
 	}
 
-	public long getTimeShiftMS() {
-		return timeShiftMS;
+	public EnergyEvent getExpiryEvent() {
+		return getLastEvent(EventMainCategory.EXPIRY);
 	}
 
 	public boolean isStartInFutur() {
-		EnergySupply supply = getEnergySupply();
+		EnergyFlow supply = getProductionOrNeed();
 		return supply.isStartInFutur();
 	}
 
-	public EnergyEvent generateStartEvent() {
-		EnergySupply supply = getEnergySupply();
-		EventType eventType = getStartEventType();
-		if(supply.isStartInFutur()) {
-			startEvent = null;
+	public EnergyFlow getProductionOrNeed() {
+		if(this.isConsumer()) {
+			return getGlobalNeed();
 		} else {
+			return getGlobalProduction();
+		}
+	}
+
+	public EnergyEvent generateStartEvent() throws HandlingException {
+		EnergyFlow supplyOrRequest = getProductionOrNeed();
+		EventType eventType = getStartEventType();
+		if(supplyOrRequest.isStartInFutur()) {
+			EnergyEvent startEvent = getStartEvent();
+			if(startEvent != null) {
+				mapLastEvents.remove(startEvent.getBeginDate());
+			}
+		} else {
+			EnergyEvent startEvent = this.generateEvent(eventType, "");
 			try {
-				EnergyEvent newEvent = new EnergyEvent(eventType, supply, "");
-				startEvent = EnergyDbHelper.registerEvent(newEvent);
+				startEvent = EnergyDbHelper.registerEvent(startEvent, "generateStartEvent by " + this.agentName);
 			} catch (DoublonException e) {
-				startEvent = EnergyDbHelper.retrieveEvent(eventType, agentName, false, supply.getBeginDate());
+				startEvent = EnergyDbHelper.retrieveEvent(eventType, agentName, false, supplyOrRequest.getBeginDate());
 			}
 			waitingStartEvent = null;
 			if (startEvent.getId() != null) {
-				this.getEnergySupply().setEventId(startEvent.getId());
+				this.setEventId(startEvent.getId());
 			}
-		}
-		// Remove other events
-		stopEvent = null;
-		expiryEvent = null;
-		// Post event in LSA
-		postEvent(startEvent);
-		return startEvent;
-	}
-
-	public EnergyEvent generateUpdateEvent(WarningType warningType) {
-		EnergySupply supply = getEnergySupply();
-		EventType eventType = getUpdateEventType();
-		if (startEvent != null) {
-			EnergyEvent newEvent = new EnergyEvent(eventType, supply, "");
-			newEvent.setWarningType(warningType);
-			EnergyEvent originStartEvent = startEvent.clone();
-			newEvent.setOriginEvent(originStartEvent);
-			PowerSlot powerSlotBefore = originStartEvent.getPowerSlot();
-			PowerSlot powerUpdate = newEvent.getPowerSlot().clone();
-			powerUpdate.substract(powerSlotBefore);
-			newEvent.setPowerUpateSlot(powerUpdate);
-			startEvent = EnergyDbHelper.registerEvent2(newEvent);
-			// Remove other events
-			stopEvent = null;
-			expiryEvent = null;
 			// Post event in LSA
-			postEvent(startEvent);
+			pushAndPostEvent(startEvent);
+			return startEvent;
 		}
-		return startEvent;
+		return null;
 	}
 
-	public EnergyEvent generateExpiryEvent() {
-		EnergySupply supply = getEnergySupply();
+	public EnergyEvent generateUpdateEvent(WarningType warningType) throws HandlingException {
+		EventType eventType = getUpdateEventType();
+		EnergyEvent startEvent = getStartEvent();
+		if (startEvent != null) {
+			EnergyEvent updateEvent = this.generateEvent(eventType, "");
+			updateEvent.setWarningType(warningType);
+			EnergyEvent originStartEvent = startEvent.clone();
+			updateEvent.setOriginEvent(originStartEvent);
+			PowerSlot powerSlotBefore = originStartEvent.getPowerSlot();
+			PowerSlot powerUpdate = updateEvent.getPowerSlot().clone();
+			powerUpdate.substract(powerSlotBefore);
+			updateEvent.setPowerUpdateSlot(powerUpdate);
+			updateEvent = EnergyDbHelper.registerEvent2(updateEvent, "generateUpdateEvent by " + this.agentName);
+			if (updateEvent.getId() != null) {
+				this.setEventId(updateEvent.getId());
+			}
+			// Post event in LSA
+			pushAndPostEvent(updateEvent);
+			return updateEvent;
+		}
+		return null;
+	}
+
+	public EnergyEvent generateSwitchEvent(WarningType warningType) throws HandlingException {
+		EventType eventType = getSwitchEventType();
+		EnergyEvent startEvent = getStartEvent();
+		if (startEvent != null) {
+			EnergyEvent switchEvent = this.generateEvent(eventType, "");
+			switchEvent.setWarningType(warningType);
+			EnergyEvent originStartEvent = startEvent.clone();
+			switchEvent.setOriginEvent(originStartEvent);
+			PowerSlot powerUpdate = switchEvent.getPowerSlot().clone();
+			if (EventObjectType.REQUEST.equals(switchEvent.getEventObjectType())) {
+				powerUpdate.multiplyBy(-1.0);
+			}
+			PowerSlot powerSlotBefore = originStartEvent.getPowerSlot().clone();
+			if (EventObjectType.REQUEST.equals(originStartEvent.getEventObjectType())) {
+				powerSlotBefore.multiplyBy(-1.0);
+			}
+			powerUpdate.substract(powerSlotBefore);
+			// powerUpdate.add(powerSlotBefore);
+			switchEvent.setPowerUpdateSlot(powerUpdate);
+			switchEvent = EnergyDbHelper.registerEvent2(switchEvent, "generateSwitchEvent by " + this.agentName);
+			if (switchEvent.getId() != null) {
+				this.setEventId(switchEvent.getId());
+			}
+			// Post event in LSA
+			boolean alreadyIn = mapLastEvents.containsKey(switchEvent.getBeginDate());
+			EnergyEvent lastEvent = getLastEvent();
+			logger.info("generateSwitchEvent : for debug : before pushAndPostEvent : switchEvent = " + switchEvent + ", alreadyIn = " + alreadyIn+ ", lastEvent = " + lastEvent);
+			pushAndPostEvent(switchEvent);
+			return switchEvent;
+		}
+		return null;
+	}
+
+	public EnergyEvent generateExpiryEvent() throws HandlingException {
+		EnergyFlow supply = getProductionOrNeed();
 		EventType eventType = getExpiryEventType();
 		Date expiryDate = supply.getEndDate();
-		expiryEvent = new EnergyEvent(eventType, supply, "");
+		EnergyEvent expiryEvent = this.generateEvent(eventType, "");
 		expiryEvent.setBeginDate(expiryDate);
 		expiryEvent.setEndDate(expiryDate);
+		EnergyEvent startEvent = getStartEvent();
 		if (startEvent != null) {
-			expiryEvent.setOriginEvent(this.startEvent.clone());
+			expiryEvent.setOriginEvent(startEvent.clone());
 		}
-		expiryEvent = EnergyDbHelper.registerEvent2(expiryEvent);
-		// Remove other events
-		startEvent = null;
-		stopEvent = null;
+		expiryEvent = EnergyDbHelper.registerEvent2(expiryEvent, "generateExpiryEvent by " + this.agentName);
 		// Post event in LSA
-		postEvent(expiryEvent);
+		pushAndPostEvent(expiryEvent);
 		return expiryEvent;
 	}
 
-	public EnergyEvent generateStopEvent(RegulationWarning warning, String log) {
+	public EnergyEvent generateStopEvent(RegulationWarning warning, String log) throws HandlingException {
 		Date timeStop = warning.getDate();
 		// Caution : on ProducerAgent implementation : Date timeStop =
-		// SapereUtil.getCurrentSeconde();
-		if (this instanceof ProducerAgent) {
-			// timeStop = SapereUtil.getCurrentSeconde();
-		}
-		EnergySupply supply = getEnergySupply();
 		EventType eventType = getStopEventType();
-		stopEvent = new EnergyEvent(eventType, supply, log);
+		EnergyEvent stopEvent = this.generateEvent(eventType, log);
 		stopEvent.setBeginDate(timeStop);
 		stopEvent.setEndDate(timeStop);
+		EnergyEvent startEvent = getStartEvent();
 		if (startEvent != null) {
 			stopEvent.setOriginEvent(startEvent.clone());
 		}
 		if (warning != null) {
 			stopEvent.setWarningType(warning.getType());
 		}
-		stopEvent = EnergyDbHelper.registerEvent2(stopEvent);
-		// Remove other events
-		startEvent = null;
-		expiryEvent = null;
+		stopEvent = EnergyDbHelper.registerEvent2(stopEvent, "generateStopEvent by " + this.agentName);
 		// Post event in LSA
-		postEvent(stopEvent);
+		pushAndPostEvent(stopEvent);
 		return stopEvent;
 	}
 
@@ -185,6 +247,34 @@ public abstract class EnergyAgent extends MicroGridAgent implements IEnergyAgent
 		return null;
 	}
 
+	private void pushAndPostEvent(EnergyEvent newEvent) {
+		Date newDate = newEvent.getBeginDate();
+		if(mapLastEvents.size() > 0) {
+			//logger.info("pushAndPostEvent : for debug : lastEvents = " + mapLastEvents);
+			Date firstDate = mapLastEvents.keySet().iterator().next();
+			if(newDate.before(firstDate)) {
+				logger.error("pushAndPostEvent : new date " + UtilDates.format_time.format(newDate) + " is before last event date " + UtilDates.format_time.format(firstDate));
+				logger.error("pushAndPostEvent : newEvent : " + newEvent);
+				for(Date nextDate : mapLastEvents.keySet()) {
+					logger.error("pushAndPostEvent : mapLastEvents[" + UtilDates.format_time.format(nextDate) + "] = " + mapLastEvents.get(nextDate));
+				}
+				// clear all previous events
+				mapLastEvents.clear();
+			}
+		}
+		mapLastEvents.put(newDate, newEvent);
+		int maxSize = 5;
+		while(mapLastEvents.size() > maxSize) {
+			Iterator<Date> dateIt = mapLastEvents.keySet().iterator();
+			Date idxToRemove = dateIt.next();
+			while(dateIt.hasNext()) {
+				idxToRemove = dateIt.next();
+			}
+			mapLastEvents.remove(idxToRemove);
+		}
+		postEvent(newEvent);
+	}
+
 	public void postEvent(EnergyEvent eventToPost) {
 		EnergyEventTable energyEventTable = getEventTable();
 		if (energyEventTable == null) {
@@ -192,8 +282,7 @@ public abstract class EnergyAgent extends MicroGridAgent implements IEnergyAgent
 		}
 		try {
 			energyEventTable.putEvent(eventToPost.clone());
-			this.lsa.removePropertiesByName("EVENT");
-			addProperty(new Property("EVENT", energyEventTable));
+			replacePropertyWithName(new Property("EVENT", energyEventTable));
 			eventDecay = SapereUtil.EVENT_INIT_DECAY;
 			firstDecay = true;
 		} catch (Exception e) {
@@ -201,54 +290,27 @@ public abstract class EnergyAgent extends MicroGridAgent implements IEnergyAgent
 		}
 	}
 
-
-	public void addProperty(Property propertyToAdd) {
-		if (lsa.getProperties().size() >= Lsa.PROPERTIESSIZE) {
-			propertiesToPost.add(propertyToAdd);
-			logger.info(this.agentName + " addProperty : cannot post propertiesToPost " + propertyToAdd.getValue()
-					+ " in lsa. Put it waiting queue.");
-		} else {
-			lsa.addProperty(propertyToAdd);
-		}
-	}
-
-	protected void sendProperties() {
-		while (this.propertiesToPost.size() > 0 && lsa.getProperties().size() < Lsa.PROPERTIESSIZE - 1) {
-			Property prop = propertiesToPost.remove(0);
-			logger.info(this.agentName + " : post not sent property " + prop);
-			lsa.addProperty(prop);
-		}
-	}
-
 	public EnergyEvent getStopEvent() {
-		return stopEvent;
+		return getLastEvent(EventMainCategory.STOP);
 	}
 
 	public void cleanEventProperties() {
+		/*
+		if(this.isConsumer()) {
+			logger.info("EnergyAgent.cleanEventProperties : For debug : eventDecay = " + eventDecay);
+		}*/
 		if (eventDecay > 0) {
 			eventDecay -= 1;
 		} else {
 			this.lsa.removePropertiesByName("EVENT");
 			if (debugLevel > 0) {
-				logger.info("after removing event property : startEvent = " + startEvent);
+				logger.info("after removing event property : startEvent = " + getStartEvent());
 			}
 		}
-	}
-
-	protected boolean hasWantedProperty(Lsa bondedLsa) {
-		for (String nextWaiting : getInput()) {
-			if (!bondedLsa.getPropertiesByQueryAndName(agentName, nextWaiting).isEmpty()) {
-				return true;
-			}
-			if (!bondedLsa.getPropertiesByName(nextWaiting).isEmpty()) {
-				return true;
-			}
-		}
-		return false;
 	}
 
 	public boolean hasExpired() {
-		EnergySupply supply = getEnergySupply();
+		EnergyFlow supply = getProductionOrNeed();
 		if (supply == null) {
 			return false;
 		}
@@ -256,7 +318,7 @@ public abstract class EnergyAgent extends MicroGridAgent implements IEnergyAgent
 	}
 
 	public boolean isDisabled() {
-		EnergySupply supply = getEnergySupply();
+		EnergyFlow supply = getProductionOrNeed();
 		if (supply == null) {
 			return false;
 		}
@@ -264,7 +326,7 @@ public abstract class EnergyAgent extends MicroGridAgent implements IEnergyAgent
 	}
 
 	public boolean isActive() {
-		EnergySupply supply = getEnergySupply();
+		EnergyFlow supply = getProductionOrNeed();
 		if (supply == null) {
 			return false;
 		}
@@ -272,7 +334,7 @@ public abstract class EnergyAgent extends MicroGridAgent implements IEnergyAgent
 	}
 
 	public boolean isInActiveSlot(Date aDate) {
-		EnergySupply supply = getEnergySupply();
+		EnergyFlow supply = getProductionOrNeed();
 		if (supply == null) {
 			return false;
 		}
@@ -280,7 +342,7 @@ public abstract class EnergyAgent extends MicroGridAgent implements IEnergyAgent
 	}
 
 	public int getTimeLeftSec(boolean addWaitingBeforeStart) {
-		EnergySupply supply = getEnergySupply();
+		EnergyFlow supply = getProductionOrNeed();
 		if (supply == null) {
 			return 0;
 		}
@@ -291,30 +353,22 @@ public abstract class EnergyAgent extends MicroGridAgent implements IEnergyAgent
 		return id;
 	}
 
-	public void reinitialize(int _id, AgentAuthentication _authentication, EnergySupply _globalSupply) {
-		initCommonFields(_id, _authentication, _globalSupply, lsaInputTags, lsaOutputTags);
-		this.lsa.removeAllProperties();
-		this.lsa.setAgentName("");
+	protected void auxReinitializeLSA(int _id, AgentAuthentication _authentication, String[] inputTags, String[] outputTags, NodeContext nodeContext) {
+		initCommonFields(_id, _authentication, nodeContext);
+		this.reInitializeLsa(inputTags, outputTags, LsaType.Service);
 		// Added
 		firstDecay = true;
-		lsa.removeSyntheticProperty(SyntheticPropertyName.LOCATION);
-		lsa.removeSyntheticProperty(SyntheticPropertyName.BOND);
-		lsa.removeSyntheticProperty(SyntheticPropertyName.DIFFUSE);
-		lsa.removeSyntheticProperty(SyntheticPropertyName.QUERY);
-		lsa.removeSyntheticProperty(SyntheticPropertyName.SOURCE);
-		lsa.removeSyntheticProperty(SyntheticPropertyName.GRADIENT_HOP);
-		this.authentication = _authentication;
 		logger.info(this.agentName + " reinitialize : lsa = " + lsa.toVisualString() + " this=" + this
 				+ " memory address =" + this.hashCode());
 	}
 
-	public boolean tryReactivation() {
+	public boolean tryReactivation() throws HandlingException {
 		boolean result = false;
 		Property pDisabled = lsa.getOnePropertyByName("DISABLED");
 		if (pDisabled != null && pDisabled.getValue() instanceof RegulationWarning) {
 			// Clean expired disabled property
 			RegulationWarning warning = (RegulationWarning) pDisabled.getValue();
-			EnergySupply energySupply = getEnergySupply();
+			EnergyFlow energySupply = getProductionOrNeed();
 			if (warning.hasWaitingExpired()) {
 				if (WarningType.OVER_CONSUMPTION.equals(warning.getType())
 						|| WarningType.OVER_PRODUCTION.equals(warning.getType())) {
@@ -339,15 +393,14 @@ public abstract class EnergyAgent extends MicroGridAgent implements IEnergyAgent
 					if (stillOverflow) {
 						// Agent will be still disabled
 						warning.setWaitingDeadline(UtilDates.shiftDateMinutes(getCurrentDate(), DISABLED_DURATION_MINUTES));
-						lsa.removePropertiesByName("DISABLED");
-						lsa.addProperty(new Property("DISABLED", warning));
+						replacePropertyWithName(new Property("DISABLED", warning));
 					} else {
 						// Agent is no longer disabled
 						lsa.removePropertiesByName("DISABLED");
 						try {
-							energySupply.setBeginDate(getCurrentDate());
-							energySupply.setDisabled(false);
-							startEvent = generateStartEvent();
+							this.setBeginDate(getCurrentDate());
+							this.setDisabled(false);
+							generateStartEvent();
 						} catch (Exception e) {
 							logger.error(e);
 						}
@@ -356,7 +409,7 @@ public abstract class EnergyAgent extends MicroGridAgent implements IEnergyAgent
 				} else if (WarningType.USER_INTERRUPTION.equals(warning.getType())) {
 					// Stop the agent
 					lsa.removePropertiesByName("DISABLED");
-					energySupply.setEndDate(getCurrentDate());
+					this.setEndDate(getCurrentDate());
 				} /*
 					 * else if (WarningType.CHANGE_REQUEST.equals(warning.getType())) { // TODO :
 					 * check // Stop the agent ONLY FOR PRODUCER if(this.isProducer()) {
@@ -365,27 +418,17 @@ public abstract class EnergyAgent extends MicroGridAgent implements IEnergyAgent
 			}
 		} else if (waitingStartEvent != null && !isStartInFutur()) {
 			waitingStartEvent = null;
-			startEvent = generateStartEvent();
+			generateStartEvent();
 		}
 		return result;
 	}
 
 	@Override
-	public void onPropagationEvent(PropagationEvent event) {
-		// logger.info("onPropagationEvent " + location + " " + this.agentName + " " +
-		// event);
-		Lsa eventLsa = event.getLsa();
-		String source = eventLsa.getSyntheticProperty(SyntheticPropertyName.SOURCE).toString();
-		if (!"".equals(source) && !nodeConfig.getMainServiceAddress().equals(source)) {
-			logger.info("onPropagationEvent : source = " + source + " , localIpPort = " + nodeConfig.getMainServiceAddress());
-		}
-		if (eventLsa.getAgentName().contains("*")) {
-			logger.info("onPropagationEvent : eventLsa.getAgentName() = " + eventLsa.getAgentName());
-		}
+	public void onSpreadingEvent(SpreadingEvent event) {
 	}
 
 	@Override
-	public void handleWarning(RegulationWarning warning) {
+	public void handleWarning(RegulationWarning warning) throws HandlingException {
 		if (!receivedWarnings.contains(warning)) {
 			receivedWarnings.add(warning);
 			// Over consumption
@@ -404,7 +447,7 @@ public abstract class EnergyAgent extends MicroGridAgent implements IEnergyAgent
 	}
 
 	@Override
-	public void handleWarningGeneralInteruption(RegulationWarning warning) {
+	public void handleWarningGeneralInteruption(RegulationWarning warning) throws HandlingException {
 		if(!this.isDisabled()) {
 			// Disable agent
 			disableAgent(warning);
@@ -414,16 +457,16 @@ public abstract class EnergyAgent extends MicroGridAgent implements IEnergyAgent
 	}
 
 	@Override
-	public void handleReschedule(RescheduleTable rescheduleTable) {
+	public void handleReschedule(RescheduleTable rescheduleTable) throws HandlingException {
 		// handle reschedule
 		if (rescheduleTable.hasItem(agentName)) {
 			RescheduleItem rescheduleItem = rescheduleTable.getItem(agentName);
-			EnergySupply supply = this.getEnergySupply();
-			if (rescheduleItem.getStopBegin().before(supply.getEndDate())) {
+			EnergyFlow supplyOrRequest = this.getProductionOrNeed();
+			if (rescheduleItem.getStopBegin().before(supplyOrRequest.getEndDate())) {
 				// Modify contract end date
-				supply.setBeginDate(getCurrentDate());
-				supply.setEndDate(rescheduleItem.getStopBegin());
-				startEvent = generateUpdateEvent(rescheduleItem.getWarningType());
+				this.setBeginDate(getCurrentDate());
+				this.setEndDate(rescheduleItem.getStopBegin());
+				generateUpdateEvent(rescheduleItem.getWarningType());
 			}
 		}
 	}
@@ -432,10 +475,11 @@ public abstract class EnergyAgent extends MicroGridAgent implements IEnergyAgent
 	public void setInitialLSA() {
 		try {
 			if(isStartInFutur()) {
-				logger.warning("setInitialLSA " + this.agentName + " : start date is in the future " + UtilDates.format_date_time.format(getEnergySupply().getBeginDate()));
-				this.waitingStartEvent =  new EnergyEvent( getStartEventType(), getEnergySupply(), "");
+				Date beginDate = getProductionOrNeed().getBeginDate();
+				logger.warning("setInitialLSA " + this.agentName + " : start date is in the future " + UtilDates.format_date_time.format(beginDate));
+				this.waitingStartEvent = this.generateEvent(getStartEventType(), "");
 			} else {
-				this.startEvent = generateStartEvent();
+				generateStartEvent();
 			}
 		} catch (Exception e) {
 			logger.error(e);
@@ -451,16 +495,7 @@ public abstract class EnergyAgent extends MicroGridAgent implements IEnergyAgent
 		}
 	}
 
-	protected void completeOutputPropertyIfNeeded() {
-		String sOutputProperty = "" + lsa.getSyntheticProperty(SyntheticPropertyName.OUTPUT);
-		for (String nextOutput : this.getOutput())
-			if (!sOutputProperty.contains(nextOutput)) {
-				sOutputProperty = sOutputProperty + "," + nextOutput;
-			}
-		lsa.addSyntheticProperty(SyntheticPropertyName.OUTPUT, sOutputProperty);
-	}
-
-	protected void disableAgent(RegulationWarning warning, String[] lsaPropToRemove) {
+	protected void disableAgent(RegulationWarning warning, String[] lsaPropToRemove) throws HandlingException {
 		for (String prop : lsaPropToRemove) {
 			if (!lsa.getPropertiesByName(prop).isEmpty()) {
 				lsa.removePropertiesByNames(lsaPropToRemove);
@@ -479,8 +514,9 @@ public abstract class EnergyAgent extends MicroGridAgent implements IEnergyAgent
 			 * warningToSet.setReceptionDeadline(SapereUtil.shiftDateMinutes(getCurrentDate(),
 			 * DISABLED_DURATION_MINUTES));
 			 */
-			lsa.addProperty(new Property("DISABLED", warningToSet));
+			addProperty(new Property("DISABLED", warningToSet));
 		}
+		EnergyEvent stopEvent = getStopEvent();
 		if (stopEvent == null) {
 			stopEvent = generateStopEvent(warning, "");
 			// eventToPost = stopEvent.clone();
@@ -509,9 +545,11 @@ public abstract class EnergyAgent extends MicroGridAgent implements IEnergyAgent
 				logger.warning(this.agentName + " will expire");
 				this.addDecay(1);
 			}
+			EnergyEvent expiryEvent = getExpiryEvent();
 			// Post expiration event
 			if (expiryEvent == null) {
 				try {
+					EnergyEvent startEvent = getStartEvent();
 					if (startEvent != null) {
 						expiryEvent = generateExpiryEvent();
 					}
@@ -521,29 +559,6 @@ public abstract class EnergyAgent extends MicroGridAgent implements IEnergyAgent
 			}
 		}
 		return hasExpired;
-	}
-
-	public boolean containsChosenLsa(String agentName) {
-		if (tableChosenLsa == null) {
-			return false;
-		}
-		return tableChosenLsa.containsKey(agentName);
-	}
-
-	public Lsa getChosenLsa(String agentName) {
-		if (!containsChosenLsa(agentName)) {
-			return null;
-		}
-		return tableChosenLsa.get(agentName);
-	}
-
-	public void setPropertyChosen(String agentName, String propName) {
-		if (this.containsChosenLsa(agentName)) {
-			Lsa chosenLSA = this.getChosenLsa(agentName);
-			List<Property> listProp = chosenLSA.getPropertiesByName(propName);
-			int indx = rand.nextInt(listProp.size());
-			listProp.get(indx).setChosen(true); // one Lsa can contain many property for same query
-		}
 	}
 
 	public void logLsaProperties() {
@@ -562,25 +577,30 @@ public abstract class EnergyAgent extends MicroGridAgent implements IEnergyAgent
 		return false;
 	}
 
-	public void stopAgent(RegulationWarning warning) {
+	public void stopAgent(RegulationWarning warning) throws HandlingException {
 		if(!this.hasExpired()) {
-			getEnergySupply().setEndDate(getCurrentDate());
+			Date currentDate = getCurrentDate();
+			this.setEndDate(currentDate);
+			/*
+			if(this.getGlobalProduction() != null) {
+				getGlobalProduction().setEndDate(getCurrentDate());
+			}
+			if(this.getGlobalNeed() != null) {
+				getGlobalNeed().setEndDate(getCurrentDate());
+			}*/
 		}
+		EnergyEvent stopEvent = getStopEvent();
 		if(stopEvent == null) {
 			stopEvent = generateStopEvent(warning, "");
 		}
 	}
 
-	public Date getCurrentDate() {
-		return UtilDates.getNewDate(timeShiftMS);
-	}
-
 	public String getLocation() {
-		return this.authentication.getNodeLocation().getMainServiceAddress();
+		return this.getAuthentication().getNodeLocation().getMainServiceAddress();
 	}
 
 	public String getNodeName() {
-		return this.authentication.getNodeLocation().getName();
+		return lsa.getAgentAuthentication().getNodeLocation().getName();
 	}
 
 }

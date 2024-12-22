@@ -1,6 +1,8 @@
 package com.sapereapi.exception;
 
-public class UnauthorizedModificationException extends Exception {
+import com.sapereapi.model.HandlingException;
+
+public class UnauthorizedModificationException extends HandlingException {
 
 	/**
 	 * 

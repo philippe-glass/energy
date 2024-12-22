@@ -4,6 +4,8 @@ import java.lang.reflect.Constructor;
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 import java.lang.reflect.Parameter;
+import java.math.BigDecimal;
+import java.text.ParseException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
@@ -22,31 +24,43 @@ import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
 
+import com.sapereapi.lightserver.DisableJson;
+import com.sapereapi.model.HandlingException;
 import com.sapereapi.model.LaunchConfig;
+import com.sapereapi.model.NodeContext;
 import com.sapereapi.model.OperationResult;
+import com.sapereapi.model.OptionItem;
+import com.sapereapi.model.PredictionSetting;
+import com.sapereapi.model.TimestampedValue;
 import com.sapereapi.model.energy.AgentForm;
 import com.sapereapi.model.energy.Device;
 import com.sapereapi.model.energy.DeviceMeasure;
 import com.sapereapi.model.energy.DeviceProperties;
-import com.sapereapi.model.energy.NodeContent;
-import com.sapereapi.model.energy.NodeTotal;
-import com.sapereapi.model.energy.OptionItem;
 import com.sapereapi.model.energy.PowerSlot;
-import com.sapereapi.model.energy.TimestampedValue;
-import com.sapereapi.model.energy.forcasting.ForcastingResult;
+import com.sapereapi.model.energy.forcasting.ForcastingResult1;
+import com.sapereapi.model.energy.forcasting.ForcastingResult2;
 import com.sapereapi.model.energy.input.AgentFilter;
-import com.sapereapi.model.markov.MarkovStateHistory;
-import com.sapereapi.model.markov.MarkovTimeWindow;
-import com.sapereapi.model.markov.NodeTransitionMatrices;
-import com.sapereapi.model.markov.TransitionMatrix;
-import com.sapereapi.model.markov.TransitionMatrixKey;
-import com.sapereapi.model.referential.AgentType;
+import com.sapereapi.model.energy.node.NodeContent;
+import com.sapereapi.model.energy.node.NodeTotal;
+import com.sapereapi.model.learning.FeaturesKey;
+import com.sapereapi.model.learning.TimeWindow;
+import com.sapereapi.model.learning.VariableFeaturesKey;
+import com.sapereapi.model.learning.VariableStateHistory;
+import com.sapereapi.model.learning.lstm.LSTMModelInfo;
+import com.sapereapi.model.learning.lstm.LSTMPredictionResult;
+import com.sapereapi.model.learning.lstm.LayerDefinition;
+import com.sapereapi.model.learning.lstm.ParamType;
+import com.sapereapi.model.learning.markov.TransitionMatrix;
+import com.sapereapi.model.learning.prediction.LearningAggregationOperator;
+import com.sapereapi.model.learning.prediction.PredictionContext;
 import com.sapereapi.model.referential.DeviceCategory;
-import com.sapereapi.model.referential.EnvironmentalImpact;
+import com.sapereapi.util.matrix.DoubleMatrix;
+import com.sapereapi.util.matrix.IterationMatrix;
+import com.sapereapi.util.matrix.IterationObsNb;
+import com.sapereapi.util.matrix.OldIterationMatrix2;
 
-import Jama.Matrix;
 import eu.sapere.middleware.log.AbstractLogger;
-import eu.sapere.middleware.node.NodeConfig;
+import eu.sapere.middleware.node.NodeLocation;
 
 public class UtilJsonParser {
 	public static Pattern JAVA_DATE_PATTERN = Pattern.compile("^(?<dow>[a-zA-Z]{3}) (?<month>[a-zA-Z]{3}) (?<day>[0-9]{2}) (?<hours>[0-9]{2}):(?<minutes>[0-9]{2}):(?<sec>[0-9]{2}) (?<tz>(CET|CEST)) (?<year>[0-9]{4})$");
@@ -58,10 +72,26 @@ public class UtilJsonParser {
 	final static String ESCAPED_QUOTE = "\\" + QUOTE;
 	final static List<String> excludeMethodList = Arrays.asList("toString", "getClass", "wait", "hashCode", "notify", "getDeclaringClass", "notifyAll", "getRowPackedCopy", "getColumnPackedCopy", "getArrayCopy");
 
-	public static NodeConfig parseNodeConfig(JSONObject jsonNodeConfig, AbstractLogger logger) {
-		NodeConfig nodeConfig = new NodeConfig();
-		parseJSONObject(nodeConfig, jsonNodeConfig, logger);
-		return nodeConfig;
+	public static NodeLocation parseNodeLocationg(JSONObject jsonNodeLocation, AbstractLogger logger) {
+		NodeLocation nodeLocation = new NodeLocation();
+		parseJSONObject(nodeLocation, jsonNodeLocation, logger);
+		return nodeLocation;
+	}
+
+	public static PredictionSetting parsePredictionSetting(JSONObject jsonPredSettings, AbstractLogger logger) {
+		PredictionSetting predictionSetting = new PredictionSetting();
+		parseJSONObject(predictionSetting, jsonPredSettings, logger);
+		if(jsonPredSettings.has("aggregator")) {
+			LearningAggregationOperator aggregator = parseLearningAggregationOperator(jsonPredSettings.getJSONObject("aggregator"), logger);
+			predictionSetting.setAggregator(aggregator);
+		}
+		return predictionSetting;
+	}
+
+	public static LearningAggregationOperator parseLearningAggregationOperator(JSONObject jsonNodeAggregOp, AbstractLogger logger) {
+		LearningAggregationOperator aggregationOperator = new LearningAggregationOperator();
+		parseJSONObject(aggregationOperator, jsonNodeAggregOp, logger);
+		return aggregationOperator;
 	}
 
 	public static TimestampedValue parseTimeStampedValue(JSONObject jsonTimestampedValue, AbstractLogger logger) {
@@ -72,40 +102,106 @@ public class UtilJsonParser {
 
 	public static NodeContent parseNodeContent(JSONObject jsonNodeContent, AbstractLogger logger) {
 		long timeShiftMS = jsonNodeContent.getLong("timeShiftMS");
-		NodeConfig nodeConfig = parseNodeConfig(jsonNodeContent.getJSONObject("nodeConfig"), logger);
-		NodeContent result = new NodeContent(nodeConfig, new AgentFilter(), timeShiftMS);
-		JSONObject jsonNodeTotal = jsonNodeContent.getJSONObject("total");
 		try {
+			NodeContext nodeContext = parseNodeContext(jsonNodeContent.getJSONObject("nodeContext"), logger);
+			NodeContent result = new NodeContent(nodeContext, new AgentFilter(), timeShiftMS);
+			JSONObject jsonNodeTotal = jsonNodeContent.getJSONObject("total");
 			NodeTotal nodeTotal = parseNodeTotal(jsonNodeTotal, logger);
 			result.setTotal(nodeTotal);
-		} catch (Exception e1) {
-			logger.error(e1);
+			JSONArray json_producers = jsonNodeContent.getJSONArray("producers");
+			for (int i = 0; i < json_producers.length(); i++) {
+				JSONObject jsonAgentForm = json_producers.getJSONObject(i);
+				try {
+					AgentForm producer = parseAgentForm(jsonAgentForm, logger);
+					result.addProducer(producer);
+				} catch (Exception e) {
+					logger.error(e);
+				}
+			}
+			JSONArray json_consumers = jsonNodeContent.getJSONArray("consumers");
+			for (int i = 0; i < json_consumers.length(); i++) {
+				JSONObject jsonAgentForm = json_consumers.getJSONObject(i);
+				try {
+					AgentForm consumer = parseAgentForm(jsonAgentForm, logger);
+					result.addConsumer(consumer);
+				} catch (Exception e) {
+					logger.error(e);
+				}
+			}
+			return result;
+		} catch (Exception e) {
+			logger.error(e);
 		}
+		return null;
+	}
 
-		JSONArray json_producers = jsonNodeContent.getJSONArray("producers");
-		for (int i = 0; i < json_producers.length(); i++) {
-			JSONObject jsonAgentForm = json_producers.getJSONObject(i);
+	public static NodeContext parseNodeContext(JSONObject jsonNodeContext, AbstractLogger logger) throws HandlingException {
+		NodeContext result = new NodeContext();
+		parseJSONObject(result, jsonNodeContext, logger);
+		JSONObject json_mapDatetimeShifts = jsonNodeContext.getJSONObject("datetimeShifts");
+		Map<Integer, Integer> datetimeShifts = new HashMap<Integer, Integer>();
+		Iterator<String> keys = json_mapDatetimeShifts.keys();
+		while (keys.hasNext()) {
+			String key = keys.next();
+			Integer keyInt = Integer.valueOf(key);
+			Integer intValue = json_mapDatetimeShifts.getInt(key);
+			if(intValue != null) {
+				datetimeShifts.put(keyInt, intValue);
+				//TransitionMatrixKey matrixKey = parseTransitionMatrixKey(json_matrixKey, logger);
+			}
+		}
+		result.setDatetimeShifts(datetimeShifts);
+		JSONObject jsonNodeLocation = jsonNodeContext.getJSONObject("nodeLocation");
+		result.setNodeLocation(parseNodeLocationg(jsonNodeLocation, logger));
+		JSONArray jsonNeighbourConfigs = jsonNodeContext.getJSONArray("neighbourNodeLocations");
+		List<NodeLocation> listNeighbourConfigs = new ArrayList<NodeLocation>();
+		for (int i = 0; i < jsonNeighbourConfigs.length(); i++) {
+			JSONObject jsonNextNodeLocation = jsonNeighbourConfigs.getJSONObject(i);
 			try {
-				AgentForm producer = parseAgentForm(jsonAgentForm, logger);
-				result.addProducer(producer);
+				NodeLocation nextNodeLocation = parseNodeLocationg(jsonNextNodeLocation, logger);
+				listNeighbourConfigs.add(nextNodeLocation);
 			} catch (Exception e) {
 				logger.error(e);
 			}
 		}
-		JSONArray json_consumers = jsonNodeContent.getJSONArray("consumers");
-		for (int i = 0; i < json_consumers.length(); i++) {
-			JSONObject jsonAgentForm = json_consumers.getJSONObject(i);
+		result.setNeighbourNodeLocations(listNeighbourConfigs);
+		return result;
+	}
+
+
+	public static PredictionContext parsePredictionContext(JSONObject jsonPredictionContext, AbstractLogger logger) throws HandlingException {
+		PredictionContext result = new PredictionContext();
+		parseJSONObject(result, jsonPredictionContext, logger);
+		JSONObject jsonNodeContext = jsonPredictionContext.getJSONObject("nodeContext");
+		result.setNodeContext(parseNodeContext(jsonNodeContext, logger));
+		JSONArray json_allTimeWindows = jsonPredictionContext.getJSONArray("allTimeWindows");
+		List<TimeWindow> listTimeWindows = new ArrayList<TimeWindow>();
+		for (int i = 0; i < json_allTimeWindows.length(); i++) {
+			JSONObject jsonTimeWindows = json_allTimeWindows.getJSONObject(i);
 			try {
-				AgentForm consumer = parseAgentForm(jsonAgentForm, logger);
-				result.addConsumer(consumer);
+				TimeWindow timeWindow = parseTimeWindow(jsonTimeWindows, logger);
+				listTimeWindows.add(timeWindow);
 			} catch (Exception e) {
 				logger.error(e);
+			}
+		}
+		result.setAllTimeWindows(listTimeWindows);
+		//Map<Integer, Map<String, TransitionMatrixKey>> mapTransitionMatrixKeys = new HashMap<Integer, Map<String,TransitionMatrixKey>>();
+		JSONObject json_mapTransitionMatrixKeys = jsonPredictionContext.getJSONObject("mapTransitionMatrixKeys");
+		Iterator<String> keys = json_mapTransitionMatrixKeys.keys();
+		while (keys.hasNext()) {
+			String key = keys.next();
+			JSONObject json_map2 = json_mapTransitionMatrixKeys.getJSONObject(key);
+			Iterator<String> keys2 = json_map2.keys();
+			while (keys2.hasNext()) {
+				JSONObject json_matrixKey = json_map2.getJSONObject(key);
+				VariableFeaturesKey matrixKey = parseTransitionMatrixKey(json_matrixKey, logger);
 			}
 		}
 		return result;
 	}
 
-	public static Map<String, String> parseJsonMapString(JSONObject jsonobj, AbstractLogger logger) throws Exception {
+	public static Map<String, String> parseJsonMapString(JSONObject jsonobj, AbstractLogger logger) throws HandlingException {
 		Map<String, String> map = new HashMap<String, String>();
 		Iterator<String> keys = jsonobj.keys();
 		while (keys.hasNext()) {
@@ -116,7 +212,7 @@ public class UtilJsonParser {
 		return map;
 	}
 
-	public static Map<String, Double> parseJsonMapDouble(JSONObject jsonobj, AbstractLogger logger) throws Exception {
+	public static Map<String, Double> parseJsonMapDouble(JSONObject jsonobj, AbstractLogger logger) throws HandlingException {
 		Map<String, Double> map = new HashMap<String, Double>();
 		Iterator<String> keys = jsonobj.keys();
 		while (keys.hasNext()) {
@@ -127,7 +223,7 @@ public class UtilJsonParser {
 		return map;
 	}
 
-	public static Map<String, Integer> parseJsonMapInteger(JSONObject jsonobj, AbstractLogger logger) throws Exception {
+	public static Map<String, Integer> parseJsonMapInteger(JSONObject jsonobj, AbstractLogger logger) throws HandlingException {
 		Map<String, Integer> map = new HashMap<String, Integer>();
 		Iterator<String> keys = jsonobj.keys();
 		while (keys.hasNext()) {
@@ -138,7 +234,7 @@ public class UtilJsonParser {
 		return map;
 	}
 
-	public static Map<String, Long> parseJsonMapLong(JSONObject jsonobj, AbstractLogger logger) throws Exception {
+	public static Map<String, Long> parseJsonMapLong(JSONObject jsonobj, AbstractLogger logger) throws HandlingException {
 		Map<String, Long> map = new HashMap<String, Long>();
 		Iterator<String> keys = jsonobj.keys();
 		while (keys.hasNext()) {
@@ -149,10 +245,70 @@ public class UtilJsonParser {
 		return map;
 	}
 
-	public static Matrix parseJsonMatrix(JSONObject jsonobj, AbstractLogger logger) throws Exception {
+	public static Map<String, Boolean> parseJsonMapBoolean(JSONObject jsonobj, AbstractLogger logger) throws HandlingException {
+		Map<String, Boolean> map = new HashMap<String, Boolean>();
+		Iterator<String> keys = jsonobj.keys();
+		while (keys.hasNext()) {
+			String key = keys.next();
+			Boolean value = jsonobj.getBoolean(key);
+			map.put(key, value);
+		}
+		return map;
+	}
+
+	public static IterationObsNb parseIterationObsNb(JSONObject jsonobj, AbstractLogger logger) throws HandlingException {
+		IterationObsNb result = new IterationObsNb();
+		parseJSONObject(result, jsonobj, logger);
+		//Map<Integer, Double> map = new HashMap<Integer, Double>();
+		JSONObject jsonValues = jsonobj.getJSONObject("values");
+		Iterator<String> keys = jsonValues.keys();
+		while (keys.hasNext()) {
+			Object key = keys.next();
+			Double value = jsonValues.getDouble(""+key);
+			//map.put(Integer.valueOf(key), value);
+			result.setValue(Integer.valueOf(""+key), value);
+		}
+		return result;
+	}
+
+	public static IterationMatrix parseJsonIterationMatrix(JSONObject jsonobj, AbstractLogger logger) throws HandlingException {
 		int nbOfColumns = SapereUtil.getIntValue(jsonobj.get("columnDimension"));
 		int nbOfRows = SapereUtil.getIntValue(jsonobj.get("rowDimension"));
-		Matrix matrix = new Matrix(nbOfRows,nbOfColumns);
+		IterationMatrix matrix = new IterationMatrix(nbOfRows,nbOfColumns);
+		JSONArray jsonMatrix = jsonobj.getJSONArray("array");
+		for (int rowIndex = 0; rowIndex < jsonMatrix.length(); rowIndex++) {
+			JSONArray jsonRowArray = jsonMatrix.getJSONArray(rowIndex);
+			for (int colIndex = 0; colIndex < jsonRowArray.length(); colIndex++) {
+				JSONObject testObj = jsonRowArray.getJSONObject(colIndex);
+				IterationObsNb iterationObsNb = parseIterationObsNb(testObj, logger);
+				//double cellValue = SapereUtil.getDoubleValue(jsonRowArray.get(colIndex));
+				matrix.set(rowIndex, colIndex, iterationObsNb);
+			}
+		}
+		return matrix;
+	}
+
+	public static OldIterationMatrix2 parseJsonIterationMatrix2(JSONObject jsonobj, AbstractLogger logger) throws HandlingException {
+		int nbOfColumns = SapereUtil.getIntValue(jsonobj.get("columnDimension"));
+		int nbOfRows = SapereUtil.getIntValue(jsonobj.get("rowDimension"));
+		OldIterationMatrix2 matrix = new OldIterationMatrix2(nbOfRows,nbOfColumns);
+		JSONArray jsonMatrix = jsonobj.getJSONArray("array");
+		for (int rowIndex = 0; rowIndex < jsonMatrix.length(); rowIndex++) {
+			JSONArray jsonRowArray = jsonMatrix.getJSONArray(rowIndex);
+			for (int colIndex = 0; colIndex < jsonRowArray.length(); colIndex++) {
+				JSONObject testObj = jsonRowArray.getJSONObject(colIndex);
+				Map<Integer, Double> iterationObsNb = parseJsonMapIntDouble(testObj, logger);
+				//double cellValue = SapereUtil.getDoubleValue(jsonRowArray.get(colIndex));
+				matrix.set(rowIndex, colIndex, iterationObsNb);
+			}
+		}
+		return matrix;
+	}
+
+	public static DoubleMatrix parseJsonMatrix(JSONObject jsonobj, AbstractLogger logger) throws HandlingException {
+		int nbOfColumns = SapereUtil.getIntValue(jsonobj.get("columnDimension"));
+		int nbOfRows = SapereUtil.getIntValue(jsonobj.get("rowDimension"));
+		DoubleMatrix matrix = new DoubleMatrix(nbOfRows, nbOfColumns);
 		JSONArray jsonMatrix = jsonobj.getJSONArray("array");
 		for (int rowIndex = 0; rowIndex < jsonMatrix.length(); rowIndex++) {
 			JSONArray jsonRowArray = jsonMatrix.getJSONArray(rowIndex);
@@ -164,15 +320,47 @@ public class UtilJsonParser {
 		return matrix;
 	}
 
-	public static Map<String, Matrix> parseJsonMapMatrix(JSONObject jsonobj, AbstractLogger logger) throws Exception {
-		Map<String, Matrix> result = new HashMap<String, Matrix>();
+	public static DoubleMatrix parseJsonMatrix2(JSONArray jsonMatrix, AbstractLogger logger) throws HandlingException {
+		// int nbOfColumns = SapereUtil.getIntValue(jsonobj.get("columnDimension"));
+		// int nbOfRows = SapereUtil.getIntValue(jsonobj.get("rowDimension"));
+		DoubleMatrix matrix = null;
+		int nbOfRows = jsonMatrix.length();
+		// DoubleMatrix matrix = new DoubleMatrix(nbOfRows,nbOfColumns);
+		// JSONArray jsonMatrix = jsonobj.getJSONArray("array");
+		for (int rowIndex = 0; rowIndex < jsonMatrix.length(); rowIndex++) {
+			Object nextRow = jsonMatrix.get(rowIndex);
+			if (nextRow instanceof JSONArray) {
+				JSONArray jsonRowArray = jsonMatrix.getJSONArray(rowIndex);
+				int nbOfColumns = jsonRowArray.length();
+				if (matrix == null) {
+					matrix = new DoubleMatrix(nbOfRows, nbOfColumns);
+				}
+				for (int colIndex = 0; colIndex < jsonRowArray.length(); colIndex++) {
+					double cellValue = SapereUtil.getDoubleValue(jsonRowArray.get(colIndex));
+					matrix.set(rowIndex, colIndex, cellValue);
+				}
+			} else if (nextRow instanceof Double || nextRow instanceof BigDecimal || nextRow instanceof Float) {
+				Double nextValue = SapereUtil.getDoubleValue(nextRow);
+				if (matrix == null) {
+					matrix = new DoubleMatrix(nbOfRows, 1);
+				}
+				matrix.set(rowIndex, 0, nextValue);
+			} else {
+				logger.warning("nextRow = " + nextRow);
+			}
+		}
+		return matrix;
+	}
+
+	public static Map<String, DoubleMatrix> parseJsonMapMatrix(JSONObject jsonobj, AbstractLogger logger) throws HandlingException {
+		Map<String, DoubleMatrix> result = new HashMap<String, DoubleMatrix>();
 		Iterator<String> keys = jsonobj.keys();
 		while (keys.hasNext()) {
 			String key = keys.next();
 			JSONObject jsonValue = jsonobj.getJSONObject(key);
 			int nbOfColumns = SapereUtil.getIntValue(jsonValue.get("columnDimension"));
 			int nbOfRows = SapereUtil.getIntValue(jsonValue.get("rowDimension"));
-			Matrix matrix = new Matrix(nbOfRows,nbOfColumns);
+			DoubleMatrix matrix = new DoubleMatrix(nbOfRows,nbOfColumns);
 			JSONArray jsonMatrix = jsonValue.getJSONArray("array");
 			for (int rowIndex = 0; rowIndex < jsonMatrix.length(); rowIndex++) {
 				JSONArray jsonRowArray = jsonMatrix.getJSONArray(rowIndex);
@@ -186,7 +374,7 @@ public class UtilJsonParser {
 		return result;
 	}
 
-	public static Map<String, Double> parseJsonMap2(JSONObject jsonobj, AbstractLogger logger) throws Exception {
+	public static Map<String, Double> parseJsonMap2(JSONObject jsonobj, AbstractLogger logger) throws HandlingException {
 		Map<String, Double> map = new HashMap<String, Double>();
 		Iterator<String> keys = jsonobj.keys();
 		while (keys.hasNext()) {
@@ -197,20 +385,32 @@ public class UtilJsonParser {
 		return map;
 	}
 
-	public static Map<String, PowerSlot> parseJsonMapPowerSlot(JSONObject jsonobj, AbstractLogger logger) throws Exception {
+	public static Map<Integer, Double> parseJsonMapIntDouble(JSONObject jsonobj, AbstractLogger logger) throws HandlingException {
+		Map<Integer, Double> map = new HashMap<Integer, Double>();
+		Iterator<String> keys = jsonobj.keys();
+		while (keys.hasNext()) {
+			String key = keys.next();
+			Double value = jsonobj.getDouble(key);
+			map.put(Integer.valueOf(key), value);
+		}
+		return map;
+	}
+
+	public static Map<String, PowerSlot> parseJsonMapPowerSlot(JSONObject jsonobj, AbstractLogger logger) throws HandlingException {
 		Map<String, PowerSlot> map = new HashMap<String, PowerSlot>();
 		Iterator<String> keys = jsonobj.keys();
 		while (keys.hasNext()) {
 			String key = keys.next();
 			PowerSlot powerSlot = new PowerSlot();
+			JSONObject jsonValue = jsonobj.getJSONObject(key);
 			// parse the power slot
-			parseJSONObject(powerSlot, jsonobj, logger);
+			parseJSONObject(powerSlot, jsonValue, logger);
 			map.put(key, powerSlot);
 		}
 		return map;
 	}
 
-	public static DeviceMeasure parseDeviceMeasure(JSONObject jsonDeviceMeasure, AbstractLogger logger) throws Exception {
+	public static DeviceMeasure parseDeviceMeasure(JSONObject jsonDeviceMeasure, AbstractLogger logger) throws HandlingException {
 		DeviceMeasure mesasure = new DeviceMeasure();
 		parseJSONObject(mesasure, jsonDeviceMeasure, logger);
 		mesasure.setMap_power_p(parseJsonMapDouble(jsonDeviceMeasure.getJSONObject("map_power_p"), logger));
@@ -219,13 +419,13 @@ public class UtilJsonParser {
 		return mesasure;
 	}
 
-	public static MarkovStateHistory parseMarkovStateHistory(JSONObject jsonDevice, AbstractLogger logger) throws Exception {
-		MarkovStateHistory markovStateHistory = new MarkovStateHistory();
-		parseJSONObject(markovStateHistory, jsonDevice, logger);
-		return markovStateHistory;
+	public static VariableStateHistory parseVariableStateHistory(JSONObject jsonDevice, AbstractLogger logger) throws HandlingException {
+		VariableStateHistory variableStateHistory = new VariableStateHistory();
+		parseJSONObject(variableStateHistory, jsonDevice, logger);
+		return variableStateHistory;
 	}
 
-	public static Device parseDevice(JSONObject jsonDevice, AbstractLogger logger) throws Exception {
+	public static Device parseDevice(JSONObject jsonDevice, AbstractLogger logger) throws HandlingException {
 		Device device = new Device();
 		parseJSONObject(device, jsonDevice, logger);
 		DeviceProperties deviceProperties = parseDeviceProperties(jsonDevice.getJSONObject("properties"), logger);
@@ -233,14 +433,14 @@ public class UtilJsonParser {
 		return device;
 	}
 
-	public static DeviceProperties parseDeviceProperties(JSONObject jsonDeviceProperties, AbstractLogger logger) throws Exception {
+	public static DeviceProperties parseDeviceProperties(JSONObject jsonDeviceProperties, AbstractLogger logger) throws HandlingException {
 		DeviceProperties deviceProperties = new DeviceProperties();
 		parseJSONObject(deviceProperties, jsonDeviceProperties, logger);
 		return deviceProperties;
 	}
 
-	public static MarkovTimeWindow parseMarkovTimeWindow(JSONObject jsonTimeWindow, AbstractLogger logger) throws Exception {
-		MarkovTimeWindow timeWinow = new MarkovTimeWindow();
+	public static TimeWindow parseTimeWindow(JSONObject jsonTimeWindow, AbstractLogger logger) throws HandlingException {
+		TimeWindow timeWinow = new TimeWindow();
 		parseJSONObject(timeWinow, jsonTimeWindow, logger);
 		JSONArray jsonDaysOfWeek = jsonTimeWindow.getJSONArray("daysOfWeek");
 		Set<Integer> daysOfWeek = new HashSet<Integer>();
@@ -252,34 +452,69 @@ public class UtilJsonParser {
 		return timeWinow;
 	}
 
-	public static TransitionMatrixKey parseTransitionMatrixKey(JSONObject jsonTrMatrixKey, AbstractLogger logger) throws Exception {
-		TransitionMatrixKey result = new TransitionMatrixKey();
-		parseJSONObject(result, jsonTrMatrixKey, logger);
-		result.setTimeWindow(parseMarkovTimeWindow(jsonTrMatrixKey.getJSONObject("timeWindow"), logger));
+	public static FeaturesKey parseFeaturesKey(JSONObject jsonFeaturesKey, AbstractLogger logger) throws HandlingException {
+		FeaturesKey result = new FeaturesKey();
+		parseJSONObject(result, jsonFeaturesKey, logger);
+		result.setTimeWindow(parseTimeWindow(jsonFeaturesKey.getJSONObject("timeWindow"), logger));
 		return result;
 	}
 
-	public static TransitionMatrix parseTransitionMatrix(JSONObject jsonTrMatrix, AbstractLogger logger) throws Exception {
+	public static VariableFeaturesKey parseTransitionMatrixKey(JSONObject jsonTrMatrixKey, AbstractLogger logger) throws HandlingException {
+		VariableFeaturesKey result = new VariableFeaturesKey();
+		parseJSONObject(result, jsonTrMatrixKey, logger);
+		result.setFeaturesKey(parseFeaturesKey(jsonTrMatrixKey.getJSONObject("featuresKey"), logger));
+		return result;
+	}
+
+	private static Map<Integer, Date> aux_retrieveMapIterationDates(JSONObject jsonTrMatrix, AbstractLogger logger) throws HandlingException {
+		JSONObject jsonMapIterationDates = jsonTrMatrix.getJSONObject("mapIterationDates");
+		Iterator<String> keys = jsonMapIterationDates.keys();
+		Map<Integer, Date> mapIterationDates = new HashMap<Integer, Date>();
+		while (keys.hasNext()) {
+			Object key = keys.next();
+			Object value = jsonMapIterationDates.get(""+key);
+			Date date = parseJsonDate(""+value);
+			mapIterationDates.put(Integer.valueOf(""+key), date);
+		}
+		return mapIterationDates;
+	}
+
+	private static List<Integer> aux_retrieveIterations(JSONObject jsonTrMatrix, AbstractLogger logger) throws HandlingException {
+		List<Integer> iterations = new ArrayList<Integer>();
+		JSONArray jsonIterations = jsonTrMatrix.getJSONArray("iterations");
+		for (int i = 0; i < jsonIterations.length(); i++) {
+			iterations.add( jsonIterations.getInt(i));
+		}
+		return iterations;
+	}
+
+	public static TransitionMatrix parseTransitionMatrix(JSONObject jsonTrMatrix, AbstractLogger logger) throws HandlingException {
 		TransitionMatrix result = new TransitionMatrix();
 		parseJSONObject(result, jsonTrMatrix, logger);
 		try {
 			result.setKey(parseTransitionMatrixKey(jsonTrMatrix.getJSONObject("key"), logger));
-			result.setIterObsMatrix(parseJsonMatrix(jsonTrMatrix.getJSONObject("iterObsMatrix"), logger));
-			result.setAllObsMatrix(parseJsonMatrix(jsonTrMatrix.getJSONObject("allObsMatrix"), logger));
-			result.setNormalizedMatrix1(parseJsonMatrix(jsonTrMatrix.getJSONObject("normalizedMatrix1"), logger));
+			result.setCompleteObsMatrix(parseJsonIterationMatrix(jsonTrMatrix.getJSONObject("completeObsMatrix"), logger));
+			result.setCompleteCorrectionsMatrix(parseJsonIterationMatrix(jsonTrMatrix.getJSONObject("completeCorrectionsMatrix"), logger));
+			result.setAllObsMatrix(parseJsonMatrix(jsonTrMatrix.getJSONObject("allObsMatrix"), logger));			
 			result.setAllCorrectionsMatrix(parseJsonMatrix(jsonTrMatrix.getJSONObject("allCorrectionsMatrix"), logger));
+			result.setNormalizedMatrix1(parseJsonMatrix(jsonTrMatrix.getJSONObject("normalizedMatrix1"), logger));
+			result.setNormalizedMatrix2(parseJsonMatrix(jsonTrMatrix.getJSONObject("normalizedMatrix2"), logger));
+			Map<Integer, Date> mapIterationDates = aux_retrieveMapIterationDates(jsonTrMatrix, logger);
 		} catch (JSONException e) {
-			e.printStackTrace();
+			logger.error(e);
 		} catch (Exception e) {
-			e.printStackTrace();
+			logger.error(e);
 		}
 		return result;
 	}
 
-	public static NodeTransitionMatrices parseNodeTransitionMatrices(JSONObject jsonNodeTM, AbstractLogger logger) throws Exception {
+	/*
+	public static NodeTransitionMatrices parseNodeTransitionMatrices(JSONObject jsonNodeTM, AbstractLogger logger) throws HandlingException {
 		NodeTransitionMatrices result = new NodeTransitionMatrices();
 		parseJSONObject(result, jsonNodeTM, logger);
 		try {
+			//JSONObject jsonNodeLocation = jsonNodeTM.getJSONObject("nodeLocation");
+			//result.setNodeLocation(parseNodeLocation(jsonNodeLocation, logger));
 			JSONArray jsonVariables = jsonNodeTM.getJSONArray("variables");
 			List<String> listVariables = new ArrayList<>();
 			for (int i = 0; i < jsonVariables.length(); i++) {
@@ -287,7 +522,7 @@ public class UtilJsonParser {
 			}
 			String[] resultArray = new String[listVariables.size()];
 			resultArray = listVariables.toArray(resultArray);
-			result.setVariables(resultArray);
+			//result.setVariables(resultArray);
 			JSONObject jsonMatrices = jsonNodeTM.getJSONObject("mapMatrices");
 			Map<String, TransitionMatrix> mapMatrices = new HashMap<String, TransitionMatrix>();
 			Iterator<String> keys = jsonMatrices.keys();
@@ -298,14 +533,18 @@ public class UtilJsonParser {
 				mapMatrices.put(key, trMatrice);
 			}
 			result.setMapMatrices(mapMatrices);
-			result.setTimeWindow(parseMarkovTimeWindow(jsonNodeTM.getJSONObject("timeWindow"), logger));
+			result.setFeaturesKey(parseFeaturesKey(jsonNodeTM.getJSONObject("featuresKey"), logger));
+			Map<Integer, Date> mapIterationDates = aux_retrieveMapIterationDates(jsonNodeTM, logger);
+			//result.setMapIterationDates(mapIterationDates);
+			List<Integer> iterations = aux_retrieveIterations(jsonNodeTM, logger);
+			//result.setIterations(iterations);
 		} catch (JSONException e) {
-			e.printStackTrace();
+			logger.error(e);
 		} catch (Exception e) {
 			logger.error(e);
 		}
 		return result;
-	}
+	}*/
 
 	public static Object parseJSONObject2(Class<?> objectClass, JSONObject jsonObject, AbstractLogger logger)  {
 		try {
@@ -319,6 +558,15 @@ public class UtilJsonParser {
 		return null;
 	}
 
+	public static Object auxGetEnumValue(Class enumClass, String fieldName, JSONObject jsonObject) {
+		if (jsonObject != null && enumClass.isEnum()) {
+			String svalue = jsonObject.getString(fieldName);
+			Object result = Enum.valueOf(enumClass, svalue);
+			return result;
+		}
+		return null;
+	}
+
 	public static Object parseJSONObject(Object targetObject, JSONObject jsonObject, AbstractLogger logger)  {
 		Class<?> targetObjectClass = targetObject.getClass();
 		for(Method method : targetObjectClass.getMethods())  {
@@ -327,9 +575,13 @@ public class UtilJsonParser {
 				String fieldName =  SapereUtil.firstCharToLower(method.getName().substring(3));
 				if(jsonObject.has(fieldName) && !jsonObject.isNull(fieldName))  {
 					Class<?> paramType = param.getType();
+					Object value = jsonObject.get(fieldName);
 					Object valueToSet = null;
+					Object enumValue = auxGetEnumValue(paramType, fieldName, jsonObject);
 					try {
-						if(paramType.equals(String.class)) {
+						if(enumValue != null) {
+							valueToSet = enumValue;
+						} else if(paramType.equals(String.class)) {
 							valueToSet = jsonObject.getString(fieldName);
 						} else if(paramType.equals(Double.class) || paramType.equals(double.class)) {
 							valueToSet = jsonObject.getDouble(fieldName);
@@ -347,15 +599,64 @@ public class UtilJsonParser {
 						}else if(paramType.equals(Date.class))  {
 							valueToSet = parseJsonDate(jsonObject.getString(fieldName));
 						//} else if(paramType.equals(Map.class)) {
-						} else if(paramType.equals(EnvironmentalImpact.class)) {
-							String svalue = jsonObject.getString(fieldName);
-							valueToSet = EnvironmentalImpact.getByName(svalue);
-						} else if(paramType.equals(DeviceCategory.class)) {
-							String svalue = jsonObject.getString(fieldName);
-							valueToSet = DeviceCategory.getByName(svalue);
-						} else if(paramType.equals(AgentType.class)) {
-							String svalue = jsonObject.getString(fieldName);
-							valueToSet = AgentType.getByName(svalue);
+						// Added 1st June 2024
+						} else if(String[].class.equals(paramType) && value instanceof JSONArray) {
+							JSONArray jsonArray = (JSONArray) value;
+							String[] toSet = new String[jsonArray.length()];
+							for (int i = 0; i < jsonArray.length() ; i++) {
+								Object valueItem = jsonArray.get(i);
+								toSet[i] = ""+valueItem;
+							}
+							valueToSet = toSet;
+						} else if(Date[].class.equals(paramType) && value instanceof JSONArray) {
+							JSONArray jsonArray = (JSONArray) value;
+							Date[] toSet = new Date[jsonArray.length()];
+							for (int i = 0; i < jsonArray.length() ; i++) {
+								Object valueItem = jsonArray.get(i);
+								toSet[i] = UtilJsonParser.parseJsonDate(""+valueItem);
+							}
+							valueToSet = toSet;
+						} else if(String[].class.equals(paramType) && !(value instanceof JSONArray)) {
+							String sValue = ""+value;
+							if(sValue.length() > 0) {
+								String[] toSet = sValue.split(",");
+								if(toSet.length > 0) {
+									valueToSet = toSet;
+								}
+							}
+						//} else if(paramType.equals(Map.class)) {
+						} else if(Integer[].class.equals(paramType) && value instanceof JSONArray) {
+							JSONArray jsonArray = (JSONArray) value;
+							Integer[] toSet = new Integer[jsonArray.length()];
+							for (int i = 0; i < jsonArray.length() ; i++) {
+								Object valueItem = jsonArray.get(i);
+								toSet[i] = Integer.valueOf(""+valueItem);
+							}
+							valueToSet = toSet;
+						} else if(Double[].class.equals(paramType) && value instanceof JSONArray) {
+							JSONArray jsonArray = (JSONArray) value;
+							Double[] toSet = new Double[jsonArray.length()];
+							for (int i = 0; i < jsonArray.length() ; i++) {
+								Object valueItem = jsonArray.get(i);
+								toSet[i] = Double.valueOf(""+valueItem);
+							}
+							valueToSet = toSet;
+						} else if(Float[].class.equals(paramType) && value instanceof JSONArray) {
+							logger.warning("fillObject : Float[] not tested ");
+							JSONArray jsonArray = (JSONArray) value;
+							Float[] toSet = new Float[jsonArray.length()];
+							for (int i = 0; i < jsonArray.length() ; i++) {
+								Object valueItem = jsonArray.get(i);
+								toSet[i] = Float.valueOf(""+valueItem);
+							}
+						} else if(Long[].class.equals(paramType) && value instanceof JSONArray) {
+							JSONArray jsonArray = (JSONArray) value;
+							Long[] toSet = new Long[jsonArray.length()];
+							for (int i = 0; i < jsonArray.length() ; i++) {
+								Object valueItem = jsonArray.get(i);
+								toSet[i] = Long.valueOf(""+valueItem);;
+							}
+							valueToSet = toSet;
 						}
 					} catch (Throwable e) {
 						logger.error(e);
@@ -366,7 +667,6 @@ public class UtilJsonParser {
 						} catch (Throwable e) {
 							logger.error(e);
 						}
-
 					}
 				}
 			}
@@ -374,57 +674,245 @@ public class UtilJsonParser {
 		return targetObject;
 	}
 
-	public static OperationResult parseOperationResult(JSONObject jsonAgent, AbstractLogger logger) throws Exception {
+	public static OperationResult parseOperationResult(JSONObject jsonAgent, AbstractLogger logger) throws HandlingException {
 		OperationResult operationResult = new OperationResult();
 		parseJSONObject(operationResult, jsonAgent, logger);
 		return operationResult;
 	}
 
-	public static OptionItem parseOptionItem(JSONObject jsonOptionItem, AbstractLogger logger) throws Exception {
+	public static OptionItem parseOptionItem(JSONObject jsonOptionItem, AbstractLogger logger) throws HandlingException {
 		OptionItem optionItem = new OptionItem();
 		parseJSONObject(optionItem, jsonOptionItem, logger);
 		return optionItem;
 	}
 
-	public static AgentForm parseAgentForm(JSONObject jsonAgent, AbstractLogger logger) throws Exception {
+	public static AgentForm parseAgentForm(JSONObject jsonAgent, AbstractLogger logger) throws HandlingException {
 		AgentForm agentForm = new AgentForm();
 		parseJSONObject(agentForm, jsonAgent, logger);
 		Map<String, Double> offersRepartition2 = parseJsonMapDouble(jsonAgent.getJSONObject("offersRepartition"), logger);
+		PowerSlot ongoingContractTotal = new PowerSlot();
+		parseJSONObject(ongoingContractTotal, jsonAgent.getJSONObject("ongoingContractsTotalLocal"), logger);
+		agentForm.setOngoingContractsTotal(ongoingContractTotal);
 		agentForm.setOffersRepartition(offersRepartition2);
 		Map<String, PowerSlot> contractsRepartition2 = parseJsonMapPowerSlot(jsonAgent.getJSONObject("ongoingContractsRepartition"), logger);
 		agentForm.setOngoingContractsRepartition(contractsRepartition2);
-		OptionItem deviceCategory = parseOptionItem(jsonAgent.getJSONObject("deviceCategory"), logger);
+		String sDeviceCategory = "" + jsonAgent.get("deviceCategory");
+		DeviceCategory deviceCategory = DeviceCategory.valueOf(sDeviceCategory);
 		agentForm.setDeviceCategory(deviceCategory);
-		NodeConfig nodeConfig = parseNodeConfig(jsonAgent.getJSONObject("location"), logger);
-		agentForm.setLocation(nodeConfig);
+		NodeLocation nodeLocation = parseNodeLocationg(jsonAgent.getJSONObject("location"), logger);
+		agentForm.setLocation(nodeLocation);
 		return agentForm;
 	}
 
-
-	public static ForcastingResult parseForcastingResult(JSONObject jsonForcastingResult, AbstractLogger logger) throws Exception {
-		ForcastingResult result = new ForcastingResult();
-		JSONArray json_values = jsonForcastingResult.getJSONArray("values");
-		List<Double> values = new ArrayList<>();
-		for(int idx=0; idx < json_values.length(); idx++) {
-			Object value = json_values.get(idx);
-			values.add(SapereUtil.getDoubleValue(value));
+	public static ForcastingResult1 parseForcastingResult1(JSONObject jsonForcastingResult, AbstractLogger logger) throws HandlingException {
+		ForcastingResult1 result = new ForcastingResult1();
+		JSONArray json_values = jsonForcastingResult.getJSONArray("predictions");
+		logger.info("parseForcastingResult : json_values = "+ json_values);
+		List<Double> mainList = new ArrayList<>();
+		for(int idx1=0; idx1 < json_values.length(); idx1++) {
+			Object value = json_values.get(idx1);
+			mainList.add(SapereUtil.getDoubleValue(value));
 		}
-		result.setValues(values);
-		return result;		
+		result.setPredictions(mainList);
+		return result;
 	}
 
-	private static NodeTotal parseNodeTotal(JSONObject jsonNodeTotal, AbstractLogger logger) throws Exception {
+	public static ForcastingResult2 parseForcastingResult2(JSONObject jsonForcastingResult, AbstractLogger logger) throws HandlingException {
+		ForcastingResult2 result = new ForcastingResult2();
+		JSONArray json_values = jsonForcastingResult.getJSONArray("predictions");
+		//logger.info("parseForcastingResult : json_values = "+ json_values);
+		List<List<Double>> mainList = new ArrayList<>();
+		for(int idx1=0; idx1 < json_values.length(); idx1++) {
+			Object json_obj2 = json_values.get(idx1);
+			List<Double> subList = new ArrayList<Double>();
+			if (json_obj2 instanceof JSONArray) {
+				JSONArray json_array2 = (JSONArray) json_obj2;
+				//logger.info("parseForcastingResult : json_array2 = "+ json_array2);
+				for(int idx=0; idx < json_array2.length(); idx++) {
+					Object value2 = json_array2.get(idx);
+					subList.add(SapereUtil.getDoubleValue(value2));
+				}
+			} else if (json_obj2 instanceof double[]) {
+				for(double nextDouble : (double[]) json_obj2) {
+					subList.add(nextDouble);
+				}
+			} else if (json_obj2 instanceof float[]) {
+				for(float nextDouble : (float[]) json_obj2) {
+					subList.add((double) nextDouble);
+				}
+			}
+			mainList.add(subList);
+		}
+		result.setPredictions(mainList);
+		return result;
+	}
+
+	private static List<List<Double>> auxRetrieve2dimListOfDouble(JSONArray json_listOfList, AbstractLogger logger) {
+		List<List<Double>> listOfList = new ArrayList<List<Double>>();
+		for(int idx1=0; idx1 < json_listOfList.length(); idx1++) {
+			Object json_obj2 = json_listOfList.get(idx1);
+			List<Double> subList = new ArrayList<Double>();
+			if (json_obj2 instanceof JSONArray) {
+				JSONArray json_array2 = (JSONArray) json_obj2;
+				//logger.info("parseForcastingResult : json_array2 = "+ json_array2);
+				for(int idx=0; idx < json_array2.length(); idx++) {
+					Object value2 = json_array2.get(idx);
+					subList.add(SapereUtil.getDoubleValue(value2));
+				}
+			} else if (json_obj2 instanceof double[]) {
+				for(double nextDouble : (double[]) json_obj2) {
+					subList.add(nextDouble);
+				}
+			} else if (json_obj2 instanceof float[]) {
+				for(float nextDouble : (float[]) json_obj2) {
+					subList.add((double) nextDouble);
+				}
+			}
+			listOfList.add(subList);
+		}
+		return listOfList;
+	}
+
+	public static List<Date> parseListDates(JSONArray json_dates, AbstractLogger logger) {
+		List<Date> listDates = new ArrayList<Date>();
+		for (int idx1 = 0; idx1 < json_dates.length(); idx1++) {
+			String sNextDate = "" + json_dates.get(idx1);
+			try {
+				Date nextDate = parseJsonDate(sNextDate);
+				listDates.add(nextDate);
+			} catch (HandlingException e) {
+				logger.error(e);
+			}
+		}
+		return listDates;
+	}
+
+	public static List<List<Date>> parseListListDates(JSONArray json_dates, AbstractLogger logger) {
+		List<List<Date>> result = new ArrayList<List<Date>>();
+		for (int idx1 = 0; idx1 < json_dates.length(); idx1++) {
+			JSONArray nextJsonDateList = json_dates.getJSONArray(idx1);
+			List<Date> nextDateList = parseListDates(nextJsonDateList, logger);
+			result.add(nextDateList);
+		}
+		return result;
+	}
+
+	public static List<Integer> parseListInteger(JSONArray json_dates, AbstractLogger logger) {
+		List<Integer> listInteger = new ArrayList<Integer>();
+		for (int idx1 = 0; idx1 < json_dates.length(); idx1++) {
+			Object nextObj = json_dates.get(idx1);
+			Integer nextInt = SapereUtil.getIntValue(nextObj);
+			listInteger.add(nextInt);
+		}
+		return listInteger;
+	}
+
+	public static LSTMPredictionResult parseLSTMPredictionResult(JSONObject jsonPredictionResult,
+			AbstractLogger logger) {
+		LSTMPredictionResult result = new LSTMPredictionResult();
+		parseJSONObject(result, jsonPredictionResult, logger);
+		JSONArray json_predictedValues = jsonPredictionResult.getJSONArray("listPredicted");
+		List<List<Double>> predictedValues = auxRetrieve2dimListOfDouble(json_predictedValues, logger);
+		result.setListPredicted(predictedValues);
+		List<Integer> listHorizon = parseListInteger(jsonPredictionResult.getJSONArray("horizons"), logger);
+		result.setHorizons(listHorizon);
+		List<List<Date>> listDatesX = parseListListDates(jsonPredictionResult.getJSONArray("listDatesX"), logger);
+		result.setListDatesX(listDatesX);
+		List<Date> predictionDates = parseListDates(jsonPredictionResult.getJSONArray("predictionDates"), logger);
+		result.setPredictionDates(predictionDates);
+		JSONArray json_listY = jsonPredictionResult.getJSONArray("listY");
+		List<List<Double>> trueValues = auxRetrieve2dimListOfDouble(json_listY, logger);
+		result.setListTrue(trueValues);
+		return result;
+	}
+
+	public static LayerDefinition parseLayerDefinition(JSONObject jsonLayer, AbstractLogger logger) {
+		LayerDefinition result = new LayerDefinition();
+		parseJSONObject(result, jsonLayer, logger);
+		JSONArray jsonParamsTypes = jsonLayer.getJSONArray("paramTypes");
+		List<ParamType> listParamType = new ArrayList<ParamType>();
+		for (int idx = 0; idx < jsonParamsTypes.length(); idx++) {
+			String sParamType = jsonParamsTypes.getString(idx);
+			listParamType.add(ParamType.valueOf(sParamType));
+		}
+		result.setParamTypes(listParamType);
+		/*
+		 * List<Integer> dimensions = new ArrayList<Integer>(); JSONArray
+		 * json_dimensions = jsonLayer.getJSONArray("listPredicted"); for(int idx=0; idx
+		 * < json_layers.length(); idx++) { JSONObject json_layer =
+		 * json_layers.getJSONObject(idx); } layerDimension
+		 */
+		return result;
+	}
+
+	public static List<LSTMModelInfo> parseListLSTMModelInfo(JSONArray jsonListModelInfo, AbstractLogger logger)
+			throws HandlingException {
+		List<LSTMModelInfo> result = new ArrayList<LSTMModelInfo>();
+		for (int idx = 0; idx < jsonListModelInfo.length(); idx++) {
+			JSONObject json_modelInfo = jsonListModelInfo.getJSONObject(idx);
+			result.add(parseLSTMModelInfo(json_modelInfo, logger));
+		}
+		return result;
+	}
+
+	public static LSTMModelInfo parseLSTMModelInfo(JSONObject jsonModelInfo, AbstractLogger logger)
+			throws HandlingException {
+		LSTMModelInfo result = new LSTMModelInfo();
+		parseJSONObject(result, jsonModelInfo, logger);
+		List<LayerDefinition> layers = new ArrayList<LayerDefinition>();
+		JSONArray json_layers = jsonModelInfo.getJSONArray("layers");
+		for (int idx = 0; idx < json_layers.length(); idx++) {
+			JSONObject json_layer = json_layers.getJSONObject(idx);
+			layers.add(parseLayerDefinition(json_layer, logger));
+		}
+		result.setLayers(layers);
+		JSONObject jsonMatrices = jsonModelInfo.getJSONObject("mapMatrices");
+		Map<String, DoubleMatrix> mapMatrices = new HashMap<String, DoubleMatrix>();
+		Iterator<String> keys1 = jsonMatrices.keys();
+		while (keys1.hasNext()) {
+			String key = keys1.next();
+			JSONArray jsonArray = jsonMatrices.getJSONArray(key);
+			DoubleMatrix trMatrice = parseJsonMatrix2(jsonArray, logger);
+			if(trMatrice == null) {
+				logger.error("parseLSTMModelInfo : null matrix for key " + key + " resulting from jsonArray " + jsonArray);
+			} else {
+				mapMatrices.put(key, trMatrice);
+			}
+		}
+		result.setMapMatrices(mapMatrices);
+		Map<String, List<Integer>> mapShapes = new HashMap<String, List<Integer>>();
+		JSONObject jsonShapes = jsonModelInfo.getJSONObject("mapShapes");
+		Iterator<String> keys2 = jsonShapes.keys();
+		while (keys2.hasNext()) {
+			String key2 = keys2.next();
+			JSONArray jsonArray = jsonShapes.getJSONArray(key2);
+			List<Integer> dimensions = new ArrayList<Integer>();
+			for (int idx = 0; idx < jsonArray.length(); idx++) {
+				Integer nextDimension = SapereUtil.getIntValue(jsonArray.get(idx));
+				dimensions.add(nextDimension);
+			}
+			mapShapes.put(key2, dimensions);
+		}
+		result.setMapShapes(mapShapes);
+		return result;
+	}
+
+	private static NodeTotal parseNodeTotal(JSONObject jsonNodeTotal, AbstractLogger logger) throws HandlingException {
 		NodeTotal nodeTotal = new NodeTotal();
 		parseJSONObject(nodeTotal, jsonNodeTotal, logger);
 		return nodeTotal;
 	}
 
-
-	public static Date parseJsonDate(String jsonDate) throws Exception {
+	public static Date parseJsonDate(String jsonDate) throws HandlingException {
 		if(jsonDate.contains("T")) {
 			String shortDate = jsonDate.substring(0, 19);
 			UtilDates.format_json_datetime_prev.setTimeZone(TimeZone.getTimeZone("Europe/Zurich"));
-			Date date1 = UtilDates.format_json_datetime_prev.parse(shortDate);
+			Date date1;
+			try {
+				date1 = UtilDates.format_json_datetime_prev.parse(shortDate);
+			} catch (ParseException e) {
+				throw new HandlingException(""+e);
+			}
 			return date1;
 		} else {
 			if(jsonDate.length() == 25) {
@@ -438,26 +926,31 @@ public class UtilJsonParser {
 					//System.out.println("tz = " + jsonDate);
 				}
 			}
-			Date date2 = UtilDates.format_json_datetime.parse(jsonDate);
+			Date date2;
+			try {
+				date2 = UtilDates.format_json_datetime.parse(jsonDate);
+			} catch (ParseException e) {
+				throw new HandlingException(""+e);
+			}
 			return date2;
 		}
 	}
 
-	public static LaunchConfig parseLaunchConfig(JSONObject jsonLaunchConcig, AbstractLogger logger) throws Exception {
+	public static LaunchConfig parseLaunchConfig(JSONObject jsonLaunchConcig, AbstractLogger logger) throws HandlingException {
 		LaunchConfig  launchConfig = new LaunchConfig();
-		Map<String,String> mapLocationByNode = parseJsonMapString(jsonLaunchConcig.getJSONObject("mapLocationByNode"), logger);
-		launchConfig.setMapLocationByNode(mapLocationByNode);
+		Map<String,String> mapNodeByLocation = parseJsonMapString(jsonLaunchConcig.getJSONObject("mapNodeByLocation"), logger);
+		launchConfig.setMapNodeByLocation(mapNodeByLocation);
 		JSONObject jsonMapNodes = jsonLaunchConcig.getJSONObject("mapNodes");
-		Map<String, NodeConfig> mapNodeConfig = new HashMap<String, NodeConfig>();
+		Map<String, NodeLocation> mapNodeLocation = new HashMap<String, NodeLocation>();
 		Iterator<String> keys = jsonMapNodes.keys();
 		while (keys.hasNext()) {
 			String key = keys.next();
-			JSONObject jsonNodeConfig = jsonMapNodes.getJSONObject(key);
-			NodeConfig nodeConfig = new NodeConfig();
-			parseJSONObject(nodeConfig, jsonNodeConfig, logger);
-			mapNodeConfig.put(key, nodeConfig);
+			JSONObject jsonNodeLocation = jsonMapNodes.getJSONObject(key);
+			NodeLocation nodeLocation = new NodeLocation();
+			parseJSONObject(nodeLocation, jsonNodeLocation, logger);
+			mapNodeLocation.put(key, nodeLocation);
 		}
-		launchConfig.setMapNodes(mapNodeConfig);
+		launchConfig.setMapNodes(mapNodeLocation);
 		return launchConfig;
 	}
 
@@ -648,6 +1141,8 @@ public class UtilJsonParser {
 					if(method.getParameterCount()==0) {
 						String methodName = method.getName();
 						if(excludeMethodList.contains(methodName)) {
+							// do nothing
+						} else if (method.isAnnotationPresent(DisableJson.class)) {
 							// do nothing
 						} else {
 							//logger.info("method name : " + methodClass.getName() + "." + methodName + " " + depth);

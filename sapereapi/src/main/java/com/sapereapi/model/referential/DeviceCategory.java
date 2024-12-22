@@ -3,35 +3,40 @@ package com.sapereapi.model.referential;
 import java.util.ArrayList;
 import java.util.List;
 
-import com.sapereapi.model.energy.OptionItem;
+import com.sapereapi.model.OptionItem;
 
 public enum DeviceCategory {
-	WATER_HEATING("Water Heating", false)
-	,HEATING("Heating", false)
-	,COOKING("Cooking", false)
-	,SHOWERS("Showers", false)
-	,WASHING_DRYING("Washing/drying", false)
-	,LIGHTING("Lighting", false)
-	,AUDIOVISUAL("Audiovisual", false)
-	,COLD_APPLIANCES("Cold applicances", false)
-	,ICT("ICT", false)
-	,OTHER("Other", false)
-	,UNKNOWN("Unknown", false)
-	,ELECTRICAL_PANEL("Electrical panel", false)
-	// Producer category
-	,EXTERNAL_ENG("External supply", true)
-	,WIND_ENG("Wind", true)
-	,SOLOR_ENG("Solar", true)
-	,BIOMASS_ENG("Biomass", true)
-	,HYDRO_ENG("Hydro", true)
+	 // Consumer categories
+	 WATER_HEATING("Water Heating", false, true)
+	,HEATING("Heating", false, true)
+	,COOKING("Cooking", false, true)
+	,SHOWERS("Showers", false, true)
+	,WASHING_DRYING("Washing/drying", false, true)
+	,LIGHTING("Lighting", false, true)
+	,AUDIOVISUAL("Audiovisual", false, true)
+	,COLD_APPLIANCES("Cold applicances", false, true)
+	,ICT("ICT", false, true)
+	,OTHER("Other", false, true)
+	,UNKNOWN("Unknown", false, true)
+	,ELECTRICAL_PANEL("Electrical panel", false, true)
+	// Producer categories
+	,EXTERNAL_ENG("External supply", true, false)
+	,WIND_ENG("Wind", true, false)
+	,SOLOR_ENG("Solar", true, false)
+	,BIOMASS_ENG("Biomass", true, false)
+	,HYDRO_ENG("Hydro", true, false)
+	// Hybrid categories
+	,HYBRID("Hybrid", true, true)
 	;
 
 	private String label;
 	private boolean isProducer;
+	private boolean isConsumer;
 
-	DeviceCategory(String _label, boolean _isProducer) {
+	DeviceCategory(String _label, boolean _isProducer, boolean _isConsumer) {
 		this.label = _label;
 		this.isProducer = _isProducer;
+		this.isConsumer = _isConsumer;
 	}
 
 	public String getLabel() {
@@ -42,18 +47,12 @@ public enum DeviceCategory {
 		return isProducer;
 	}
 
-	public OptionItem getOptionItem() {
-		return new OptionItem(this.name(), label);
+	public boolean isConsumer() {
+		return isConsumer;
 	}
 
-	public static DeviceCategory getByLabel(String label) {
-		String label2 = (label == null) ? "" : label;
-		for (DeviceCategory pLevel : DeviceCategory.values()) {
-			if (pLevel.getLabel().equals(label2)) {
-				return pLevel;
-			}
-		}
-		return DeviceCategory.UNKNOWN;
+	public OptionItem getOptionItem() {
+		return new OptionItem(this.name(), label);
 	}
 
 	public static DeviceCategory getByName(String name) {
@@ -66,26 +65,10 @@ public enum DeviceCategory {
 		return DeviceCategory.UNKNOWN;
 	}
 
-	public static List<String> getLabels() {
-		List<String> result = new ArrayList<String>();
-		for (DeviceCategory pLevel : DeviceCategory.values()) {
-			result.add(pLevel.getLabel());
-		}
-		return result;
-	}
-
-	public static List<DeviceCategory> getList() {
-		List<DeviceCategory> result = new ArrayList<DeviceCategory>();
-		for (DeviceCategory item : DeviceCategory.values()) {
-			result.add(item);
-		}
-		return result;
-	}
-
-	public static List<OptionItem> getOptionList(boolean isProducer) {
+	public static List<OptionItem> getOptionList(boolean isProducer, boolean isConsumer) {
 		List<OptionItem> result = new ArrayList<OptionItem>();
 		for (DeviceCategory item : DeviceCategory.values()) {
-			if(item.isProducer == isProducer) {
+			if(item.isProducer() == isProducer && item.isConsumer() == isConsumer) {
 				result.add(item.getOptionItem());
 			}
 		}

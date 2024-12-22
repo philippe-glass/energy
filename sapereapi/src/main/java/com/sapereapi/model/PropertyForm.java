@@ -12,6 +12,7 @@ public class PropertyForm {
 	private String query;
 	private String bond;
 	private String value;
+	private String aggregatedValue;
 	private String name;
 	private String state;
 	private String ip;
@@ -30,6 +31,11 @@ public class PropertyForm {
 		this.state = property.getState();
 		this.ip = property.getIp();
 		this.chosen = property.getChosen();
+		if(property.getAggregatedValue() == null) {
+			this.aggregatedValue = "";
+		} else {
+			this.aggregatedValue = ""+property.getAggregatedValue();
+		}
 	}
 
 	public String getQuery() {
@@ -52,6 +58,14 @@ public class PropertyForm {
 		return value;
 	}
 
+	public String getAggregatedValue() {
+		return aggregatedValue;
+	}
+
+	public void setAggregatedValue(String aggregatedValue) {
+		this.aggregatedValue = aggregatedValue;
+	}
+
 	public List<String> getValueLines() {
 		if(value==null) {
 			return new ArrayList<String>();
@@ -60,22 +74,11 @@ public class PropertyForm {
 		return result;
 	}
 
-	public String getValueLine1() {
-		if(value==null) {
-			return "";
-		}
-		String[] lines = value.split(SapereUtil.CR);
-		return lines[0];
-	}
-
-	public List<String> getValueFollowingLines() {
-		if(value != null && value.contains(SapereUtil.CR)) {
-			List<String> result = new ArrayList<String>(Arrays.asList(value.split(SapereUtil.CR)));
-			result.remove(0);
-			return result;
-		} else {
+	public List<String> getAggregatedValueLines() {
+		if (aggregatedValue == null) {
 			return new ArrayList<String>();
 		}
+		return new ArrayList<String>(Arrays.asList(aggregatedValue.split(SapereUtil.CR)));
 	}
 
 	public void setValue(String value) {

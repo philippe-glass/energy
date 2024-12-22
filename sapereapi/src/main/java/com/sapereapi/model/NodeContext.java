@@ -5,11 +5,12 @@ import java.util.ArrayList;
 import java.util.Date;
 import java.util.List;
 import java.util.Map;
-import java.util.TimeZone;
 
+import com.sapereapi.lightserver.DisableJson;
+import com.sapereapi.model.learning.PredictionScope;
 import com.sapereapi.util.UtilDates;
 
-import eu.sapere.middleware.node.NodeConfig;
+import eu.sapere.middleware.node.NodeLocation;
 import eu.sapere.middleware.node.NodeManager;
 
 public class NodeContext implements Serializable {
@@ -18,45 +19,65 @@ public class NodeContext implements Serializable {
 	 */
 	private static final long serialVersionUID = 879794;
 	protected Long id = null;
-	protected NodeConfig nodeConfig = null;
-	protected List<NodeConfig> neighbourNodeConfigs = new ArrayList<>();
+	protected NodeLocation nodeLocation = null;
+	protected List<NodeLocation> neighbourNodeLocations = new ArrayList<>();
 	protected String scenario;
 	protected long timeShiftMS = 0;
-	protected String sessionId = null;
+	protected Session session = null;
 	protected Map<Integer, Integer> datetimeShifts = null;
 	protected Double maxTotalPower = null;
 	protected String variables[] = { "requested", "produced", "consumed", "provided", "available", "missing" };
 	protected boolean supervisionDisabled;
+	protected boolean awardsActivated = true;
+	protected boolean energyStorageActivated = false;
 	protected boolean complementaryRequestsActivated = true;
-	protected boolean aggregationsActivated = true;
-	protected boolean predictionsActivated = false;
+	protected boolean qualityOfServiceActivated = false;
+	protected PredictionSetting nodePredicitonSetting = new PredictionSetting();
+	protected PredictionSetting clusterPredictionSetting = new PredictionSetting();
 	protected String urlForcasting = null;
-	protected TimeZone timeZone = TimeZone.getTimeZone("Europe/Zurich");
+	protected String timeZoneId = "Europe/Zurich";
+	protected int debugLevel;
+	protected String learningAgentName;
+	protected String regulatorAgentName;
 
-	public NodeContext(Long _id, NodeConfig _nodeConfig, String scenario, Map<Integer, Integer> _datetimeShifts,
-			Double _maxTotalPower, String aSessionId, String[] _variables
+	public NodeContext(Long _id
+			, NodeLocation _nodeLocation
+			, String scenario, Map<Integer, Integer> _datetimeShifts
+			, Double _maxTotalPower
+			, Session aSession
+			, String[] _variables
+			, String _learningAgentName
+			, String _regulatorAgentName
 			, boolean _supervisionDisabled
 			, boolean _activateComplementaryRequests
-			, boolean _activateAggregation
-			, boolean _activatePrediction
-			, TimeZone _timeZone
-			, String _urlForcasting) {
+			, boolean _awardsActivated
+			, boolean _energyStorageActivated
+			, PredictionSetting _nodePredicitonSetting
+			, PredictionSetting _clusterPredictionSetting
+			, String _timeZoneId
+			, String _urlForcasting
+			, int _debugLevel) {
 		super();
 		this.id = _id;
-		this.nodeConfig = _nodeConfig;
+		this.nodeLocation = _nodeLocation;
 		this.scenario = scenario;
 		this.datetimeShifts = _datetimeShifts;
 		this.timeShiftMS = UtilDates.computeTimeShiftMS(datetimeShifts);
 		this.maxTotalPower = _maxTotalPower;
-		this.sessionId = aSessionId;
+		this.session = aSession;
 		this.variables = _variables;
 		this.supervisionDisabled = _supervisionDisabled;
 		this.complementaryRequestsActivated = _activateComplementaryRequests;
-		this.aggregationsActivated = _activateAggregation;
-		this.predictionsActivated = _activatePrediction;
-		this.neighbourNodeConfigs = new ArrayList<>();
-		this.timeZone = _timeZone;
+		this.awardsActivated = _awardsActivated;
+		this.energyStorageActivated = _energyStorageActivated;
+		this.nodePredicitonSetting = _nodePredicitonSetting;
+		this.clusterPredictionSetting = _clusterPredictionSetting;
+		this.neighbourNodeLocations = new ArrayList<>();
+		this.timeZoneId = _timeZoneId;
 		this.urlForcasting = _urlForcasting;
+		this.learningAgentName = _learningAgentName;
+		this.regulatorAgentName = _regulatorAgentName;
+		this.debugLevel = _debugLevel;
 	}
 
 	public NodeContext() {
@@ -64,7 +85,7 @@ public class NodeContext implements Serializable {
 	}
 
 	public boolean isLocal() {
-		return (nodeConfig != null) && NodeManager.isLocal(nodeConfig);
+		return (nodeLocation != null) && NodeManager.isLocal(nodeLocation);
 	}
 
 	public String getScenario() {
@@ -91,12 +112,29 @@ public class NodeContext implements Serializable {
 		this.maxTotalPower = maxTotalPower;
 	}
 
-	public String getSessionId() {
-		return sessionId;
+	public Session getSession() {
+		return session;
 	}
 
-	public void setSessionId(String sessionId) {
-		this.sessionId = sessionId;
+	public void setSession(Session session) {
+		this.session = session;
+	}
+
+	@DisableJson
+	public String getLearningAgentName() {
+		return learningAgentName;
+	}
+
+	public void setLearningAgentName(String learningAgentName) {
+		this.learningAgentName = learningAgentName;
+	}
+
+	public String getRegulatorAgentName() {
+		return regulatorAgentName;
+	}
+
+	public void setRegulatorAgentName(String regulatorAgentName) {
+		this.regulatorAgentName = regulatorAgentName;
 	}
 
 	public Map<Integer, Integer> getDatetimeShifts() {
@@ -105,6 +143,7 @@ public class NodeContext implements Serializable {
 
 	public void setDatetimeShifts(Map<Integer, Integer> datetimeShifts) {
 		this.datetimeShifts = datetimeShifts;
+		this.timeShiftMS = UtilDates.computeTimeShiftMS(datetimeShifts);
 	}
 
 	public String[] getVariables() {
@@ -123,12 +162,12 @@ public class NodeContext implements Serializable {
 		this.id = id;
 	}
 
-	public NodeConfig getNodeConfig() {
-		return nodeConfig;
+	public NodeLocation getNodeLocation() {
+		return nodeLocation;
 	}
 
-	public void setNodeConfig(NodeConfig nodeConfig) {
-		this.nodeConfig = nodeConfig;
+	public void setNodeLocation(NodeLocation nodeLocation) {
+		this.nodeLocation = nodeLocation;
 	}
 
 	public boolean isSupervisionDisabled() {
@@ -147,36 +186,71 @@ public class NodeContext implements Serializable {
 		this.complementaryRequestsActivated = activateComplementaryRequests;
 	}
 
-	public boolean isAggregationsActivated() {
-		return aggregationsActivated;
+	public boolean isAwardsActivated() {
+		return awardsActivated;
 	}
 
-	public void setAggregationsActivated(boolean activateAggregation) {
-		this.aggregationsActivated = activateAggregation;
+	public void setAwardsActivated(boolean awardsActivated) {
+		this.awardsActivated = awardsActivated;
 	}
 
-	public boolean isPredictionsActivated() {
-		return predictionsActivated;
+	public boolean isEnergyStorageActivated() {
+		return energyStorageActivated;
 	}
 
-	public void setPredictionsActivated(boolean activatePrediction) {
-		this.predictionsActivated = activatePrediction;
+	public void setEnergyStorageActivated(boolean energyStorageActivated) {
+		this.energyStorageActivated = energyStorageActivated;
 	}
 
-	public List<NodeConfig> getNeighbourNodeConfigs() {
-		return neighbourNodeConfigs;
+	public PredictionSetting getPredictionSetting(PredictionScope scope) {
+		if(PredictionScope.NODE.equals(scope)) {
+			return nodePredicitonSetting;
+		} else if(PredictionScope.CLUSTER.equals(scope)) {
+			return clusterPredictionSetting;
+		}
+		return null;
 	}
 
-	public void setNeighbourNodeConfigs(List<NodeConfig> neighbourNodeConfigs) {
-		this.neighbourNodeConfigs = neighbourNodeConfigs;
+	public boolean isPredictionsActivated(PredictionScope scope) {
+		PredictionSetting predictionSetting = getPredictionSetting(scope);
+		return predictionSetting != null && predictionSetting.isActivated();
 	}
 
-	public void resetNeighbourNodeConfig() {
-		this.neighbourNodeConfigs.clear();
+	public boolean _isPredictionsActivated() {
+		return nodePredicitonSetting.isActivated() || clusterPredictionSetting.isActivated();
 	}
 
-	public void addNeighbourNodeConfig(NodeConfig aNodeConfig) {
-		this.neighbourNodeConfigs.add(aNodeConfig);
+	public boolean isAggregationsActivated(PredictionScope scope) {
+		PredictionSetting predictionSetting = getPredictionSetting(scope);
+		return predictionSetting.isModelAggregationActivated();
+	}
+
+	public boolean isQualityOfServiceActivated() {
+		return qualityOfServiceActivated;
+	}
+
+	public void setQualityOfServiceActivated(boolean qualityOfServiceActivated) {
+		this.qualityOfServiceActivated = qualityOfServiceActivated;
+	}
+
+	public void setComplementaryRequestsActivated(boolean complementaryRequestsActivated) {
+		this.complementaryRequestsActivated = complementaryRequestsActivated;
+	}
+
+	public List<NodeLocation> getNeighbourNodeLocations() {
+		return neighbourNodeLocations;
+	}
+
+	public void setNeighbourNodeLocations(List<NodeLocation> neighbourNodeLocations) {
+		this.neighbourNodeLocations = neighbourNodeLocations;
+	}
+
+	public void resetNeighbourNodeLocations() {
+		this.neighbourNodeLocations.clear();
+	}
+
+	public void addNeighbourNodeLocation(NodeLocation aNodeLocation) {
+		this.neighbourNodeLocations.add(aNodeLocation);
 	}
 
 	public String getUrlForcasting() {
@@ -187,38 +261,53 @@ public class NodeContext implements Serializable {
 		this.urlForcasting = urlForcasting;
 	}
 
-	public List<Long> getNeighbourNodeConfigIds() {
-		List<Long> result = new ArrayList<Long>();
-		for(NodeConfig nextNodeConfig : this.neighbourNodeConfigs) {
-			result.add(nextNodeConfig.getId());
-		}
-		return result;
+	public PredictionSetting getNodePredicitonSetting() {
+		return nodePredicitonSetting;
+	}
+
+	public void setNodePredicitonSetting(PredictionSetting nodePredicitonSetting) {
+		this.nodePredicitonSetting = nodePredicitonSetting;
+	}
+
+	public PredictionSetting getClusterPredictionSetting() {
+		return clusterPredictionSetting;
+	}
+
+	public void setClusterPredictionSetting(PredictionSetting clusterPredictionSetting) {
+		this.clusterPredictionSetting = clusterPredictionSetting;
 	}
 
 	public List<String> getNeighbourNMainServiceAddresses() {
 		List<String> result = new ArrayList<String>();
-		for(NodeConfig nextNodeConfig : this.neighbourNodeConfigs) {
-			result.add(nextNodeConfig.getMainServiceAddress());
+		for(NodeLocation nextNodeLocation : this.neighbourNodeLocations) {
+			result.add(nextNodeLocation.getMainServiceAddress());
 		}
 		return result;
 	}
 
-	public String getNeighbourNames() {
-		StringBuffer result = new StringBuffer();
-		String sep = "";
-		for(NodeConfig nextNodeConfig : this.neighbourNodeConfigs) {
-			result.append(sep).append(nextNodeConfig.getName());
-			sep = ",";
+	public List<String> getNeighbourNodes() {
+		List<String> result = new ArrayList<String>();
+		for(NodeLocation nextNodeLocation : this.neighbourNodeLocations) {
+			result.add(nextNodeLocation.getName());
 		}
-		return result.toString();
+		return result;
 	}
 
+
 	public NodeContext clone() {
-		NodeContext result = new NodeContext(id, nodeConfig.clone(), scenario, datetimeShifts, maxTotalPower, sessionId,
-				variables, supervisionDisabled, complementaryRequestsActivated
-				, aggregationsActivated, predictionsActivated, timeZone, urlForcasting);
-		for(NodeConfig nextNodeConfig : neighbourNodeConfigs) {
-			result.addNeighbourNodeConfig(nextNodeConfig.clone());
+		return copyContent(true);
+	}
+
+	public NodeContext copyContent(boolean copyId) {
+		Long idToSet = copyId ? id : null;
+		NodeContext result = new NodeContext(idToSet, nodeLocation.clone(), scenario, datetimeShifts, maxTotalPower
+				, session == null ? null : session.clone()
+				, variables, learningAgentName, regulatorAgentName
+				, supervisionDisabled, complementaryRequestsActivated, awardsActivated, energyStorageActivated
+				, nodePredicitonSetting.clone(), clusterPredictionSetting.clone()
+				, timeZoneId, urlForcasting, debugLevel);
+		for(NodeLocation nextNodeLocation : neighbourNodeLocations) {
+			result.addNeighbourNodeLocation(nextNodeLocation.clone());
 		}
 		return result;
 	}
@@ -228,22 +317,30 @@ public class NodeContext implements Serializable {
 	}
 
 	public Date getCurrentDate() {
-		return UtilDates.getNewDate(timeShiftMS);
+		return UtilDates.getNewDateNoMilliSec(timeShiftMS);
 	}
 
 	public String getMainServiceAddress() {
-		if (nodeConfig == null) {
+		if (nodeLocation == null) {
 			return null;
 		}
-		return nodeConfig.getMainServiceAddress();
+		return nodeLocation.getMainServiceAddress();
 	}
 
-	public TimeZone getTimeZone() {
-		return timeZone;
+	public String getTimeZoneId() {
+		return timeZoneId;
 	}
 
-	public void setTimeZone(TimeZone timeZone) {
-		this.timeZone = timeZone;
+	public void setTimeZoneId(String timeZoneId) {
+		this.timeZoneId = timeZoneId;
+	}
+
+	public int getDebugLevel() {
+		return debugLevel;
+	}
+
+	public void setDebugLevel(int debugLevel) {
+		this.debugLevel = debugLevel;
 	}
 
 }

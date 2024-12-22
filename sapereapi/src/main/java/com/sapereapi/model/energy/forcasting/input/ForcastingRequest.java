@@ -2,11 +2,11 @@ package com.sapereapi.model.energy.forcasting.input;
 
 import java.io.Serializable;
 import java.util.Date;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.TreeMap;
 
-import com.sapereapi.model.energy.TimestampedValue;
+import com.sapereapi.model.TimestampedValue;
 import com.sapereapi.util.UtilDates;
 
 public class ForcastingRequest implements Serializable {
@@ -36,7 +36,8 @@ public class ForcastingRequest implements Serializable {
 	}
 
 	public Map<String, Double> getMap() {
-		Map<String, Double> result = new HashMap<>();
+		TreeMap<String, Double> result = new TreeMap<>();
+		//Map<String, Double> result = new HashMap<>();
 		for (TimestampedValue nextTSvalue : timestampedValues) {
 			Date date = nextTSvalue.getTimestamp();
 			String jsonDate = UtilDates.format_json_datetime.format(date);

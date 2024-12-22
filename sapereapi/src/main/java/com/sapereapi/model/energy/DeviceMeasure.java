@@ -56,9 +56,9 @@ public class DeviceMeasure {
 
 	public void addPhaseMeasures(PhaseNumber _phaseNumber, Double power_p, Double power_q, Double power_s) {
 		if (_phaseNumber != null) {
-			map_power_p.put(_phaseNumber.getLabel(), power_p);
-			map_power_q.put(_phaseNumber.getLabel(), power_q);
-			map_power_s.put(_phaseNumber.getLabel(), power_s);
+			map_power_p.put(_phaseNumber.name(), power_p);
+			map_power_q.put(_phaseNumber.name(), power_q);
+			map_power_s.put(_phaseNumber.name(), power_s);
 		}
 	}
 
@@ -78,9 +78,9 @@ public class DeviceMeasure {
 		this.datetime = datetime;
 		this.deviceName = deviceName;
 		if (_phaseNumber != null) {
-			map_power_p.put(_phaseNumber.getLabel(), power_p);
-			map_power_q.put(_phaseNumber.getLabel(), power_q);
-			map_power_s.put(_phaseNumber.getLabel(), power_s);
+			map_power_p.put(_phaseNumber.name(), power_p);
+			map_power_q.put(_phaseNumber.name(), power_q);
+			map_power_s.put(_phaseNumber.name(), power_s);
 		}
 	}
 
@@ -127,7 +127,7 @@ public class DeviceMeasure {
 	public DeviceMeasure clone() {
 		DeviceMeasure result = new DeviceMeasure(this.datetime, this.deviceName,  null, null, null, null);
 		for(String phase : map_power_p.keySet()) {
-			PhaseNumber phaseNumber = PhaseNumber.getByLabel(phase);
+			PhaseNumber phaseNumber = PhaseNumber.valueOf(phase);
 			result.addPhaseMeasures(phaseNumber, map_power_p.get(phase), map_power_q.get(phase), map_power_s.get(phase));
 		}
 		return result;

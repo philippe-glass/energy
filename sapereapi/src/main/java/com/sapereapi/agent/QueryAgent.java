@@ -17,9 +17,9 @@ import eu.sapere.middleware.lsa.SyntheticPropertyName;
 import eu.sapere.middleware.node.NodeManager;
 import eu.sapere.middleware.node.notifier.event.BondEvent;
 import eu.sapere.middleware.node.notifier.event.DecayedEvent;
-import eu.sapere.middleware.node.notifier.event.LsaUpdatedEvent;
-import eu.sapere.middleware.node.notifier.event.PropagationEvent;
+import eu.sapere.middleware.node.notifier.event.AggregationEvent;
 import eu.sapere.middleware.node.notifier.event.RewardEvent;
+import eu.sapere.middleware.node.notifier.event.SpreadingEvent;
 
 public class QueryAgent extends SapereAgent {
 	private static final long serialVersionUID = 202L;
@@ -54,7 +54,7 @@ public class QueryAgent extends SapereAgent {
 
 	public void reinitialize(String agentName, String[] subdescription, String[] propertiesName, Object[] values,LsaType type) {
 		initFields(agentName, subdescription, propertiesName, values, type);
-		this.lsa.setAgentName("");
+		//this.lsa.setAgentName("");
 		this.lsa.removeAllProperties();
 		setInitialLSA();
 		query();
@@ -64,7 +64,7 @@ public class QueryAgent extends SapereAgent {
 		logger.info("rewarded-->" + lsaResult.getAgentName() +" by "+ reward);
 		logger.info("lsaResult: "+lsaResult.toVisualString());
 		
-		if(lsaResult.getAgentName().contains("*")) {
+		if(lsaResult.isPropagated()) {
 			lsaResult.addSyntheticProperty(SyntheticPropertyName.TYPE, LsaType.Reward);
 			sendTo(lsaResult, lsaResult.getSyntheticProperty(SyntheticPropertyName.SOURCE).toString());
 			}
@@ -81,17 +81,15 @@ public class QueryAgent extends SapereAgent {
 				Property proprety = new Property(prop[i], values[i], agentName, "",
 						Arrays.toString(waiting).replace("[", "").replace("]", "") + "|"
 								+ Arrays.toString(prop).replace("[", "").replace("]", ""),
-						NodeManager.getLocation(), false);
+						NodeManager.getLocationAddress(), false);
 				lsa.addProperty(proprety);
 			}
 		}
+		addGradient(3);
+		addDecay(4);
 		lsa.addSyntheticProperty(SyntheticPropertyName.QUERY, lsa.getAgentName());
-		lsa.addSyntheticProperty(SyntheticPropertyName.DIFFUSE, "1");
-		lsa.addSyntheticProperty(SyntheticPropertyName.DECAY, "4");
-		lsa.addSyntheticProperty(SyntheticPropertyName.GRADIENT_HOP, "3");
 		lsa.addSyntheticProperty(SyntheticPropertyName.STATE, Arrays.toString(waiting).replaceAll("\\[|\\]", "") + "|"
 				+ Arrays.toString(prop).replaceAll("\\[|\\]", ""));
-		//lsa.addSyntheticProperty(SyntheticPropertyName.STATE, "PROD|REQ,Value,Date,Duration");
 		if(debugLevel>0) {
 			logger.info("query injected" + lsa.toVisualString());
 		}
@@ -151,7 +149,7 @@ public class QueryAgent extends SapereAgent {
 	}
 
 	@Override
-	public void onPropagationEvent(PropagationEvent event) {
+	public void onSpreadingEvent(SpreadingEvent event) {
 
 	}
 
@@ -161,7 +159,7 @@ public class QueryAgent extends SapereAgent {
 	}
 
 	@Override
-	public void onLsaUpdatedEvent(LsaUpdatedEvent event) {
+	public void onAggregationEvent(AggregationEvent event) {
 
 	}
 

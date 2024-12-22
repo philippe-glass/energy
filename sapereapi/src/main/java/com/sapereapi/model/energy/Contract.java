@@ -1,30 +1,39 @@
 package com.sapereapi.model.energy;
 
-import java.io.Serializable;
-import java.util.ArrayList;
 import java.util.Date;
 import java.util.HashSet;
-import java.util.List;
+import java.util.Map;
 import java.util.Set;
 
+import com.sapereapi.db.EnergyDbHelper;
 import com.sapereapi.log.SapereLogger;
+import com.sapereapi.model.HandlingException;
+import com.sapereapi.model.TimeSlot;
+import com.sapereapi.model.energy.pricing.ComposedRate;
+import com.sapereapi.model.energy.pricing.DiscountItem;
+import com.sapereapi.model.energy.pricing.PricingTable;
 import com.sapereapi.util.SapereUtil;
 import com.sapereapi.util.UtilDates;
 
-import eu.sapere.middleware.agent.AgentAuthentication;
 import eu.sapere.middleware.agent.SapereAgent;
-import eu.sapere.middleware.lsa.values.IAggregateable;
+import eu.sapere.middleware.log.AbstractLogger;
 
-public class Contract extends CompositeOffer implements IEnergyObject, Cloneable, Serializable {
+public class Contract extends CompositeOffer implements IEnergyObject, Cloneable {
 	private static final long serialVersionUID = 4L;
 	private Date validationDeadline;
 	private Set<String> agreements;
 	private Set<String> disagreements;
+	private PricingTable globalPricingTable;
+	private Long eventId;
+
+
+	public Contract() {
+		super();
+	}
 
 	public Contract(CompositeOffer globalOffer, Date _validationDeadline) {
 		super();
 		this.request = globalOffer.getRequest();
-		this.consumerAgent = globalOffer.getConsumerAgent();
 		this.timeShiftMS = globalOffer.getTimeShiftMS();
 		Date current = getCurrentDate();
 		this.beginDate = globalOffer.getBeginDate();
@@ -32,16 +41,12 @@ public class Contract extends CompositeOffer implements IEnergyObject, Cloneable
 			beginDate = current;
 		}
 		this.endDate = globalOffer.getEndDate();
-		this.mapPower = globalOffer.getMapPower();
-		this.mapPowerMin = globalOffer.getMapPowerMin();
-		this.mapPowerMax = globalOffer.getMapPowerMax();
-		this.mapLocation = globalOffer.getMapLocation();
-		this.singleOffersIds = globalOffer.getSingleOffersIds();
+		this.mapContributions = globalOffer.getMapContributions();
 		this.agreements = new HashSet<>();
 		this.disagreements = new HashSet<>();
 		this.validationDeadline = _validationDeadline;
 		this.isMerged = globalOffer.isMerged();
-		this.consumerDeviceProperties = globalOffer.getConsumerDeviceProperties();
+		this.globalPricingTable = globalOffer.auxComputeTotalPricingTable();
 	}
 
 	public void stop(String agentName) {
@@ -52,7 +57,7 @@ public class Contract extends CompositeOffer implements IEnergyObject, Cloneable
 		Set<String> result = new HashSet<>();
 		try {
 			result.addAll(getProducerAgents());
-			result.add(consumerAgent);
+			result.add(getConsumerAgent());
 		} catch (Exception e) {
 			SapereLogger.getInstance().error(e);
 		}
@@ -89,6 +94,14 @@ public class Contract extends CompositeOffer implements IEnergyObject, Cloneable
 
 	public void setDisagreements(Set<String> disagreement) {
 		this.disagreements = disagreement;
+	}
+
+	public Long getEventId() {
+		return eventId;
+	}
+
+	public void setEventId(Long eventId) {
+		this.eventId = eventId;
 	}
 
 	public void addProducerAgreement(SapereAgent consumerAgent, String producerName, boolean isOK) {
@@ -150,8 +163,8 @@ public class Contract extends CompositeOffer implements IEnergyObject, Cloneable
 
 	public Set<String> getContractors() {
 		Set<String> result = new HashSet<String>();
-		result.add(this.consumerAgent);
-		for (String producer : this.mapPower.keySet()) {
+		result.add(getConsumerAgent());
+		for (String producer : this.mapContributions.keySet()) {
 			result.add(producer);
 		}
 		return result;
@@ -182,7 +195,7 @@ public class Contract extends CompositeOffer implements IEnergyObject, Cloneable
 
 	public String formatContent(boolean restricted) {
 		StringBuffer result = new StringBuffer();
-		result.append(restricted ? "(Restricted contract) " : "(Contract) ").append(this.consumerAgent);
+		result.append(restricted ? "(Restricted contract) " : "(Contract) ").append(getConsumerAgent());
 		if(isComplementary()) {
 			result.append(" [COMPLEMENTARY] ");
 		}
@@ -190,7 +203,7 @@ public class Contract extends CompositeOffer implements IEnergyObject, Cloneable
 			result.append(" [merged] ");
 		}
 		if (!restricted) {
-			result.append(" : ").append(SapereUtil.formaMapValues(this.mapPower, UtilDates.df3));
+			result.append(" : ").append(SapereUtil.formaMapValues(this.getMapPower(), UtilDates.df3));
 		}
 		result.append(" Sum W= " + UtilDates.df3.format(this.getPower())).append(" From ")
 				.append(beginDate==null?"" : UtilDates.format_time.format(this.beginDate))
@@ -220,10 +233,28 @@ public class Contract extends CompositeOffer implements IEnergyObject, Cloneable
 		return false;
 	}
 
+	public PricingTable getGlobalPricingTable() {
+		return globalPricingTable;
+	}
+
+	public void setGlobalPricingTable(PricingTable globalPricingTable) {
+		this.globalPricingTable = globalPricingTable;
+	}
+
 	public Contract copy(boolean copyIds) {
-		CompositeOffer globalOffer = (CompositeOffer) super.copy(copyIds);
-		Date cloneValidationDealine = (this.validationDeadline == null) ? null : new Date(validationDeadline.getTime());
-		Contract result = new Contract(globalOffer, cloneValidationDealine);
+		Contract result = new Contract();
+		if (request != null) {
+			result.setRequest(request.clone());
+		}
+		//result.setConsumerAgent(consumerAgent);
+		result.setTimeShiftMS(timeShiftMS);
+		result.setBeginDate(beginDate);
+		result.setEndDate(endDate);
+		result.setValidationDeadline(validationDeadline);
+		result.setMerged(isMerged);
+		// clone of mapPowertable
+		Map<String, SingleContribution> cloneMapContribution = SingleContribution.cloneMapContribution(mapContributions, copyIds);		
+		result.setMapContributions(cloneMapContribution);
 		Set<String> copyAgreements = new HashSet<>();
 		for (String next : agreements) {
 			copyAgreements.add(next);
@@ -234,6 +265,13 @@ public class Contract extends CompositeOffer implements IEnergyObject, Cloneable
 			copyDisagreements.add(next);
 		}
 		result.setDisagreements(copyDisagreements);
+		if (globalPricingTable != null) {
+			result.setGlobalPricingTable(this.globalPricingTable.clone());
+		}
+		if (copyIds && this.eventId != null) {
+			result.setEventId(eventId);
+		}
+		// do not copy awardCreaditUsage
 		return result;
 	}
 
@@ -243,7 +281,7 @@ public class Contract extends CompositeOffer implements IEnergyObject, Cloneable
 	}
 
 	@Override
-	public Contract copyForLSA() {
+	public Contract copyForLSA(AbstractLogger logger) {
 		return copy(false);
 	}
 
@@ -273,20 +311,98 @@ public class Contract extends CompositeOffer implements IEnergyObject, Cloneable
 	}
 
 	public int getIssuerDistance() {
-		return request.getIssuerDistance();
+		if(request.getIssuerProperties() == null) {
+			return 0;
+		}
+		return request.getIssuerProperties().getDistance();
 	}
 
-	public boolean checkCanMerge(Contract otherContract) throws Exception {
+	public boolean modifyRequest(EnergyRequest newRequest, EnergyRequest complementaryRequest, AbstractLogger logger) throws HandlingException{
+		if(canModify(newRequest, complementaryRequest)) {
+			logger.info("modifyRequest begin : initial gap = " + this.computeGap());
+			EnergyRequest newRequest2 = newRequest.clone();
+			logger.info("CompositeOffer.modifyRequest newRequest = " + newRequest2 + ", complementaryRequest = " + complementaryRequest);
+			Contract oldContract = this.clone();
+			Date newBeginDate = getCurrentDate();
+			newRequest2.setBeginDate(new Date(newBeginDate.getTime()));
+			this.setRequest(newRequest2);
+			this.setBeginDate(new Date(newBeginDate.getTime()));
+			this.modifyPower(newRequest2.getPower(), logger);
+			this.modifyPricingTable(oldContract, logger);
+			return this.hasChanged(oldContract);
+		}
+		return false;
+	}
+
+	public void modifyPricingTable(Contract oldContract, AbstractLogger logger) {
+		if(globalPricingTable != null && globalPricingTable.hasDiscount()) {
+			double lastUsageWH = oldContract.computeCreditUsedWH("modifyRequest > modifyPricingTable", logger);
+			logger.info("Contract.modifyPricingTable : globalPricingTable before = " + globalPricingTable + ", lastUsageWH = " + SapereUtil.roundPower(lastUsageWH));
+			globalPricingTable = globalPricingTable.applyContractUpdateOnTable(lastUsageWH, this, logger);
+			logger.info("Contract.modifyPricingTable : globalPricingTable after = " + globalPricingTable);
+		}
+	}
+
+	public double computeCreditUsedWH(String step, AbstractLogger logger) {
+		// NB : contract cannot be expired
+		if (this.isOnGoing() && Math.abs(request.getAwardsCredit()) > 0) {
+			Date current = getCurrentDate();
+			Double currentPower = getPower();
+			if(Math.abs(UtilDates.computeDurationSeconds(current, endDate)) <= 5) {
+				current = endDate;
+			}
+			// ONLY FOR LOG
+			double creditUsedWH = globalPricingTable.computeCreditUsedWH(beginDate, current, currentPower, step, logger);
+			double creditGrantedWH = globalPricingTable.couputeCreditGrantedWH();
+			DiscountItem globalDiscount = globalPricingTable.computeGlobalDiscount();
+			try {
+				double firstRateDiscount = getFirstRateDiscount();
+				double timeSpentSec = UtilDates.computeDurationSeconds(beginDate, current);
+				double expectedTimeSpentSec = UtilDates.computeDurationSeconds(beginDate, endDate);
+				if(expectedTimeSpentSec != 0) {
+					logger.info("Contract.computeCreditUsedWH : spent time ratio = " + SapereUtil.roundPower(timeSpentSec / expectedTimeSpentSec) );
+				}
+				if(creditGrantedWH != 0) {
+					logger.info("Contract.computeCreditUsedWH : used credit ratio = " + SapereUtil.roundPower(creditUsedWH / creditGrantedWH) );
+				}
+				long requestEventId = request.getEventId();
+				TimeSlot usageSlot = new TimeSlot(beginDate, current);
+				EnergyDbHelper.logCreditUsedWH(eventId, requestEventId, creditUsedWH, globalDiscount, usageSlot, endDate, firstRateDiscount, timeSpentSec, step);
+			} catch (HandlingException e) {
+				logger.error(e);
+			}
+			return creditUsedWH;
+		}
+		return 0.0;
+	}
+
+	public double getFirstRateDiscount() {
+		ComposedRate firstRate = globalPricingTable.getRate(beginDate);
+		if(firstRate != null) {
+			return firstRate.getDiscountValue();
+		}
+		return 0.0;
+	}
+
+	public double getFirstRateValue() {
+		ComposedRate firstRate = globalPricingTable.getRate(beginDate);
+		if(firstRate != null) {
+			return firstRate.getValue();
+		}
+		return 0.0;
+	}
+
+	public boolean checkCanMerge(Contract otherContract) throws HandlingException {
 		if(!this.isOnGoing() || !otherContract.isOnGoing()) {
-			throw new Exception("Contract.merge : both contracts must be ongoing");
+			throw new HandlingException("Contract.merge : both contracts must be ongoing");
 		}
 		if(this.hasDisagreement() || otherContract.hasDisagreement()) {
-			throw new Exception("Contract.merge : both contracts must have no disagreement");
+			throw new HandlingException("Contract.merge : both contracts must have no disagreement");
 		}
 		return super.checkCanMerge(otherContract);
 	}
 
-	public boolean merge(Contract otherContract) throws Exception {
+	public boolean merge(Contract otherContract) throws HandlingException {
 		this.isMerged = false;
 		if(checkCanMerge(otherContract)) {
 			super.merge(otherContract);
@@ -295,8 +411,13 @@ public class Contract extends CompositeOffer implements IEnergyObject, Cloneable
 		return isMerged;
 	}
 
-	@Override
-	public Contract aggregate(String operator, List<IAggregateable> listObjects, AgentAuthentication agentAuthentication) {
+	/*
+	public Contract aggregate1(String operator, List<IAggregateable> listObjects, AgentAuthentication agentAuthentication, AbstractLogger logger) {
+		return aggregate2(operator, listObjects, agentAuthentication, logger);
+	}
+
+
+	public static Contract aggregate2(String operator, List<IAggregateable> listObjects, AgentAuthentication agentAuthentication, AbstractLogger logger) {
 		List<Contract> listContracts = new ArrayList<>();
 		for(IAggregateable nextObj : listObjects) {
 			if(nextObj instanceof Contract) {
@@ -327,12 +448,11 @@ public class Contract extends CompositeOffer implements IEnergyObject, Cloneable
 						nextContract.getRequest().setIsComplementary(true);
 						result.merge(nextContract);
 					} catch (Exception e) {
-						// TODO Auto-generated catch block
-						e.printStackTrace();
+						logger.error(e);
 					}
 				}
 			}
 		}
 		return result;
-	}
+	}*/
 }

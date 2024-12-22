@@ -4,10 +4,12 @@ import java.util.Date;
 import java.util.Set;
 
 import com.sapereapi.log.SapereLogger;
+import com.sapereapi.model.energy.pricing.PricingTable;
 import com.sapereapi.util.SapereUtil;
 import com.sapereapi.util.UtilDates;
 
-import eu.sapere.middleware.node.NodeConfig;
+import eu.sapere.middleware.log.AbstractLogger;
+import eu.sapere.middleware.node.NodeLocation;
 
 /**
  * Contract informaitons with the reduced visibility of a producer agent
@@ -64,7 +66,8 @@ public class ReducedContract extends EnergySupply implements IEnergyObject {
 		if (hasDisagreement()) {
 			return false;
 		}
-		return agreements.contains(ALL_OTHERS) && agreements.contains(this.issuer);
+		String issuer = getIssuer();
+		return agreements.contains(ALL_OTHERS) && agreements.contains(issuer);
 	}
 
 	public boolean hasDisagreement() {
@@ -72,11 +75,13 @@ public class ReducedContract extends EnergySupply implements IEnergyObject {
 	}
 
 	public boolean hasProducerAgreement() {
-		return agreements.contains(this.issuer);
+		String issuer = getIssuer();
+		return agreements.contains(issuer);
 	}
 
 	public boolean hasProducerDisagreement() {
-		return disagreements.contains(this.issuer);
+		String issuer = getIssuer();
+		return disagreements.contains(issuer);
 	}
 
 	public boolean isOnGoing() {
@@ -117,46 +122,48 @@ public class ReducedContract extends EnergySupply implements IEnergyObject {
 	}
 
 	public int getIssuerDistance() {
-		return request.getIssuerDistance();
+		if(request.getIssuerProperties() == null) {
+			return 0;
+		}
+		return request.getIssuerProperties().getDistance();
 	}
 
 	public String getConsumerAgent() {
 		return request.getIssuer();
 	}
 
-	public NodeConfig getConsumerLocation() {
-		if (request == null) {
+	public NodeLocation getConsumerLocation() {
+		if (request == null || request.getIssuerProperties() == null) {
 			return null;
 		}
-		return request.getIssuerLocation();
+		return request.getIssuerProperties().getLocation();
 	}
 
-	public ReducedContract(EnergyRequest _request, EnergySupply supply, Date _validationDeadline) {
-		super(supply.getIssuer(), supply.getIssuerLocation(), supply.getIssuerDistance(), _request.isComplementary(), supply.getPower(), supply.getPowerMin(),
-				supply.getPowerMax(), supply.getBeginDate(), supply.getEndDate(), supply.getDeviceProperties(),
-				supply.getPricingTable(), supply.getTimeShiftMS());
-		this.request = _request;
-		this.validationDeadline = _validationDeadline;
-		//this.isComplementary = request.isComplementary;
+	public ReducedContract(EnergyRequest request
+			, EnergySupply supply
+			, Date validationDeadline) {
+		super(supply.getIssuerProperties(), request.isComplementary(), supply.getPowerSlot(), supply.getBeginDate(), supply.getEndDate(), supply.getPricingTable());
+		this.request = request;
+		this.validationDeadline = validationDeadline;
 	}
 
 	public PowerSlot getForcastProducerPowerSlot(Date aDate) {
 		if(this.isInActiveSlot(aDate)) {
-			return new PowerSlot(power, powerMin, powerMax);
+			return powerSlot.clone();
 		} else {
 			return new PowerSlot();
 		}
 	}
 
 	public PowerSlot getProducerPowerSlot() {
-		return new PowerSlot(power, powerMin, powerMax);
+		return powerSlot.clone();
 	}
 
-	/**/
 	public ReducedContract copy(boolean copyIds) {
 		PricingTable clonePricingTable = pricingTable == null ? null : pricingTable.clone();
-		EnergySupply cloneSupply = new EnergySupply(issuer, issuerLocation, issuerDistance, isComplementary, power, powerMin, powerMax, beginDate,
-				endDate, deviceProperties, clonePricingTable, timeShiftMS);
+		ProsumerProperties cloneIssuerProperties = this.issuerProperties.copy(copyIds);
+		EnergySupply cloneSupply = new EnergySupply(cloneIssuerProperties, isComplementary, getPowerSlot(),
+				beginDate, endDate, clonePricingTable);
 		ReducedContract result = new ReducedContract(request.copy(copyIds), cloneSupply, validationDeadline);
 		result.setAgreements(SapereUtil.cloneSetStr(agreements));
 		result.setDisagreements(SapereUtil.cloneSetStr(disagreements));
@@ -165,7 +172,7 @@ public class ReducedContract extends EnergySupply implements IEnergyObject {
 	}
 
 	@Override
-	public ReducedContract copyForLSA() {
+	public ReducedContract copyForLSA(AbstractLogger logger) {
 		return copy(false);
 	}
 
@@ -175,10 +182,11 @@ public class ReducedContract extends EnergySupply implements IEnergyObject {
 	}
 
 	public void addProducerAgreement(boolean isOk) {
+		String issuer = getIssuer();
 		if (isOk) {
-			this.agreements.add(this.issuer);
+			this.agreements.add(issuer);
 		} else {
-			this.disagreements.add(this.issuer);
+			this.disagreements.add(issuer);
 		}
 	}
 

@@ -13,6 +13,7 @@ import java.util.TimeZone;
 public class UtilDates {
 	public static TimeZone timezone = TimeZone.getTimeZone("GMT");
 	public static SimpleDateFormat format_date_time = new SimpleDateFormat("yyyyMMdd HH:mm:ss");
+	public static SimpleDateFormat format_date_time_py = new SimpleDateFormat("dd/MM/yyyy HH:mm:ss");
 	public static SimpleDateFormat format_time = new SimpleDateFormat("HH:mm:ss");
 	public static SimpleDateFormat format_sql = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss");
 	public static SimpleDateFormat format_sql_day = new SimpleDateFormat("yyyy-MM-dd");
@@ -31,7 +32,7 @@ public class UtilDates {
 			Date testDate = format_json_datetime.parse(test);
 		} catch (ParseException e) {
 			// TODO Auto-generated catch block
-			e.printStackTrace();
+			SapereLogger.getInstance().error(e);
 		}*/
 	}
 
@@ -51,13 +52,13 @@ public class UtilDates {
 		format_json_datetime.setTimeZone(timezone);
 		Date date = new Date();
 		String sDate = format_json_datetime.format(date);
-		System.out.print(sDate);
+		//System.out.print(sDate);
 	}
 
 	public final static String CR = System.getProperty("line.separator"); // Cariage return
 
 	public final static DecimalFormat df = new DecimalFormat("#.##");
-	public final static DecimalFormat df2 = new DecimalFormat("#.#####");
+	public final static DecimalFormat df5 = new DecimalFormat("#.#####");
 	public final static DecimalFormat df3 = new DecimalFormat("#.###");
 
 	public final static int MS_IN_MINUTE = 1000 * 60;
@@ -86,12 +87,17 @@ public class UtilDates {
 		return format_time.format(current);
 	}
 
-	public static String generateSessionId() {
+	public static String generateSessionNumber() {
 		Random random = new Random();
 		int rand3 = random.nextInt(10000);
 		return format_sessionid.format(new Date()) + "_" + String.format("%04d", rand3);
 	}
 
+
+	public static Date getNewDateNoMilliSec(Long timeShiftMS) {
+		Date newDate = getNewDate(timeShiftMS);
+		return removeMilliSeconds(newDate);
+	}
 
 	public static Date getNewDate(Long timeShiftMS) {
 		if(timeShiftMS == null || timeShiftMS.doubleValue() == 0) {
@@ -248,6 +254,11 @@ public class UtilDates {
 		return result;
 	}
 
+	public static Date removeMilliSeconds(Date aDate) {
+		long dateTime = (aDate.getTime() - aDate.getTime() % 1000);
+		return new Date(dateTime);
+	}
+
 	public static Date getSpecificTime(Date dayDate, int hours, int minutes) {
 		Calendar calendar = Calendar.getInstance();
 		calendar.setTime(dayDate);
@@ -257,6 +268,10 @@ public class UtilDates {
 		calendar.set(Calendar.MILLISECOND, 0);
 		//Date result = calendar.getTime();
 		return calendar.getTime();
+	}
+
+	public static Date getCeilDayStart(Date aDate) {
+		return getSpecificTime(aDate, 0, 0);
 	}
 
 	public static Date getCeilHourStart(Date aDate) {
@@ -320,7 +335,7 @@ public class UtilDates {
 	}
 
 	public static double computeDurationHours(Date beginDate, Date endDate) {
-		long deltaMS = endDate.getTime() - beginDate.getTime();
+		double deltaMS = endDate.getTime() - beginDate.getTime();
 		return deltaMS / MS_IN_HOUR;
 	}
 

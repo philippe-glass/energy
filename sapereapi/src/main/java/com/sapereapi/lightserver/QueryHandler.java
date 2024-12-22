@@ -5,20 +5,18 @@ import java.util.List;
 
 import com.sapereapi.agent.QueryAgent;
 import com.sapereapi.model.Sapere;
+import com.sapereapi.model.ServerConfig;
 import com.sapereapi.model.Service;
 import com.sapereapi.model.input.Query;
 import com.sapereapi.util.UtilHttp;
 
-import eu.sapere.middleware.node.NodeConfig;
-
 public class QueryHandler extends AbstractHandler {
 
-	public QueryHandler(String uri, NodeConfig nodeConfig, List<NodeConfig> _defaultNeighbours) {
+	public QueryHandler(String uri, ServerConfig _serverConfig) {
 		super();
 		this.uri = uri;
-		this.nodeConfig = nodeConfig;
 		this.handlerTable = new HashMap<>();
-		this.defaultNeighbours = _defaultNeighbours;
+		this.serverConfig = _serverConfig;
 		initHandlerTable();
 		logger.info("end init ConfigHandler");
 	}

@@ -1,6 +1,8 @@
 package com.sapereapi.exception;
 
-public class IncompleteMatrixException extends Exception {
+import com.sapereapi.model.HandlingException;
+
+public class IncompleteMatrixException extends HandlingException {
 
 	/**
 	 * 

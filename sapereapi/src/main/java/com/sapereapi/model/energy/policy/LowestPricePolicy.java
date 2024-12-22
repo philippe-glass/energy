@@ -8,7 +8,8 @@ import com.sapereapi.log.SapereLogger;
 import com.sapereapi.model.TimeSlot;
 import com.sapereapi.model.energy.EnergyRequest;
 import com.sapereapi.model.energy.EnergySupply;
-import com.sapereapi.model.energy.PricingTable;
+import com.sapereapi.model.energy.pricing.ComposedRate;
+import com.sapereapi.model.energy.pricing.PricingTable;
 import com.sapereapi.util.SapereUtil;
 import com.sapereapi.util.UtilDates;
 
@@ -43,16 +44,20 @@ public class LowestPricePolicy implements IConsumerPolicy{
 
 	@Override
 	public EnergyRequest updateRequest(EnergyRequest currentRequest) {
-		if(!currentRequest.hasExpired() && mapProducerPricingTale.size() > 0) {
-			String tag = this.getClass().getSimpleName() + ".updateRequest " + currentRequest.getIssuer() + " : ";
+		//if(currentRequest.hasExpired() && mapProducerPricingTale.size() > 0) {
+		if(true && mapProducerPricingTale.size() > 0) {
+			String reqIssuer = currentRequest.getIssuer();
+			String tag = this.getClass().getSimpleName() + ".updateRequest " + reqIssuer + " : ";
 			Date current = currentRequest.getCurrentDate();
 			PricingTable avgPricingTable = computeAvgPricingTable(currentRequest.getTimeShiftMS());
 			logger.info(tag + " : avgPricingTable = " + avgPricingTable);
 			Date minEndTime = new Date(current.getTime() +  (long) (0.5 * currentRequest.getTotalDurationMS()));
 			TimeSlot targetTimeSlot = avgPricingTable.getLowestPriceTimeSlot(current, minEndTime);
-			Double correspondingRate = avgPricingTable.getRatesTable().get(targetTimeSlot);
-			logger.info(tag + " , current = " + UtilDates.formatTimeOrDate(current, currentRequest.getTimeShiftMS()) + ", targetTimeSlot = " + targetTimeSlot + " correspondingRate = "+ correspondingRate);
 			if(targetTimeSlot != null) {
+				Date targetDate = targetTimeSlot.getBeginDate();
+				ComposedRate correspondingRate = avgPricingTable.getRate(targetDate);
+				logger.info(tag + " , current = " + UtilDates.formatTimeOrDate(current, currentRequest.getTimeShiftMS())
+					+ ", targetTimeSlot = " + targetTimeSlot + " correspondingRate = "+ correspondingRate);
 				Date newBeginDate = targetTimeSlot.getBeginDate();
 				if (newBeginDate.before(current)) {
 					newBeginDate = current;
@@ -72,12 +77,10 @@ public class LowestPricePolicy implements IConsumerPolicy{
 					} catch (Exception e) {
 						logger.error(e);
 					}
-					logger.info(tag + currentRequest.getIssuer()  + ": change of request date from "
-					+ UtilDates.formatTimeOrDate(currentRequest.getBeginDate(), currentRequest.getTimeShiftMS())
-					+ " to " + UtilDates.formatTimeOrDate(targetTimeSlot.getBeginDate(), currentRequest.getTimeShiftMS())
-					+ " corresponding rate = " + correspondingRate
-					+ " "
-					);
+					logger.info(tag + reqIssuer  + ": change of request date from "
+							+ UtilDates.formatTimeOrDate(currentRequest.getBeginDate(), currentRequest.getTimeShiftMS())
+							+ " to " + UtilDates.formatTimeOrDate(targetTimeSlot.getBeginDate(), currentRequest.getTimeShiftMS())
+							+ " corresponding rate = " + correspondingRate+ " ");
 					logger.info(tag + "result = " + result);
 					return result;
 				}

@@ -12,12 +12,13 @@ import org.springframework.web.bind.annotation.RestController;
 
 import com.sapereapi.db.EnergyDbHelper;
 import com.sapereapi.model.Generate;
+import com.sapereapi.model.HandlingException;
 import com.sapereapi.model.NodeContext;
 import com.sapereapi.model.Sapere;
 import com.sapereapi.model.Simulation;
 import com.sapereapi.model.input.NeighboursUpdateRequest;
 
-import eu.sapere.middleware.node.NodeConfig;
+import eu.sapere.middleware.node.NodeLocation;
 
 @RestController
 @RequestMapping("/config")
@@ -25,9 +26,9 @@ public class ConfigController  {
 	@Autowired
 	private Environment environment;
 
-	@GetMapping(path = "/allNodeConfigs")
-	public List<NodeConfig> allNodeConfigs() {
-		return Sapere.getInstance().retrieveAllNodeConfigs();
+	@GetMapping(path = "/allNodeLocations")
+	public List<NodeLocation> allNodeLocations() throws HandlingException {
+		return Sapere.getInstance().retrieveAllNodeLocations();
 	}
 
 	@GetMapping(path = "/nodeContext")
@@ -36,13 +37,13 @@ public class ConfigController  {
 	}
 
 	@PostMapping(path = "/updateNeighbours")
-	public NodeContext updateNeighbours(@RequestBody NeighboursUpdateRequest request) {
+	public NodeContext updateNeighbours(@RequestBody NeighboursUpdateRequest request) throws HandlingException {
 		return Sapere.getInstance().updateNeighbours(request);
 	}
 
-	@PostMapping(path = "/addNodeConfig")
-	public NodeConfig addNodeConfig(@RequestBody NodeConfig nodeConfig) {
-		return EnergyDbHelper.registerNodeConfig(nodeConfig);
+	@PostMapping(path = "/addNodeLocation")
+	public NodeLocation addNodeLocation(@RequestBody NodeLocation nodeLocation) throws HandlingException {
+		return EnergyDbHelper.registerNodeLocation(nodeLocation);
 	}
 
 	@PostMapping(path = "/addServiceSim")
@@ -51,7 +52,7 @@ public class ConfigController  {
 	}
 
 	@PostMapping(path = "/setnodename")
-	public String setnodename(String nodename) {
+	public String setnodename(String nodename) throws HandlingException {
 		return Sapere.getInstance().updateNodename(nodename);
 	}
 

@@ -1,11 +1,10 @@
 package com.sapereapi.model;
 
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Calendar;
 import java.util.Collection;
-import java.util.Collections;
-import java.util.Comparator;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -13,9 +12,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Random;
 import java.util.Set;
-import java.util.SortedSet;
 import java.util.TimeZone;
-import java.util.TreeSet;
 
 import org.json.JSONObject;
 
@@ -24,64 +21,75 @@ import com.sapereapi.agent.AgentTransport;
 import com.sapereapi.agent.QueryAgent;
 import com.sapereapi.agent.ServiceAgent;
 import com.sapereapi.agent.ServiceAgentWeb;
-import com.sapereapi.agent.energy.ConsumerAgent;
 import com.sapereapi.agent.energy.EnergyAgent;
 import com.sapereapi.agent.energy.IEnergyAgent;
 import com.sapereapi.agent.energy.LearningAgent;
-import com.sapereapi.agent.energy.ProducerAgent;
+import com.sapereapi.agent.energy.ProsumerAgent;
 import com.sapereapi.agent.energy.RegulatorAgent;
-import com.sapereapi.db.DBConnection;
+import com.sapereapi.db.ClemapDbHelper;
+import com.sapereapi.db.DBConfig;
+import com.sapereapi.db.DBConnectionFactory;
 import com.sapereapi.db.EnergyDbHelper;
 import com.sapereapi.db.PredictionDbHelper;
+import com.sapereapi.db.SessionManager;
 import com.sapereapi.helper.PredictionHelper;
 import com.sapereapi.log.SapereLogger;
 import com.sapereapi.model.energy.AgentForm;
+import com.sapereapi.model.energy.ChangeRequest;
 import com.sapereapi.model.energy.DeviceProperties;
 import com.sapereapi.model.energy.EnergyEvent;
+import com.sapereapi.model.energy.EnergyFlow;
 import com.sapereapi.model.energy.EnergyRequest;
 import com.sapereapi.model.energy.EnergySupply;
 import com.sapereapi.model.energy.ExtendedEnergyEvent;
-import com.sapereapi.model.energy.MultiNodesContent;
-import com.sapereapi.model.energy.NodeContent;
-import com.sapereapi.model.energy.OptionItem;
-import com.sapereapi.model.energy.PricingTable;
+import com.sapereapi.model.energy.PowerSlot;
+import com.sapereapi.model.energy.ProsumerProperties;
 import com.sapereapi.model.energy.RegulationWarning;
 import com.sapereapi.model.energy.forcasting.EndUserForcastingResult;
-import com.sapereapi.model.energy.forcasting.ForcastingResult;
+import com.sapereapi.model.energy.forcasting.ForcastingResult1;
+import com.sapereapi.model.energy.forcasting.ForcastingResult2;
 import com.sapereapi.model.energy.forcasting.input.EndUserForcastingRef;
 import com.sapereapi.model.energy.forcasting.input.EndUserForcastingRequest;
 import com.sapereapi.model.energy.input.AgentFilter;
 import com.sapereapi.model.energy.input.AgentInputForm;
-import com.sapereapi.model.energy.policy.BasicProducerPolicy;
+import com.sapereapi.model.energy.node.MultiNodesContent;
+import com.sapereapi.model.energy.node.NodeContent;
 import com.sapereapi.model.energy.policy.IConsumerPolicy;
 import com.sapereapi.model.energy.policy.IProducerPolicy;
-import com.sapereapi.model.energy.policy.LowestDemandPolicy;
 import com.sapereapi.model.energy.policy.LowestPricePolicy;
+import com.sapereapi.model.energy.policy.PolicyFactory;
+import com.sapereapi.model.energy.pricing.PricingTable;
+import com.sapereapi.model.input.HistoryInitializationForm;
+import com.sapereapi.model.input.HistoryInitializationRequest;
 import com.sapereapi.model.input.InitializationForm;
 import com.sapereapi.model.input.NeighboursUpdateRequest;
 import com.sapereapi.model.input.Query;
-import com.sapereapi.model.markov.MarkovState;
-import com.sapereapi.model.markov.MarkovStateHistory;
-import com.sapereapi.model.markov.MarkovTimeWindow;
-import com.sapereapi.model.markov.NodeMarkovStates;
-import com.sapereapi.model.markov.NodeTransitionMatrices;
-import com.sapereapi.model.markov.TransitionMatrix;
-import com.sapereapi.model.prediction.FedAvgResult;
-import com.sapereapi.model.prediction.MultiPredictionsData;
-import com.sapereapi.model.prediction.PredictionContext;
-import com.sapereapi.model.prediction.PredictionData;
-import com.sapereapi.model.prediction.PredictionStatistic;
-import com.sapereapi.model.prediction.input.FedAvgCheckupRequest;
-import com.sapereapi.model.prediction.input.MassivePredictionRequest;
-import com.sapereapi.model.prediction.input.MatrixFilter;
-import com.sapereapi.model.prediction.input.PredictionRequest;
-import com.sapereapi.model.prediction.input.StateHistoryRequest;
-import com.sapereapi.model.prediction.input.StatisticsRequest;
+import com.sapereapi.model.learning.ILearningModel;
+import com.sapereapi.model.learning.LearningModelType;
+import com.sapereapi.model.learning.NodeStates;
+import com.sapereapi.model.learning.PredictionScope;
+import com.sapereapi.model.learning.VariableState;
+import com.sapereapi.model.learning.VariableStateHistory;
+import com.sapereapi.model.learning.aggregation.AbstractAggregationResult;
+import com.sapereapi.model.learning.prediction.LearningAggregationOperator;
+import com.sapereapi.model.learning.prediction.LearningAggregationType;
+import com.sapereapi.model.learning.prediction.MultiPredictionsData;
+import com.sapereapi.model.learning.prediction.PredictionContext;
+import com.sapereapi.model.learning.prediction.PredictionData;
+import com.sapereapi.model.learning.prediction.PredictionStatistic;
+import com.sapereapi.model.learning.prediction.input.AggregationCheckupRequest;
+import com.sapereapi.model.learning.prediction.input.MassivePredictionRequest;
+import com.sapereapi.model.learning.prediction.input.MatrixFilter;
+import com.sapereapi.model.learning.prediction.input.PredictionRequest;
+import com.sapereapi.model.learning.prediction.input.PredictionScopeFilter;
+import com.sapereapi.model.learning.prediction.input.StateHistoryRequest;
+import com.sapereapi.model.learning.prediction.input.StatisticsRequest;
 import com.sapereapi.model.referential.AgentType;
 import com.sapereapi.model.referential.DeviceCategory;
 import com.sapereapi.model.referential.EnvironmentalImpact;
 import com.sapereapi.model.referential.EventType;
 import com.sapereapi.model.referential.PriorityLevel;
+import com.sapereapi.model.referential.ProsumerRole;
 import com.sapereapi.model.referential.WarningType;
 import com.sapereapi.util.PasswordUtils;
 import com.sapereapi.util.SapereUtil;
@@ -94,32 +102,30 @@ import eu.sapere.middleware.agent.SapereAgent;
 import eu.sapere.middleware.lsa.Lsa;
 import eu.sapere.middleware.lsa.LsaType;
 import eu.sapere.middleware.lsa.Property;
-import eu.sapere.middleware.node.NodeConfig;
+import eu.sapere.middleware.node.NodeLocation;
 import eu.sapere.middleware.node.NodeManager;
 
 public class Sapere {
-	public final static int NB_DEC_POWER = 3;
-	private List<QueryAgent> querys;
+	public final static double YEAR_DURATION_MIN = 1.0 * 24 * 60 * 365;
+	public final static String DB_SERVER = "energy";
+	public final static String DB_CLEMAP = "clemap";
+	private static List<QueryAgent> querys;
 	public static List<SapereAgent> serviceAgents;
 	private static Sapere instance = null;
-	public NodeManager nodeManager;
-	private Map<String, AgentAuthentication> mapAgentAuthentication = null;
-	private Set<AgentAuthentication> authentifiedAgentsCash = null;
+	public static NodeManager nodeManager;
+	private static Map<String, AgentAuthentication> mapAgentAuthentication = null;
+	private static Set<AgentAuthentication> authentifiedAgentsCash = null;
 	public static String learningAgentName = generateAgentName(AgentType.LEARNING_AGENT);
 	public static String regulatorAgentName = generateAgentName(AgentType.REGULATOR);
-	public static String[] DEFAULT_VARIABLES = { "requested", "produced", "consumed", "provided", "available",
-			"missing" };
-	private String salt = null;
-	private static int nextConsumerId = 1;
-	private static int nextProducerId = 1;
-	private boolean useSecuresPasswords = false;
-	// Node context
-	private static NodeContext nodeContext = null;
+	private static String salt = null;
+	//private static int nextConsumerId = 1;
+	//private static int nextProducerId = 1;
+	private static int nextProsumerId = 1;
+	private static boolean useSecuresPasswords = false;
+	private static NodeContext nodeContext = null;	// Node context
 	private static SapereLogger logger = null;
-	static int debugLevel = 0;
-	public final static double YEAR_DURATION_MIN = 1.0 * 24 * 60 * 365;
 	public static boolean isRunning = false;
-	private boolean activateQoS = false;
+	private static PolicyFactory policyFactory = null; //new PolicyFactory();
 
 	public static Sapere getInstance() {
 		if (instance == null) {
@@ -135,7 +141,11 @@ public class Sapere {
 	}
 
 	public static boolean isActivatePrediction() {
-		return nodeContext.isPredictionsActivated();
+		return nodeContext._isPredictionsActivated();
+	}
+
+	public static PolicyFactory getPolicyFactory() {
+		return policyFactory;
 	}
 
 	public Sapere() {
@@ -147,25 +157,86 @@ public class Sapere {
 		// Generate Salt. The generated value can be stored.
 		salt = PasswordUtils.getSalt(2);
 		mapAgentAuthentication = new HashMap<String, AgentAuthentication>();
+		policyFactory = new PolicyFactory();
+	}
+
+
+	public static void init(ServerConfig serverConfig) throws HandlingException {
+		//String defaultTimeZoneId = "GMT";
+		//Map<Integer, Integer> dateTimeShift = new HashMap<Integer, Integer>();
+		//logger.info("initEnergyService : scenario = " + defaultScenario);
+		// initNodeManager(repository, environment);
+		NodeManager.setConfiguration(serverConfig.getNodeLocation());
+		logger = SapereLogger.getInstance();
+		DBConfig dbConfig = serverConfig.getDbConfig();
+		DBConnectionFactory.init(DB_SERVER, dbConfig, logger);
+		DBConfig dbClemapConfig = serverConfig.getClemapDbConfig();
+		DBConnectionFactory.init(DB_CLEMAP, dbClemapConfig, logger);
+		EnergyDbHelper.init();
+		ClemapDbHelper.init();
+		PredictionDbHelper.init();
+		if(serverConfig.getInitSqlScripts() != null) {
+			for (String nextInitSqlSript : serverConfig.getInitSqlScripts()) {
+				try {
+					String scriptContent = SapereUtil.loadRessourceContent(nextInitSqlSript);
+					logger.info("exec sql script " + serverConfig.getInitSqlScripts());
+					DBConnectionFactory.getInstance(DB_SERVER).execUpdate(scriptContent);
+				} catch (IOException e) {
+					logger.error(e);
+				}
+			}
+		}
+		SessionManager.registerSession();
+		NodeLocation nodeLocation = EnergyDbHelper.registerNodeLocation(serverConfig.getNodeLocation());
+		nodeContext = new NodeContext();
+		nodeContext.setMaxTotalPower(NodeStates.DEFAULT_NODE_MAX_TOTAL_POWER);
+		nodeContext.setNodeLocation(nodeLocation);
+		nodeContext.setDebugLevel(serverConfig.getDebugLevel());
+		nodeContext.setScenario(serverConfig.getScenario());
+		nodeContext.setTimeShiftMS(0);
+		nodeContext.setDatetimeShifts(new HashMap<Integer, Integer>());
+		nodeContext.setDebugLevel(serverConfig.getDebugLevel());
+		nodeContext.setUrlForcasting(serverConfig.getUrlForcasting());
+		nodeContext.setNodePredicitonSetting(serverConfig.getNodePredicitonSetting().clone());
+		nodeContext.setClusterPredictionSetting(serverConfig.getClusterPredictionSetting().clone());
+		nodeContext.setLearningAgentName(learningAgentName);
+		nodeContext.setRegulatorAgentName(regulatorAgentName);
+		Session session = SessionManager.getSession();
+		nodeContext.setSession(session);
+		TimeZone timeZone = TimeZone.getTimeZone(nodeContext.getTimeZoneId());
+		UtilDates.setTimezone(timeZone);
+		nodeContext = EnergyDbHelper.registerNodeContext(nodeContext, serverConfig.getDefaultNeighbours());
+		initNodeManager2();
+		PredictionHelper.setMaxTotalPower(nodeContext.getMaxTotalPower());
+		PredictionHelper.setVariables(nodeContext.getVariables());
+		PolicyFactory.setNodeContext(nodeContext);
 	}
 
 	public String getInfo() {
-		return NodeManager.getNodeName() + " - " + NodeManager.getLocation() + " -: "
+		return NodeManager.getNodeName() + " - " + NodeManager.getLocationAddress() + " -: "
 				+ Arrays.toString(NodeManager.networkDeliveryManager.getNeighbours());
 	}
 
-	public NodeConfig getNodeConfig() {
-		return nodeContext.getNodeConfig();
+	public NodeLocation getNodeLocation() {
+		return nodeContext.getNodeLocation();
+	}
+/*
+	public static int getDebugLevel() {
+		return debugLevel;
 	}
 
-	public Map<String, NodeConfig> getMapAllNodeConfigs(boolean addCurrentNode) {
-		LearningAgent learningAgent = getLearningAgent();
-		return learningAgent.getMapAllNodeConfigs(addCurrentNode);
+	public static void setDebugLevel(int debugLevel) {
+		Sapere.debugLevel = debugLevel;
+	}
+*/
+	public Map<String, NodeLocation> getMapAllNodeLocations(boolean addCurrentNode) {
+		return NodeManager.getMapLocationsByNode(addCurrentNode);
 	}
 
-	public List<OptionItem> getStateDates() {
-		if (nodeContext.isPredictionsActivated()) {
-			return PredictionDbHelper.getStateDates();
+	public List<OptionItem> getStateDates(PredictionScopeFilter scopeFilter) throws HandlingException {
+		PredictionContext predictionContext = getPredictionContext(scopeFilter);
+		if (predictionContext != null && predictionContext.isPredictionsActivated()) {
+			return PredictionDbHelper.getStateDates(predictionContext);
 		}
 		return new ArrayList<OptionItem>();
 	}
@@ -216,7 +287,7 @@ public class Sapere {
 						prop.setValue("test");
 					} else if (prop.getName().equals("PRED")) {
 						Object value = prop.getValue();
-						PredictionData pd = (PredictionData) value;
+						//PredictionData pd = (PredictionData) value;
 						/*
 						 * pd.setMapResults(new HashMap<>()); pd.getTargetDates().clear();
 						 * pd.getMapLastResults().clear(); pd.setListSteps(new ArrayList<>()); pd = new
@@ -314,7 +385,7 @@ public class Sapere {
 		AgentAuthentication authentication = generateAgentAuthentication(AgentType.GENERIC_SERVICE);
 		authentication.setAgentName(service.getName());
 		serviceAgents.add(new ServiceAgent(authentication, service.getInput(), service.getOutput(), LsaType.Service,
-				activateQoS));
+				nodeContext.isQualityOfServiceActivated()));
 		startService(service.getName());
 		return getLsas();
 	}
@@ -323,7 +394,7 @@ public class Sapere {
 		AgentAuthentication authentication = generateAgentAuthentication(AgentType.WEB_SERVICE);
 		authentication.setAgentName(service.getName());
 		serviceAgents.add(new ServiceAgentWeb(service.getUrl(), authentication, service.getInput(), service.getOutput(),
-				service.getAppid(), LsaType.Service, activateQoS));
+				service.getAppid(), LsaType.Service, nodeContext.isQualityOfServiceActivated()));
 		startService(service.getName());
 	}
 
@@ -335,7 +406,7 @@ public class Sapere {
 		AgentAuthentication authentication = generateAgentAuthentication(AgentType.BLOOD_SEARCH);
 		authentication.setAgentName(name);
 		serviceAgents.add(new AgentBloodSearch(authentication, new String[] { "Blood" }, new String[] { "Position" },
-				LsaType.Service, activateQoS));
+				LsaType.Service, nodeContext.isQualityOfServiceActivated()));
 		startService(name);
 	}
 
@@ -347,7 +418,7 @@ public class Sapere {
 		AgentAuthentication authentication = generateAgentAuthentication(AgentType.TRANSPORT);
 		authentication.setAgentName(name);
 		serviceAgents.add(new AgentTransport(authentication, new String[] { "Position", "Destination" },
-				new String[] { "Transport" }, LsaType.Service, activateQoS));
+				new String[] { "Transport" }, LsaType.Service, nodeContext.isQualityOfServiceActivated()));
 		startService(name);
 	}
 
@@ -381,7 +452,7 @@ public class Sapere {
 		AgentAuthentication authentication = generateAgentAuthentication(AgentType.GENERIC_QUERY);
 		authentication.setAgentName(request.getName());
 		QueryAgent queryAgent = new QueryAgent(request.getName(), authentication, request.getWaiting(),
-				request.getProp(), request.getValues(), LsaType.Query, activateQoS);
+				request.getProp(), request.getValues(), LsaType.Query, nodeContext.isQualityOfServiceActivated());
 		querys.add(queryAgent);
 		return getLsas();
 	}
@@ -395,16 +466,16 @@ public class Sapere {
 		return null;
 	}
 
-	public List<QueryAgent> getQuerys() {
+	public static List<QueryAgent> getQuerys() {
 		return querys;
 	}
 
-	public void setQuerys(List<QueryAgent> querys) {
-		this.querys = querys;
+	public static void setQuerys(List<QueryAgent> _querys) {
+		querys = _querys;
 	}
 
 	// Energy
-	private SapereAgent getAgent(String agentName) {
+	private static SapereAgent getAgent(String agentName) {
 		for (SapereAgent agent : serviceAgents) {
 			if (agent.getAgentName().equals(agentName)) {
 				return agent;
@@ -419,64 +490,56 @@ public class Sapere {
 		return null;
 	}
 
-	public static void setLocation(NodeConfig envNodeConfig) {
-		/*
-		 * Integer lsaServerPort =
-		 * Integer.valueOf(environment.getProperty("lsa_server.port")); String
-		 * lsaServerHost = String.valueOf(environment.getProperty("lsa_server.host"));
-		 * String nodeName = String.valueOf(environment.getProperty("lsa_server.name"));
-		 * Integer restServerPort =
-		 * Integer.valueOf(environment.getProperty("server.port")); NodeConfig
-		 * nodeConfig = new NodeConfig(nodeName, lsaServerHost, lsaServerPort,
-		 * restServerPort);
-		 */
-		NodeManager.setConfiguration(envNodeConfig);
-	}
 
-	public void initNodeManager2() {
-		NodeManager.setConfiguration(nodeContext.getNodeConfig());
+	public static void initNodeManager2() {
+		NodeManager.setConfiguration(nodeContext.getNodeLocation());
 		List<String> listNegibours = nodeContext.getNeighbourNMainServiceAddresses();
 		String[] arrayNegibours = new String[listNegibours.size()];
 		listNegibours.toArray(arrayNegibours);
 		NodeManager.networkDeliveryManager.setNeighbours(arrayNegibours);
+		NodeManager.instance().clearMapDistance();
 	}
 
 	public static NodeContext getNodeContext() {
 		return nodeContext;
 	}
 
-	public InitializationForm initEnergyService(NodeConfig envNodeConfig, InitializationForm initForm,
-			List<NodeConfig> defaultNeighbours) {
+
+	public InitializationForm initEnergyService(ServerConfig serverConfig, InitializationForm initForm) throws HandlingException {
 		logger.info("initEnergyService : scenario = " + initForm.getScenario());
-		// initNodeManager(repository, environment);
 		TimeZone timeZone = TimeZone.getTimeZone(initForm.getTimeZoneId());
-		DBConnection.changeSessionId();
-		Double maxTotalPower = (initForm.getMaxTotalPower() == null) ? NodeMarkovStates.DEFAULT_NODE_MAX_TOTAL_POWER
+		Double maxTotalPower = (initForm.getMaxTotalPower() == null) ? NodeStates.DEFAULT_NODE_MAX_TOTAL_POWER
 				: initForm.getMaxTotalPower();
-		/*
-		 * String nodeName = NodeManager.getNodeName(); String host =
-		 * NodeManager.getLocalIP(); int mainServerPort = NodeManager.getLocalPort();
-		 * Integer restServerPort =
-		 * Integer.valueOf(environment.getProperty("server.port")); NodeConfig
-		 * nodeConfig = new NodeConfig(nodeName, host, mainServerPort, restServerPort);
-		 */
-		NodeConfig nodeConfig = EnergyDbHelper.registerNodeConfig(envNodeConfig);
-		NodeManager.getNodeConfig().setId(nodeConfig.getId());
 		boolean activateComplementaryRequests = true;
-		boolean activateAggregation = true;
-		nodeContext = new NodeContext(null, nodeConfig, initForm.getScenario(), initForm.generateDatetimeShifts(),
-				maxTotalPower, DBConnection.getSessionId(), DEFAULT_VARIABLES, initForm.getDisableSupervision(),
-				activateComplementaryRequests, activateAggregation, initForm.isActivatePredictions(),
-				timeZone, initForm.getUrlForcasting());
-		UtilDates.setTimezone(timeZone);
-		nodeContext = EnergyDbHelper.registerContext(nodeContext);
-		if (defaultNeighbours != null) {
-			for (NodeConfig nextNodeConfig : defaultNeighbours) {
-				EnergyDbHelper.registerNodeConfig(nextNodeConfig);
-				nodeContext.addNeighbourNodeConfig(nextNodeConfig);
-			}
+		//String sessionId = DBConnection.getSessionId();
+		// Update node context
+		nodeContext.setScenario(initForm.getScenario());
+		nodeContext.setDatetimeShifts(initForm.generateDatetimeShifts());
+		if(initForm.getDisableSupervision() != null) {
+			nodeContext.setSupervisionDisabled(initForm.getDisableSupervision());
 		}
-		initNodeManager2();
+		if(initForm.getNodePredicitonSetting() != null) {
+			nodeContext.setNodePredicitonSetting(initForm.getNodePredicitonSetting());
+		}
+		if(initForm.getClusterPredictionSetting() != null) {
+			nodeContext.setClusterPredictionSetting(initForm.getClusterPredictionSetting());
+		}
+		nodeContext.setTimeZoneId(initForm.getTimeZoneId());
+		if(initForm.getUrlForcasting() != null) {
+			nodeContext.setUrlForcasting(initForm.getUrlForcasting());
+		}
+		if(initForm.getActivateAwards() != null) {
+			nodeContext.setAwardsActivated(initForm.getActivateAwards());
+		}
+		if(initForm.getActivateEnergyStorage() != null) {
+			nodeContext.setEnergyStorageActivated(initForm.getActivateEnergyStorage());
+		}
+		nodeContext.setcomplementaryRequestsActivated(activateComplementaryRequests);
+		nodeContext.setMaxTotalPower(maxTotalPower);
+		UtilDates.setTimezone(timeZone);
+		// TODO : debug case with scenario change and no scenario change
+		nodeContext = EnergyDbHelper.registerNodeContext(nodeContext, serverConfig.getDefaultNeighbours());
+		PolicyFactory.setNodeContext(nodeContext);
 		PredictionHelper.setMaxTotalPower(nodeContext.getMaxTotalPower());
 		PredictionHelper.setVariables(nodeContext.getVariables());
 		learningAgentName = generateAgentName(AgentType.LEARNING_AGENT);
@@ -485,15 +548,16 @@ public class Sapere {
 		if (toRemove != null) {
 			serviceAgents.remove(toRemove);
 		}
-		nextConsumerId = 1;
-		nextProducerId = 1;
+		nextProsumerId = 1;
+		//nextConsumerId = 1;
+		//nextProducerId = 1;
 		addServiceLearningAgent(learningAgentName);
 		addServiceRegulatorAgent(regulatorAgentName);
-		// Init markov state if requested in initForm
+		// Init stateVariable if requested in initForm
 		String stateVariable = initForm.getInitialStateVariable();
 		Integer stateId = initForm.getInitialStateId();
 		if (stateId != null && stateVariable != null && !"".equals(stateVariable)) {
-			MarkovState targetState = NodeMarkovStates.getById(stateId);
+			VariableState targetState = NodeStates.getById(stateId);
 			if (targetState != null) {
 				Boolean disableSupervision = initForm.getDisableSupervision();
 				initState(stateVariable, targetState, disableSupervision);
@@ -503,27 +567,28 @@ public class Sapere {
 		return initForm;
 	}
 
-	public List<NodeConfig> retrieveAllNodeConfigs() {
-		List<Long> toExclude = new ArrayList<>();
-		toExclude.add(nodeContext.getNodeConfig().getId());
-		return EnergyDbHelper.retrieveAllNodeConfigs(toExclude);
+
+	public List<NodeLocation> retrieveAllNodeLocations() throws HandlingException{
+		List<String> toExclude = new ArrayList<String>();
+		toExclude.add(nodeContext.getNodeLocation().getName());
+		return EnergyDbHelper.retrieveAllNodeLocations(toExclude);
 	}
 
-	public NodeContext updateNeighbours(NeighboursUpdateRequest request) {
-		List<Long> listNeighboursConfigId = new ArrayList<>();
-		if (request.getNeighboursConfigId() != null) {
-			listNeighboursConfigId = Arrays.asList(request.getNeighboursConfigId());
+	public NodeContext updateNeighbours(NeighboursUpdateRequest request) throws HandlingException {
+		List<String> listNeighboursNodes = new ArrayList<String>();
+		if (request.getNeighbourNodes() != null) {
+			listNeighboursNodes = Arrays.asList(request.getNeighbourNodes());
 		}
-		nodeContext = EnergyDbHelper.updateNeighbours(nodeContext, listNeighboursConfigId);
+		nodeContext = EnergyDbHelper.updateNeighbours(nodeContext, listNeighboursNodes);
 		initNodeManager2();
 		return nodeContext;
 	}
 
-	public String updateNodename(String nodename) {
-		nodeContext.getNodeConfig().setName(nodename);
-		NodeConfig nodeConfig = nodeContext.getNodeConfig();
-		nodeConfig = EnergyDbHelper.registerNodeConfig(nodeConfig);
-		NodeManager.setConfiguration(nodeConfig);
+	public String updateNodename(String nodename) throws HandlingException {
+		nodeContext.getNodeLocation().setName(nodename);
+		NodeLocation nodeLocation = nodeContext.getNodeLocation();
+		nodeLocation = EnergyDbHelper.registerNodeLocation(nodeLocation);
+		NodeManager.setConfiguration(nodeLocation);
 		return "ok";
 	}
 
@@ -536,13 +601,14 @@ public class Sapere {
 		// nodeManager.stopServices();
 		mapAgentAuthentication.clear();
 		authentifiedAgentsCash.clear();
-		nextConsumerId = 0;
-		nextProducerId = 0;
+		nextProsumerId = 0;
+		//nextConsumerId = 0;
+		//nextProducerId = 0;
 		isRunning = false;
-		DBConnection.changeSessionId();
+		SessionManager.changeSessionNumber();
 	}
 
-	public void checkInitialisation() {
+	public void checkInitialisation() throws HandlingException {
 		if (!isRunning) {
 			return;
 		}
@@ -562,98 +628,105 @@ public class Sapere {
 
 	public EnergySupply generateSupply(Double power, Date beginDate, Date endDate, DeviceProperties deviceProperties,
 			PricingTable pricingTable) {
-		String issuer = generateAgentName(AgentType.PRODUCER);
+		String issuer = generateAgentName(AgentType.PROSUMER);
 		int issuerDistance = 0;
 		long timeShiftMS = nodeContext.getTimeShiftMS();
 		if (!deviceProperties.isProducer()) {
 			logger.error("generateRequest : device should be a producer");
 		}
-		return new EnergySupply(issuer, nodeContext.getNodeConfig(), issuerDistance, false, power, power, power,
-				beginDate, endDate, deviceProperties, pricingTable, timeShiftMS);
+		ProsumerProperties producerProperties = new ProsumerProperties(issuer, nodeContext.getNodeLocation(), issuerDistance, timeShiftMS, deviceProperties);
+		return new EnergySupply(producerProperties, false, PowerSlot.create(power), beginDate, endDate, pricingTable);
 	}
 
 	public EnergyRequest generateRequest(Double power, Date beginDate, Double durationMinutes,
-			Double _delayToleranceMinutes, PriorityLevel _priority, DeviceProperties deviceProperties,
+			Double delayToleranceMinutes, PriorityLevel _priority, DeviceProperties deviceProperties,
 			PricingTable pricingTable) {
 		Date endDate = UtilDates.shiftDateMinutes(beginDate, durationMinutes);
-		if (!SapereUtil.checkIsRound(power, NB_DEC_POWER, logger)) {
+		if (!SapereUtil.checkPowerRounded(power, logger)) {
 			logger.warning("generateRequest : power with more than 2 dec : " + power);
 		}
 		if (deviceProperties.isProducer()) {
 			logger.error("generateRequest : device should not be a producer");
 		}
-		return generateRequest(power, beginDate, endDate, _delayToleranceMinutes, _priority, deviceProperties,
-				pricingTable);
+		return generateRequest(power, beginDate, endDate, delayToleranceMinutes, _priority, deviceProperties);
 	}
 
-	public EnergyRequest generateRequest(Double power, Date beginDate, Date endDate, Double _delayToleranceMinutes,
-			PriorityLevel _priority, DeviceProperties deviceProperties, PricingTable pricingTable) {
-		if (!SapereUtil.checkIsRound(power, NB_DEC_POWER, logger)) {
+	public EnergyRequest generateRequest(Double power, Date beginDate, Date endDate, Double delayToleranceMinutes,
+			PriorityLevel priority, DeviceProperties deviceProperties) {
+		if (!SapereUtil.checkPowerRounded(power, logger)) {
 			logger.warning("generateRequest : power with more than 2 dec : " + power);
 		}
-		String issuer = generateAgentName(AgentType.CONSUMER);
+		String issuer = generateAgentName(AgentType.PROSUMER);
 		long timeShiftMS = nodeContext.getTimeShiftMS();
 		int issuerDistance = 0;
-		return new EnergyRequest(issuer, nodeContext.getNodeConfig(), issuerDistance, false, power, power, power,
-				beginDate, endDate, _delayToleranceMinutes, _priority, deviceProperties, pricingTable, timeShiftMS);
+		ProsumerProperties consumerProperties = new ProsumerProperties(issuer, nodeContext.getNodeLocation(), issuerDistance, timeShiftMS, deviceProperties);
+		return new EnergyRequest(consumerProperties, false, PowerSlot.create(power), beginDate, endDate,
+				delayToleranceMinutes, priority);
 	}
 
 	public static String generateAgentName(AgentType agentType) {
 		String radical = agentType.getPreffix() + "_" + NodeManager.getNodeName();
+		if (AgentType.PROSUMER.equals(agentType)) {
+			return radical + "_" + nextProsumerId;
+		}
+		/*
 		if (AgentType.PRODUCER.equals(agentType)) {
 			return radical + "_" + nextProducerId;
 		} else if (AgentType.CONSUMER.equals(agentType)) {
 			return radical + "_" + nextConsumerId;
-		}
+		}*/
 		return radical;
 	}
 
-	private AgentAuthentication generateAgentAuthentication(AgentType agentType) {
+	private static AgentAuthentication generateAgentAuthentication(AgentType agentType) {
 		String agentName = generateAgentName(agentType);
 		String authenticationKey = PasswordUtils.generateAuthenticationKey();
 		String securedKey = useSecuresPasswords ? PasswordUtils.generateSecurePassword(authenticationKey, salt)
 				: authenticationKey;
-		AgentAuthentication authentication = new AgentAuthentication(agentName, agentType.getLabel(), securedKey,
-				nodeContext.getNodeConfig());
-		this.mapAgentAuthentication.put(authentication.getAgentName(), authentication);
+		AgentAuthentication authentication = new AgentAuthentication(agentName, agentType.name(), securedKey,
+				nodeContext.getNodeLocation());
+		mapAgentAuthentication.put(authentication.getAgentName(), authentication);
 		return authentication;
 	}
 
 	private static InitializationForm generateDefaultInitForm(String scenario) {
-		boolean activatePredictions = true;
-		boolean activateAggregation = true;
-		InitializationForm initForm = new InitializationForm(scenario, NodeMarkovStates.DEFAULT_NODE_MAX_TOTAL_POWER,
-				new HashMap<Integer, Integer>(), activatePredictions, activateAggregation);
+		LearningAggregationOperator aggregationOp = new LearningAggregationOperator(LearningAggregationType.MODEL, ILearningModel.OP_SAMPLING_NB, 5);
+		PredictionSetting nodePredictionSetting = new PredictionSetting(true, aggregationOp, LearningModelType.MARKOV_CHAINS);
+		PredictionSetting clusterPredictionSetting = new PredictionSetting(false, null, null);
+		InitializationForm initForm = new InitializationForm(scenario
+				,NodeStates.DEFAULT_NODE_MAX_TOTAL_POWER
+				,new HashMap<Integer, Integer>()
+				,nodePredictionSetting, clusterPredictionSetting);
 		initForm.setDisableSupervision(false);
 		return initForm;
 	}
 
-	public List<Service> test1(NodeConfig envNodeConfig) {
+	public List<Service> test1(ServerConfig serverConfig) throws HandlingException {
 		// Add producer agents
 		InitializationForm initForm = generateDefaultInitForm("test1");
-		initForm.setActivatePredictions(false);
-		initEnergyService(envNodeConfig, initForm, new ArrayList<NodeConfig>());
+		initForm.getNodePredicitonSetting().setActivated(false);
+		initForm.getClusterPredictionSetting().setActivated(false);
+		serverConfig.setDebugLevel(10);
+		initEnergyService(serverConfig, initForm);
 		Date current = getCurrentDate(); // getCurrentMinute();
-		PricingTable pricingTable = new PricingTable(current, UtilDates.shiftDateDays(current, 365), 0,
-				getTimeShiftMS());
-		IProducerPolicy producerPolicy = initDefaultProducerPolicy();
+		PricingTable pricingTable = new PricingTable(current, 0, getTimeShiftMS());
 		addServiceProducer(generateSupply(30., current, YEAR_DURATION_MIN,
-				new DeviceProperties("EDF", DeviceCategory.EXTERNAL_ENG, EnvironmentalImpact.MEDIUM, true),
-				pricingTable), producerPolicy);
+				new DeviceProperties("SIG", DeviceCategory.EXTERNAL_ENG, EnvironmentalImpact.MEDIUM),
+				pricingTable), policyFactory.initDefaultProducerPolicy(), policyFactory.initDefaultConsumerPolicy());
 		addServiceProducer(generateSupply(15., current, 40.,
-				new DeviceProperties("wind turbine1", DeviceCategory.WIND_ENG, EnvironmentalImpact.LOW, true),
-				pricingTable), producerPolicy);
+				new DeviceProperties("wind turbine1", DeviceCategory.WIND_ENG, EnvironmentalImpact.LOW),
+				pricingTable), policyFactory.initDefaultProducerPolicy(), policyFactory.initDefaultConsumerPolicy());
 		addServiceProducer(generateSupply(30., current, 30.,
-				new DeviceProperties("wind turbine2", DeviceCategory.WIND_ENG, EnvironmentalImpact.LOW, true),
-				pricingTable), producerPolicy);
+				new DeviceProperties("wind turbine2", DeviceCategory.WIND_ENG, EnvironmentalImpact.LOW),
+				pricingTable), policyFactory.initDefaultProducerPolicy(), policyFactory.initDefaultConsumerPolicy());
 		addServiceProducer(generateSupply(100., current, 6.,
-				new DeviceProperties("wind turbine3", DeviceCategory.WIND_ENG, EnvironmentalImpact.LOW, true),
-				pricingTable), producerPolicy);
+				new DeviceProperties("wind turbine3", DeviceCategory.WIND_ENG, EnvironmentalImpact.LOW),
+				pricingTable), policyFactory.initDefaultProducerPolicy(), policyFactory.initDefaultConsumerPolicy());
 
 		// Add query
 		addServiceConsumer(generateRequest(43.1, current, YEAR_DURATION_MIN, YEAR_DURATION_MIN, PriorityLevel.LOW,
-				new DeviceProperties("Refrigerator", DeviceCategory.COLD_APPLIANCES, EnvironmentalImpact.MEDIUM, false),
-				pricingTable), null);
+				new DeviceProperties("Refrigerator", DeviceCategory.COLD_APPLIANCES, EnvironmentalImpact.MEDIUM),
+				pricingTable), policyFactory.initDefaultProducerPolicy(), policyFactory.initDefaultConsumerPolicy());
 		/*
 		 * addQueryConsumer(generateRequest(27.7, current, 0.1, 150., PriorityLevel.LOW,
 		 * "Laptop Compute", DeviceCategory.ICT));
@@ -666,60 +739,57 @@ public class Sapere {
 		return getLsas();
 	}
 
-	public List<Service> test1bis(NodeConfig envNodeConfig) {
+	public List<Service> test1bis(ServerConfig serverConfig) throws HandlingException {
 		// Add producer agents
-		initEnergyService(envNodeConfig, generateDefaultInitForm("test1bis"), new ArrayList<NodeConfig>());
+		initEnergyService(serverConfig, generateDefaultInitForm("test1bis"));
 		Date current = getCurrentDate(); // getCurrentMinute();
 		// addServiceProducer(generateSupply(new Float(30.0), current, new
-		PricingTable pricingTable = new PricingTable(current, UtilDates.shiftDateDays(current, 365), 0,
-				getTimeShiftMS());
-		IProducerPolicy producerPolicy = initDefaultProducerPolicy();
+		PricingTable pricingTable = new PricingTable(current, 0, getTimeShiftMS());
+		IProducerPolicy producerPolicy = policyFactory.initDefaultProducerPolicy();
 		addServiceProducer(generateSupply(150.0, current, 200.0,
-				new DeviceProperties("EDF", DeviceCategory.EXTERNAL_ENG, EnvironmentalImpact.MEDIUM, true),
-				pricingTable), producerPolicy);
+				new DeviceProperties("SIG", DeviceCategory.EXTERNAL_ENG, EnvironmentalImpact.MEDIUM),
+				pricingTable), producerPolicy, policyFactory.initDefaultConsumerPolicy());
 
 		// Add query
 		addServiceConsumer(generateRequest(43.1, current, YEAR_DURATION_MIN, YEAR_DURATION_MIN, PriorityLevel.LOW,
-				new DeviceProperties("Refrigerator", DeviceCategory.COLD_APPLIANCES, EnvironmentalImpact.MEDIUM, false),
-				pricingTable), null);
+				new DeviceProperties("Refrigerator", DeviceCategory.COLD_APPLIANCES, EnvironmentalImpact.MEDIUM),
+				pricingTable), producerPolicy, policyFactory.initDefaultConsumerPolicy());
 
 		return getLsas();
 	}
 
-	public List<Service> test1ter(NodeConfig envNodeConfig) {
+	public List<Service> test1ter(ServerConfig serverConfig) throws HandlingException {
 		// Add producer agents
-		initEnergyService(envNodeConfig, generateDefaultInitForm("test1ter"), new ArrayList<NodeConfig>());
+		initEnergyService(serverConfig, generateDefaultInitForm("test1ter"));
 		Date current = getCurrentDate(); // getCurrentMinute();
-		PricingTable pricingTable = new PricingTable(current, UtilDates.shiftDateDays(current, 365), 0,
-				getTimeShiftMS());
-		IProducerPolicy producerPolicy = initDefaultProducerPolicy();
+		PricingTable pricingTable = new PricingTable(current, 0, getTimeShiftMS());
 		addServiceProducer(generateSupply(2000.0, current, YEAR_DURATION_MIN,
-				new DeviceProperties("EDF", DeviceCategory.EXTERNAL_ENG, EnvironmentalImpact.MEDIUM, true),
-				pricingTable), producerPolicy);
+				new DeviceProperties("SIG", DeviceCategory.EXTERNAL_ENG, EnvironmentalImpact.MEDIUM),
+				pricingTable), policyFactory.initDefaultProducerPolicy(), policyFactory.initDefaultConsumerPolicy());
 		addServiceProducer(generateSupply(150.0, current, 120.0,
-				new DeviceProperties("wind turbine1", DeviceCategory.WIND_ENG, EnvironmentalImpact.LOW, true),
-				pricingTable), producerPolicy);
+				new DeviceProperties("wind turbine1", DeviceCategory.WIND_ENG, EnvironmentalImpact.LOW),
+				pricingTable), policyFactory.initDefaultProducerPolicy(), policyFactory.initDefaultConsumerPolicy());
 		addServiceProducer(generateSupply(300.0, current, 120.0,
-				new DeviceProperties("wind turbine2", DeviceCategory.WIND_ENG, EnvironmentalImpact.LOW, true),
-				pricingTable), producerPolicy);
+				new DeviceProperties("wind turbine2", DeviceCategory.WIND_ENG, EnvironmentalImpact.LOW),
+				pricingTable), policyFactory.initDefaultProducerPolicy(), policyFactory.initDefaultConsumerPolicy());
 		addServiceProducer(generateSupply(200.0, current, 120.0,
-				new DeviceProperties("wind turbine3", DeviceCategory.WIND_ENG, EnvironmentalImpact.LOW, true),
-				pricingTable), producerPolicy);
+				new DeviceProperties("wind turbine3", DeviceCategory.WIND_ENG, EnvironmentalImpact.LOW),
+				pricingTable), policyFactory.initDefaultProducerPolicy(), policyFactory.initDefaultConsumerPolicy());
 		/**/
 
 		// Add query
 		addServiceConsumer(generateRequest(43.1, current, YEAR_DURATION_MIN, YEAR_DURATION_MIN, PriorityLevel.HIGH,
-				new DeviceProperties("Refrigerator", DeviceCategory.COLD_APPLIANCES, EnvironmentalImpact.MEDIUM, false),
-				pricingTable), null);
+				new DeviceProperties("Refrigerator", DeviceCategory.COLD_APPLIANCES, EnvironmentalImpact.MEDIUM),
+				pricingTable), policyFactory.initDefaultProducerPolicy(), policyFactory.initDefaultConsumerPolicy());
 		addServiceConsumer(generateRequest(270.7, current, 150.0, 150., PriorityLevel.LOW,
-				new DeviceProperties("Household Fan ", DeviceCategory.OTHER, EnvironmentalImpact.MEDIUM, false),
-				pricingTable), null);
+				new DeviceProperties("Household Fan ", DeviceCategory.OTHER, EnvironmentalImpact.MEDIUM),
+				pricingTable), policyFactory.initDefaultProducerPolicy(), policyFactory.initDefaultConsumerPolicy());
 		addServiceConsumer(generateRequest(720.7, current, 80., 80., PriorityLevel.LOW,
-				new DeviceProperties(" Toaster", DeviceCategory.COOKING, EnvironmentalImpact.MEDIUM, false),
-				pricingTable), null);
+				new DeviceProperties(" Toaster", DeviceCategory.COOKING, EnvironmentalImpact.MEDIUM),
+				pricingTable), policyFactory.initDefaultProducerPolicy(), policyFactory.initDefaultConsumerPolicy());
 		addServiceConsumer(generateRequest(100.0, current, 50., 50., PriorityLevel.LOW,
-				new DeviceProperties("iPad / Tablet", DeviceCategory.ICT, EnvironmentalImpact.MEDIUM, false),
-				pricingTable), null);
+				new DeviceProperties("iPad / Tablet", DeviceCategory.ICT, EnvironmentalImpact.MEDIUM),
+				pricingTable), policyFactory.initDefaultProducerPolicy(), policyFactory.initDefaultConsumerPolicy());
 		/**/
 
 		// restartConsumer("Consumer_3", new Float("11"), current,
@@ -727,85 +797,84 @@ public class Sapere {
 		return getLsas();
 	}
 
-	public List<Service> test2(NodeConfig envNodeConfig) {
-		initEnergyService(envNodeConfig, generateDefaultInitForm("test2"), new ArrayList<NodeConfig>());
+	public List<Service> test2(ServerConfig serverConfig) throws HandlingException {
+		initEnergyService(serverConfig, generateDefaultInitForm("test2"));
 		Date current = nodeContext.getCurrentDate(); // getCurrentMinute();
-		PricingTable pricingTable = new PricingTable(current, UtilDates.shiftDateDays(current, 365), 0,
-				getTimeShiftMS());
+		PricingTable pricingTable = new PricingTable(current, 0, getTimeShiftMS());
 		int nbAgents = 10;
 		for (int i = 0; i < nbAgents; i++) {
-			IProducerPolicy producerPolicy = initDefaultProducerPolicy();
+			IProducerPolicy producerPolicy = policyFactory.initDefaultProducerPolicy();
 			addServiceProducer(generateSupply(25.0, current, 60.,
-					new DeviceProperties("wind turbine " + i, DeviceCategory.WIND_ENG, EnvironmentalImpact.LOW, true),
-					pricingTable), producerPolicy);
+					new DeviceProperties("wind turbine " + i, DeviceCategory.WIND_ENG, EnvironmentalImpact.LOW),
+					pricingTable), producerPolicy, policyFactory.initDefaultConsumerPolicy());
 		}
 		for (int i = 0; i < nbAgents; i++) {
+			IProducerPolicy producerPolicy = policyFactory.initDefaultProducerPolicy();
 			addServiceConsumer(generateRequest(30 + 0.1 * i, current, 120., 120., PriorityLevel.LOW,
-					new DeviceProperties("Laptop " + i, DeviceCategory.ICT, EnvironmentalImpact.MEDIUM, false),
-					pricingTable), null);
+					new DeviceProperties("Laptop " + i, DeviceCategory.ICT, EnvironmentalImpact.MEDIUM),
+					pricingTable), producerPolicy, policyFactory.initDefaultConsumerPolicy());
 		}
 		return getLsas();
 	}
 
-	public List<Service> test3(NodeConfig envNodeConfig) {
-		initEnergyService(envNodeConfig, generateDefaultInitForm("test3"), new ArrayList<NodeConfig>());
+	public List<Service> test3(ServerConfig serverConfig) throws HandlingException {
+		initEnergyService(serverConfig, generateDefaultInitForm("test3"));
 		Date current = nodeContext.getCurrentDate(); // getCurrentMinute();
-		PricingTable pricingTable = new PricingTable(current, UtilDates.shiftDateDays(current, 365), 0,
-				getTimeShiftMS());
-		IProducerPolicy producerPolicy = initDefaultProducerPolicy();
+		PricingTable pricingTable = new PricingTable(current, 0, getTimeShiftMS());
+		IProducerPolicy producerPolicy = policyFactory.initDefaultProducerPolicy();
 		addServiceProducer(generateSupply(30.0, current, YEAR_DURATION_MIN,
-				new DeviceProperties("EDF", DeviceCategory.EXTERNAL_ENG, EnvironmentalImpact.MEDIUM, true),
-				pricingTable), producerPolicy);
+				new DeviceProperties("SIG", DeviceCategory.EXTERNAL_ENG, EnvironmentalImpact.MEDIUM),
+				pricingTable), producerPolicy, policyFactory.initDefaultConsumerPolicy());
 		addServiceProducer(generateSupply(25.0, current, 60.,
-				new DeviceProperties("wind turbine1", DeviceCategory.WIND_ENG, EnvironmentalImpact.LOW, true),
-				pricingTable), producerPolicy);
+				new DeviceProperties("wind turbine1", DeviceCategory.WIND_ENG, EnvironmentalImpact.LOW),
+				pricingTable), producerPolicy, policyFactory.initDefaultConsumerPolicy());
 		addServiceProducer(generateSupply(25.0, current, 60.,
-				new DeviceProperties("wind turbine2", DeviceCategory.WIND_ENG, EnvironmentalImpact.LOW, true),
-				pricingTable), producerPolicy);
+				new DeviceProperties("wind turbine2", DeviceCategory.WIND_ENG, EnvironmentalImpact.LOW),
+				pricingTable), producerPolicy, policyFactory.initDefaultConsumerPolicy());
 		addServiceProducer(generateSupply(25.0, current, 60.,
-				new DeviceProperties("wind turbine3", DeviceCategory.WIND_ENG, EnvironmentalImpact.LOW, true),
-				pricingTable), producerPolicy);
+				new DeviceProperties("wind turbine3", DeviceCategory.WIND_ENG, EnvironmentalImpact.LOW),
+				pricingTable), producerPolicy, policyFactory.initDefaultConsumerPolicy());
 		addServiceConsumer(generateRequest(24.7, current, 150., 150., PriorityLevel.LOW,
-				new DeviceProperties("Laptop 1", DeviceCategory.ICT, EnvironmentalImpact.MEDIUM, false), pricingTable),
-				null);
+				new DeviceProperties("Laptop 1", DeviceCategory.ICT, EnvironmentalImpact.MEDIUM), pricingTable),
+				policyFactory.initDefaultProducerPolicy(), policyFactory.initDefaultConsumerPolicy());
 		return getLsas();
 	}
 
-	public List<Service> test4(NodeConfig envNodeConfig) {
-		initEnergyService(envNodeConfig, generateDefaultInitForm("test4"), new ArrayList<NodeConfig>());
+	public List<Service> test4(ServerConfig serverConfig) throws HandlingException {
+		initEnergyService(serverConfig, generateDefaultInitForm("test4"));
 		Date current = nodeContext.getCurrentDate(); // getCurrentMinute();
-		PricingTable pricingTable = new PricingTable(current, UtilDates.shiftDateDays(current, 365), 0,
-				getTimeShiftMS());
+		PricingTable pricingTable = new PricingTable(current,  0, getTimeShiftMS());
 		// addServiceProducer(generateSupply(new Float(30.0), current,
-		// YEAR_DURATION_MIN, "EDF", DeviceCategory.EXTERNAL_ENG));
+		// YEAR_DURATION_MIN, "SIG", DeviceCategory.EXTERNAL_ENG));
 		DeviceProperties solorPanel = new DeviceProperties("solar panel1", DeviceCategory.SOLOR_ENG,
-				EnvironmentalImpact.LOW, true);
-		IProducerPolicy producerPolicy = initDefaultProducerPolicy();
-		addServiceProducer(generateSupply(50.0, current, 10., solorPanel, pricingTable), producerPolicy);
+				EnvironmentalImpact.LOW);
+		IProducerPolicy producerPolicy = policyFactory.initDefaultProducerPolicy();
+		addServiceProducer(generateSupply(50.0, current, 10., solorPanel, pricingTable)
+				, producerPolicy, policyFactory.initDefaultConsumerPolicy());
 		DeviceProperties tvLCD = new DeviceProperties("TV 32 LED/LCD ", DeviceCategory.AUDIOVISUAL,
-				EnvironmentalImpact.MEDIUM, false);
-		addServiceConsumer(generateRequest(97.7, current, 150., 150., PriorityLevel.LOW, tvLCD, pricingTable), null);
+				EnvironmentalImpact.MEDIUM);
+		addServiceConsumer(generateRequest(97.7, current, 150., 150., PriorityLevel.LOW, tvLCD, pricingTable)
+				, policyFactory.initDefaultProducerPolicy(), policyFactory.initDefaultConsumerPolicy());
 		int nbAgents = 5;
 		for (int i = 0; i < nbAgents; i++) {
 			DeviceProperties lapTop = new DeviceProperties("Laptop " + i, DeviceCategory.ICT,
-					EnvironmentalImpact.MEDIUM, false);
+					EnvironmentalImpact.MEDIUM);
 			addServiceConsumer(
-					generateRequest(30 + 0.1 * i, current, 120., 120., PriorityLevel.LOW, lapTop, pricingTable), null);
+					generateRequest(30 + 0.1 * i, current, 120., 120., PriorityLevel.LOW, lapTop, pricingTable)
+					, policyFactory.initDefaultProducerPolicy(), policyFactory.initDefaultConsumerPolicy());
 		}
 		return getLsas();
 	}
 
-	public List<Service> test5(NodeConfig envNodeConfig) {
-		initEnergyService(envNodeConfig, generateDefaultInitForm("test5"), new ArrayList<NodeConfig>());
+	public List<Service> test5(ServerConfig serverConfig) throws HandlingException {
+		initEnergyService(serverConfig, generateDefaultInitForm("test5"));
 		// Add producer agents
 		Date current = getCurrentDate();
-		PricingTable pricingTable = new PricingTable(current, UtilDates.shiftDateDays(current, 365), 0,
-				getTimeShiftMS());
-		DeviceProperties devicePropeties1 = new DeviceProperties("EDF", DeviceCategory.EXTERNAL_ENG,
-				EnvironmentalImpact.MEDIUM, true);
-		IProducerPolicy producerPolicy = initDefaultProducerPolicy();
+		PricingTable pricingTable = new PricingTable(current, 0, getTimeShiftMS());
+		DeviceProperties devicePropeties1 = new DeviceProperties("SIG", DeviceCategory.EXTERNAL_ENG,
+				EnvironmentalImpact.MEDIUM);
 		addServiceProducer(generateSupply(2700.0, current, YEAR_DURATION_MIN, devicePropeties1, pricingTable),
-				producerPolicy);
+				policyFactory.initDefaultProducerPolicy(), policyFactory.initDefaultConsumerPolicy());
 		// Add query
 		/*
 		 * addQueryConsumer( generateRequest(new Float(10.0), current, new Float(0.5),
@@ -814,113 +883,71 @@ public class Sapere {
 		return getLsas();
 	}
 
-	private PricingTable initPricingTable(int minutesByStep) {
-		Date current = nodeContext.getCurrentDate();
-		// Date end = UtilDates.shiftDateMinutes(current, 60);
-		int time = 0;
-		Map<Integer, Double> simplePicingTable = new HashMap<Integer, Double>();
-		simplePicingTable.put(time, 10.0);
-		time += 1;
-		simplePicingTable.put(time, 10.0);
-		time += 1;
-		simplePicingTable.put(time, 6.0);
-		time += minutesByStep;
-		simplePicingTable.put(time, 7.0);
-		time += minutesByStep;
-		simplePicingTable.put(time, 8.0);
-		time += minutesByStep;
-		simplePicingTable.put(time, 9.0);
-		time += minutesByStep;
-		simplePicingTable.put(time, 10.0);
-		Date lastStepDate = null;
-		PricingTable pricingTable = new PricingTable(nodeContext.getTimeShiftMS());
-		SortedSet<Integer> keys = new TreeSet<>(simplePicingTable.keySet());
-		for (int step : keys) {
-			Double rate = simplePicingTable.get(step);
-			Date nextStepDate = UtilDates.shiftDateMinutes(current, step);
-			if (lastStepDate != null) {
-				pricingTable.addPrice(lastStepDate, nextStepDate, rate);
-			}
-			lastStepDate = nextStepDate;
-		}
-		return pricingTable;
-	}
-
-	public IProducerPolicy initDefaultProducerPolicy() {
-		IProducerPolicy result = new BasicProducerPolicy(nodeContext, 0.0, IProducerPolicy.POLICY_PRIORIZATION);
-		return result;
-	}
-
 	// Tragedy of the commons
-	public List<Service> testTragedyOfTheCommons(NodeConfig envNodeConfig, boolean useProducerPolicy) {
-		initEnergyService(envNodeConfig, generateDefaultInitForm("testTragedyOfTheCommons"),
-				new ArrayList<NodeConfig>());
-		Date current = nodeContext.getCurrentDate(); // getCurrentMinute();
+	public List<Service> testTragedyOfTheCommons(ServerConfig serverConfig, boolean useDynamicPricingPolicy) throws HandlingException {
+		initEnergyService(serverConfig, generateDefaultInitForm("testTragedyOfTheCommons"));
+		/*
 		int minutesByStep = 3;
 		PricingTable pricingTable = initPricingTable(minutesByStep);// new PricingTable();
+		*/
+		String policyId = useDynamicPricingPolicy? PolicyFactory.POLICY_LOWEST_DEMAND : null;
+		IProducerPolicy producerPolicy = policyFactory.initProducerPolicy(policyId, false);
 		/*
-		 * Date end = UtilDates.shiftDateMinutes(current, 60); int step1Minutes = 1;
-		 * pricingTable.addPrice(UtilDates.shiftDateMinutes(current, 0) ,
-		 * UtilDates.shiftDateMinutes(current, step1Minutes), 10);
-		 * pricingTable.addPrice(UtilDates.shiftDateMinutes(current, step1Minutes) ,
-		 * UtilDates.shiftDateMinutes(current, step1Minutes+5), 7);
-		 * pricingTable.addPrice(UtilDates.shiftDateMinutes(current, step1Minutes+5),
-		 * end, 10);
-		 */
-		// addServiceProducer(generateSupply(new Float(30.0), current,
-		// YEAR_DURATION_MIN, "EDF", DeviceCategory.EXTERNAL_ENG));
-		IProducerPolicy producerPolicy = useProducerPolicy
-				? new LowestDemandPolicy(pricingTable, IProducerPolicy.POLICY_PRIORIZATION)
-				: initDefaultProducerPolicy();
+		IProducerPolicy producerPolicy = useDynamicPricingPolicy
+				? new LowestDemandPolicy(pricingTable, IProducerPolicy.POLICY_PRIORITIZATION)
+				: policyFactory.initDefaultProducerPolicy();
+				*/
 		DeviceProperties devicePropeties1 = new DeviceProperties("SIG", DeviceCategory.EXTERNAL_ENG,
-				EnvironmentalImpact.MEDIUM, true);
-		addServiceProducer(generateSupply(33.0, current, 60., devicePropeties1, pricingTable), producerPolicy);
+				EnvironmentalImpact.MEDIUM);
+		Date current = nodeContext.getCurrentDate(); // getCurrentMinute();
+		addServiceProducer(generateSupply(33.0, current, 60., devicePropeties1, producerPolicy.getDefaultPricingTable())
+				, producerPolicy, policyFactory.initDefaultConsumerPolicy());
 		IConsumerPolicy lowestPricePolicy = new LowestPricePolicy();
 		int nbAgents = 10;
-		// nbAgents = 1;
+		int priceDurationMinutes = PolicyFactory.getPriceDurationMinutes();
+		//nbAgents = 1;
 		for (int i = 0; i < nbAgents; i++) {
-			Date dateBegin = UtilDates.shiftDateSec(current, 10);
-			Date dateEnd = UtilDates.shiftDateSec(dateBegin, minutesByStep * 60);
+			Date dateBegin = UtilDates.shiftDateSec(current, 5);
+			logger.info("testTragedyOfTheCommons current = " + UtilDates.format_date_time.format(current)
+					+ ", dateBegin = " + UtilDates.format_date_time.format(dateBegin));
+			Date lastPriceDate = producerPolicy.getDefaultPricingTable().getEndDate();
+			Date dateEnd = UtilDates.shiftDateSec(lastPriceDate, priceDurationMinutes * 30);
 			Double power = 10.0;
-			DeviceProperties devicePropeties2 = new DeviceProperties("Battery " + i, DeviceCategory.OTHER,
-					EnvironmentalImpact.MEDIUM, false);
-			EnergyRequest request = generateRequest(power, dateBegin, dateEnd, 120., PriorityLevel.LOW,
-					devicePropeties2, new PricingTable(getTimeShiftMS()));
-			addServiceConsumer(request, lowestPricePolicy);
+			DeviceProperties devicePropeties2 = new DeviceProperties("Battery-" + (1+i), DeviceCategory.OTHER,
+					EnvironmentalImpact.MEDIUM);
+			EnergyRequest request = generateRequest(power, dateBegin, dateEnd, 120., PriorityLevel.LOW, devicePropeties2);
+			addServiceConsumer(request, policyFactory.initDefaultProducerPolicy() , lowestPricePolicy);
 		}
 		return getLsas();
 	}
 
-	public List<Service> test6(NodeConfig envNodeConfig) {
-		initEnergyService(envNodeConfig, generateDefaultInitForm("test6"), new ArrayList<NodeConfig>());
+	public List<Service> test6(ServerConfig serverConfig) throws HandlingException {
+		initEnergyService(serverConfig, generateDefaultInitForm("test6"));
 		Date current = nodeContext.getCurrentDate(); // getCurrentMinute();
 		// addServiceProducer(generateSupply(new Float(30.0), current,
-		// YEAR_DURATION_MIN, "EDF", DeviceCategory.EXTERNAL_ENG));
-		PricingTable pricingTable = new PricingTable(current, UtilDates.shiftDateDays(current, 365), 0,
-				getTimeShiftMS());
+		// YEAR_DURATION_MIN, "SIG", DeviceCategory.EXTERNAL_ENG));
+		//PricingTable pricingTable = new PricingTable(current, 0, getTimeShiftMS());
 		DeviceProperties devicePropeties1 = new DeviceProperties("solar panel1", DeviceCategory.SOLOR_ENG,
-				EnvironmentalImpact.LOW, true);
-		IProducerPolicy producerPolicy = initDefaultProducerPolicy();
-		addServiceProducer(generateSupply(33.0, current, 10., devicePropeties1, null), producerPolicy);
+				EnvironmentalImpact.LOW);
+		IProducerPolicy producerPolicy = policyFactory.initDefaultProducerPolicy();
+		addServiceProducer(generateSupply(33.0, current, 10., devicePropeties1, null), producerPolicy, policyFactory.initDefaultConsumerPolicy());
 		int nbAgents = 10;
 		for (int i = 0; i < nbAgents; i++) {
 			Date dateBegin = UtilDates.shiftDateSec(current, 5 + 65 * i);
-			Date dateEnd = UtilDates.shiftDateSec(dateBegin, 60);
+			Date dateEnd = UtilDates.shiftDateSec(dateBegin, 60*3);
 			DeviceProperties devicePropeties2 = new DeviceProperties("Battery " + (1 + i), DeviceCategory.OTHER,
-					EnvironmentalImpact.MEDIUM, false);
-			EnergyRequest request = generateRequest(10.0, dateBegin, dateEnd, 120., PriorityLevel.LOW, devicePropeties2,
-					pricingTable);
-			addServiceConsumer(request, null);
+					EnvironmentalImpact.MEDIUM);
+			EnergyRequest request = generateRequest(10.0, dateBegin, dateEnd, 120., PriorityLevel.LOW, devicePropeties2);
+			addServiceConsumer(request, policyFactory.initDefaultProducerPolicy(), policyFactory.initDefaultConsumerPolicy());
 		}
 		return getLsas();
 	}
 
-	public List<Service> initState(String variable, MarkovState targetState, boolean _supervisionDisabled) {
+	public List<Service> initState(String variable, VariableState targetState, boolean _supervisionDisabled) throws HandlingException {
 		// initEnergyService(repository, "test5");
 		// Add producer agents
 		Date current = getCurrentDate();
-		PricingTable pricingTable = new PricingTable(current, UtilDates.shiftDateDays(current, 365), 0,
-				getTimeShiftMS());
+		PricingTable pricingTable = new PricingTable(current, 0, getTimeShiftMS());
 		double minPower = targetState.getMinValue();
 		double maxPower = targetState.getMaxValue() == null ? 1.7 * minPower : targetState.getMaxValue();
 		double powerRandom = Math.random();
@@ -928,31 +955,31 @@ public class Sapere {
 		nodeContext.setSupervisionDisabled(_supervisionDisabled);
 		if ("produced".equals(variable) || "available".equals(variable) || "consumed".equals(variable)
 				|| "provided".equals(variable)) {
-			IProducerPolicy producerPolicy = initDefaultProducerPolicy();
+			IProducerPolicy producerPolicy = policyFactory.initDefaultProducerPolicy();
 			DeviceProperties prodDeviceProperties = new DeviceProperties("wind turbine 0", DeviceCategory.WIND_ENG,
-					EnvironmentalImpact.LOW, true);
+					EnvironmentalImpact.LOW);
 			addServiceProducer(generateSupply(targetPower, current, 60., prodDeviceProperties, pricingTable),
-					producerPolicy);
+					producerPolicy, policyFactory.initDefaultConsumerPolicy());
 		}
 		if ("requested".equals(variable) || "missing".equals(variable) || "consumed".equals(variable)
 				|| "provided".equals(variable)) {
 			DeviceProperties consumerDeviceProperties = new DeviceProperties("Heat pump 0", DeviceCategory.HEATING,
-					EnvironmentalImpact.MEDIUM, false);
+					EnvironmentalImpact.MEDIUM);
 			addServiceConsumer(generateRequest(targetPower, current, 120., 120., PriorityLevel.LOW,
-					consumerDeviceProperties, pricingTable), null);
+					consumerDeviceProperties, pricingTable), policyFactory.initDefaultProducerPolicy(), policyFactory.initDefaultConsumerPolicy());
 		}
 		try {
 			LearningAgent learningAgent = getLearningAgent();
 			learningAgent.refreshHistory(null);
-			learningAgent.refreshMarkovChains(true, false);
-			MarkovState currentState = learningAgent.getCurrentMarkovState(variable);
+			learningAgent.refreshLearningModel(PredictionScope.NODE, true, false);
+			VariableState currentState = learningAgent.getCurrentVariableState(PredictionScope.NODE, variable);
 			boolean stateReached = currentState != null && targetState.getId().equals(currentState.getId());
 			int cpt = 0;
 			while (!stateReached && cpt < 10) {
 				Thread.sleep(5 * 1000);
 				learningAgent.refreshHistory(null);
-				learningAgent.refreshMarkovChains(true, false);
-				currentState = learningAgent.getCurrentMarkovState(variable);
+				learningAgent.refreshLearningModel(PredictionScope.NODE, true, false);
+				currentState = learningAgent.getCurrentVariableState(PredictionScope.NODE, variable);
 				stateReached = currentState != null && targetState.getId().equals(currentState.getId());
 				cpt++;
 			}
@@ -978,7 +1005,7 @@ public class Sapere {
 		}
 		String authenticationKey = agentAuthentication.getAuthenticationKey();
 		boolean result = false;
-		if (this.mapAgentAuthentication.containsKey(agentName)) {
+		if (mapAgentAuthentication.containsKey(agentName)) {
 			String key = (mapAgentAuthentication.get(agentName)).getAuthenticationKey();
 			if (useSecuresPasswords) {
 				String securedKey = PasswordUtils.generateSecurePassword(key, salt);
@@ -993,8 +1020,10 @@ public class Sapere {
 		return result;
 	}
 
-	private void addServiceLearningAgent(
-			String agentName /* , String scenario, Map<Integer,Integer> _datetimeShifts */) {
+	private static void addServiceLearningAgent (
+			String agentName
+			// , String scenario, Map<Integer,Integer> _datetimeShifts
+			) throws HandlingException{
 		if (nodeContext == null) {
 			throw new RuntimeException("addServiceLearningAgent : undefined node context");
 		}
@@ -1008,7 +1037,7 @@ public class Sapere {
 		startService(agentName);
 	}
 
-	private void addServiceRegulatorAgent(String agentName) {
+	private static void addServiceRegulatorAgent(String agentName) {
 		AgentAuthentication authentication = generateAgentAuthentication(AgentType.REGULATOR);
 		RegulatorAgent regulatorAgent = new RegulatorAgent(agentName, authentication, nodeContext);
 		serviceAgents.add(regulatorAgent);
@@ -1033,23 +1062,31 @@ public class Sapere {
 		return null;
 	}
 
-	public AgentForm addEnergyAgent(AgentInputForm agentInputForm) {
+	public AgentForm addEnergyAgent(AgentInputForm agentInputForm) throws HandlingException {
+		agentInputForm.checkContent();	// Throws an exception if the form is not complete
 		resolveAgentsNotInsapce();
 		AgentForm result = null;
 		Date current = getCurrentDate();
 		if (agentInputForm.getEndDate() != null && agentInputForm.getEndDate().before(current)) {
 			logger.warning("#### addAgent : enddate = " + agentInputForm.getEndDate());
 		}
-		if (!SapereUtil.checkIsRound(agentInputForm.getPower(), NB_DEC_POWER, logger)) {
-			logger.warning("#### addAgent : power = " + SapereUtil.round(agentInputForm.getPower(), 3));
-			double powerToSet = SapereUtil.round(agentInputForm.getPower(), Sapere.NB_DEC_POWER);
+		if (!SapereUtil.checkPowerRounded(agentInputForm.getPower(), logger)) {
+			logger.warning("#### addAgent : power = " + SapereUtil.roundPower(agentInputForm.getPower()));
+			double powerToSet = SapereUtil.roundPower(agentInputForm.getPower());
 			agentInputForm.setPowers(powerToSet, powerToSet, powerToSet);
 		}
 		try {
 			EnergyAgent newAgent = null;
-			if (agentInputForm.isConsumer()) {
+			IProducerPolicy producerPolicy = policyFactory.initProducerPolicy(agentInputForm);
+			IConsumerPolicy consumerPolicy = policyFactory.initConsumerPolicy(agentInputForm);
+			if (agentInputForm.isProducer()) {
 				agentInputForm.generateSimplePricingTable(0);
-				PriorityLevel priority = PriorityLevel.getByLabel(agentInputForm.getPriorityLevel());
+				newAgent = addServiceProducer(agentInputForm.getPower(), agentInputForm.getBeginDate(),
+						agentInputForm.getEndDate(), agentInputForm.retrieveDeviceProperties(),
+						agentInputForm.generatePricingTable(), producerPolicy, consumerPolicy);
+			} else if (agentInputForm.isConsumer()) {
+				agentInputForm.generateSimplePricingTable(0);
+				PriorityLevel priority = agentInputForm.getPriorityLevel();
 				double delayToleranceMinutes = agentInputForm.getDelayToleranceMinutes();
 				if (delayToleranceMinutes == 0 && agentInputForm.getDelayToleranceRatio() != null) {
 					delayToleranceMinutes = agentInputForm.getDelayToleranceRatio() * UtilDates
@@ -1057,19 +1094,14 @@ public class Sapere {
 				}
 				newAgent = addServiceConsumer(agentInputForm.getPower(), agentInputForm.getBeginDate(),
 						agentInputForm.getEndDate(), delayToleranceMinutes, priority,
-						agentInputForm.retrieveDeviceProperties(), agentInputForm.generatePricingTable(), null);
-			} else if (agentInputForm.isProducer()) {
-				agentInputForm.generateSimplePricingTable(0);
-				IProducerPolicy producerPolicy = initDefaultProducerPolicy();
-				newAgent = addServiceProducer(agentInputForm.getPower(), agentInputForm.getBeginDate(),
-						agentInputForm.getEndDate(), agentInputForm.retrieveDeviceProperties(),
-						agentInputForm.generatePricingTable(), producerPolicy);
+						agentInputForm.retrieveDeviceProperties(), agentInputForm.generatePricingTable(),
+						producerPolicy, consumerPolicy);
 			}
 			if (newAgent != null) {
 				Thread.sleep(1 * 1000);
 				result = generateAgentForm(newAgent);
 			}
-		} catch (Exception e) {
+		} catch (Throwable e) {
 			logger.error(e);
 		}
 		/*
@@ -1079,65 +1111,65 @@ public class Sapere {
 		return result;
 	}
 
-	public ConsumerAgent addServiceConsumer(Double power, Date beginDate, Date endDate, Double _delayToleranceMinutes,
-			PriorityLevel _priority, DeviceProperties deviceProperties, PricingTable pricingTable,
-			IConsumerPolicy consumerPolicy) {
-		EnergyRequest request = generateRequest(power, beginDate, endDate, _delayToleranceMinutes, _priority,
-				deviceProperties, pricingTable);
-		return addServiceConsumer(request, consumerPolicy);
-	}
-
-	private ConsumerAgent addServiceConsumer(EnergyRequest need, IConsumerPolicy consumerPolicy) {
-		checkInitialisation();
-		try {
-			need.checkBeginNotPassed();
-			synchronized (mapAgentAuthentication) {
-				AgentAuthentication authentication = generateAgentAuthentication(AgentType.CONSUMER);
-				ConsumerAgent consumerAgent = new ConsumerAgent(nextConsumerId, authentication, need, consumerPolicy);
-				synchronized (consumerAgent) {
-					consumerAgent.setInitialLSA();
-				}
-				serviceAgents.add(consumerAgent);
-				// addServiceContract(consumerAgent);
-				logger.info("Add new consumer " + consumerAgent.getAgentName());
-				nextConsumerId++;
-				return consumerAgent;
-			}
-		} catch (Exception e) {
-			logger.error(e);
+	public ProsumerAgent addServiceConsumer(Double power, Date beginDate, Date endDate
+			, Double delayToleranceMinutes,
+			PriorityLevel priority, DeviceProperties deviceProperties, PricingTable pricingTable
+			,IProducerPolicy producerPolicy, IConsumerPolicy consumerPolicy) throws HandlingException {
+		if(!deviceProperties.isConsumer()) {
+			throw new HandlingException("addServiceConsumer : the givent category " +  deviceProperties.getCategory() + " is not a consumer category");
 		}
-		return null;
+		EnergyRequest request = generateRequest(power, beginDate, endDate, delayToleranceMinutes, priority,	deviceProperties);
+		return addServiceConsumer(request, producerPolicy, consumerPolicy);
 	}
 
-	private ProducerAgent addServiceProducer(EnergySupply supply, IProducerPolicy producerPolicy) {
+	private ProsumerAgent addServiceConsumer(EnergyRequest need, IProducerPolicy producerPolicy, IConsumerPolicy consumerPolicy) throws HandlingException {
+		EnergySupply supply = null;
+		return  addServiceProsumer(supply, need, producerPolicy, consumerPolicy);
+	}
+
+	private ProsumerAgent addServiceProducer(EnergySupply supply, IProducerPolicy producerPolicy, IConsumerPolicy consumerPolicy) throws HandlingException {
+		EnergyRequest need = null;
+		return addServiceProsumer(supply, need, producerPolicy, consumerPolicy);
+	}
+
+	private ProsumerAgent addServiceProsumer(EnergySupply supply, EnergyRequest need, IProducerPolicy producerPolicy, IConsumerPolicy consumerPolicy) throws HandlingException {
 		if (!isRunning) {
 			return null;
 		}
 		if (producerPolicy == null) {
-			logger.error("addServiceProducer : producerPolicy is not set");
+			logger.error("addServiceProsumer : producerPolicy is not set");
 		}
 		checkInitialisation();
-		supply.checkBeginNotPassed();
+		if(supply != null)  {
+			supply.checkBeginNotPassed();
+		}
+		if(need != null) {
+			need.checkBeginNotPassed();
+		}
 		synchronized (mapAgentAuthentication) {
-			AgentAuthentication authentication = generateAgentAuthentication(AgentType.PRODUCER);
-			ProducerAgent producerAgent = new ProducerAgent(nextProducerId, authentication, supply, producerPolicy);
-			nextProducerId++;
-			serviceAgents.add(producerAgent);
-			synchronized (producerAgent) {
-				producerAgent.setInitialLSA();
+			AgentAuthentication authentication = generateAgentAuthentication(AgentType.PROSUMER);
+			ProsumerAgent prosumerAgent = new ProsumerAgent(nextProsumerId, authentication, supply, need, producerPolicy, consumerPolicy, nodeContext);
+			synchronized (prosumerAgent) {
+				prosumerAgent.setInitialLSA();
 			}
-			logger.info("Add new producer " + producerAgent.getAgentName());
-			return producerAgent;
+			nextProsumerId++;
+			serviceAgents.add(prosumerAgent);
+			logger.info("addServiceProsumer : add new " + prosumerAgent.computeRole() + " " +  prosumerAgent.getAgentName());
+			return prosumerAgent;
 		}
 	}
 
-	public ProducerAgent addServiceProducer(Double power, Date beginDate, Date endDate,
-			DeviceProperties deviceProperties, PricingTable pricingTable, IProducerPolicy producerPolicy) {
+	public ProsumerAgent addServiceProducer(Double power, Date beginDate, Date endDate,
+			DeviceProperties deviceProperties
+			, PricingTable pricingTable, IProducerPolicy producerPolicy,  IConsumerPolicy consumerPolicy) throws HandlingException {
 		if (!isRunning) {
-			return null;
+			throw new HandlingException("Service is not running");
+		}
+		if(!deviceProperties.isProducer()) {
+			throw new HandlingException("addServiceProducer : the givent category " +  deviceProperties.getCategory() + " is not a producer category");
 		}
 		EnergySupply supply = generateSupply(power, beginDate, endDate, deviceProperties, pricingTable);
-		return this.addServiceProducer(supply, producerPolicy);
+		return this.addServiceProducer(supply, producerPolicy, consumerPolicy);
 	}
 
 	public AgentForm restartEnergyAgent(AgentInputForm agentInputForm) {
@@ -1147,9 +1179,9 @@ public class Sapere {
 		if (agentInputForm.getEndDate() != null && agentInputForm.getEndDate().before(current)) {
 			logger.warning("#### restartAgent : endadate = " + agentInputForm.getEndDate());
 		}
-		if (!SapereUtil.checkIsRound(agentInputForm.getPower(), NB_DEC_POWER, logger)) {
+		if (!SapereUtil.checkPowerRounded(agentInputForm.getPower(), logger)) {
 			logger.warning("#### restartAgent : power = " + agentInputForm.getPower());
-			double powerToSet = SapereUtil.round(agentInputForm.getPower(), NB_DEC_POWER);
+			double powerToSet = SapereUtil.roundPower(agentInputForm.getPower());
 			agentInputForm.setPowers(powerToSet, powerToSet, powerToSet);
 		}
 		try {
@@ -1174,70 +1206,13 @@ public class Sapere {
 		return result;
 	}
 
-	public ConsumerAgent restartConsumer(String consumerAgentName, EnergyRequest need) {
-		if (!isRunning) {
-			return null;
-		}
-		if (!(this.getAgent(consumerAgentName) instanceof ConsumerAgent)) {
-			return null;
-		}
-		if (need.getIssuerLocation() == null) {
-			need.setIssuerLocation(nodeContext.getNodeConfig());
-		}
-		if (!isInSpace(consumerAgentName)) {
-			logger.info("restartConsumer : restart agent " + consumerAgentName);
-			// Restart consuer agent
-			SapereAgent agent = this.getAgent(consumerAgentName);
-			NodeManager.instance().getNotifier().unsubscribe(consumerAgentName);
-			AgentAuthentication consumerAuthentication = agent.getAuthentication();
-			need.checkBeginNotPassed();
-			ConsumerAgent consumerAgent = (ConsumerAgent) agent;
-			synchronized (consumerAgent) {
-				try {
-					// Re-initialize consumer agent
-					Integer id = consumerAgent.getId();
-					consumerAgent.reinitialize(id, consumerAuthentication, need);
-					consumerAgent.initFields(need, consumerAgent.getConsumerPolicy());
-					if (!serviceAgents.contains(consumerAgent)) {
-						serviceAgents.add(consumerAgent);
-					}
-					consumerAgent.setInitialLSA();
-					// Wait untill contract agent is in space
-				} catch (Exception e) {
-					logger.error(e);
-				}
-			}
-		} else {
-			logger.info("restartConsumer : " + consumerAgentName + " is already in tupple splace");
-		}
-
-		// Wait untill consumer agent is in sapce
-		int nbWait = 0;
-		while (!isInSpace(consumerAgentName) && nbWait < 30) {
-			logger.info("restartConsumer : agent " + consumerAgentName + " not in sapce : Waiting ");
-			try {
-				Thread.sleep(100);
-			} catch (InterruptedException e) {
-				logger.error(e);
-			}
-			nbWait++;
-		}
-		logger.info("restartConsumer : agent " + consumerAgentName + " isInSpace = " + isInSpace(consumerAgentName));
-		nbWait = 0;
-		// Return consumer agent
-		SapereAgent consumerAgent1 = getAgent(consumerAgentName);
-		if (consumerAgent1 instanceof ConsumerAgent) {
-			return (ConsumerAgent) (getAgent(consumerAgentName));
-		}
-		return null;
-	}
 
 	private void setAgentExpired(String agentName, RegulationWarning warning) {
-		SapereAgent agent = this.getAgent(agentName);
+		SapereAgent agent = getAgent(agentName);
 		EnergyEvent stopEvent = this.getStopEvent(agentName);
 		if (agent instanceof EnergyAgent) {
 			EnergyAgent energyAgent = (EnergyAgent) agent;
-			energyAgent.getEnergySupply().setEndDate(getCurrentDate());
+			energyAgent.setEndDate(getCurrentDate());
 		}
 		if (stopEvent == null) {
 			generateStopEvent(agentName, warning);
@@ -1245,7 +1220,7 @@ public class Sapere {
 	}
 
 	public boolean isAgentStopped(String agentName) {
-		SapereAgent agent = this.getAgent(agentName);
+		SapereAgent agent = getAgent(agentName);
 		boolean result = false;
 		if (agent instanceof IEnergyAgent) {
 			result = ((IEnergyAgent) agent).hasExpired();
@@ -1254,7 +1229,7 @@ public class Sapere {
 	}
 
 	public EnergyEvent getStopEvent(String agentName) {
-		SapereAgent agent = this.getAgent(agentName);
+		SapereAgent agent = getAgent(agentName);
 		EnergyEvent result = null;
 		if (agent instanceof IEnergyAgent) {
 			result = ((IEnergyAgent) agent).getStopEvent();
@@ -1263,7 +1238,7 @@ public class Sapere {
 	}
 
 	public EnergyEvent generateStopEvent(String agentName, RegulationWarning warning) {
-		SapereAgent agent = this.getAgent(agentName);
+		SapereAgent agent = getAgent(agentName);
 		EnergyEvent result = null;
 		try {
 			if (agent instanceof IEnergyAgent) {
@@ -1344,7 +1319,7 @@ public class Sapere {
 		if (!isInSpace(agentName)) {
 			// Agent already out of tuple space
 			setAgentExpired(agentName, warning);
-			return this.getAgent(agentName);
+			return getAgent(agentName);
 		}
 		// Use the regulator agent to send a user interruption
 		SapereAgent regAgent = getAgent(regulatorAgentName);
@@ -1380,7 +1355,7 @@ public class Sapere {
 				logger.error(e);
 			}
 		}
-		return this.getAgent(agentName);
+		return getAgent(agentName);
 	}
 
 	public List<String> getRunningServiceAgents() {
@@ -1432,9 +1407,9 @@ public class Sapere {
 
 	public EnergySupply getAgentSupply(String agentName) {
 		EnergySupply result = null;
-		SapereAgent agent = this.getAgent(agentName);
+		SapereAgent agent = getAgent(agentName);
 		if (agent instanceof EnergyAgent) {
-			result = ((EnergyAgent) agent).getEnergySupply();
+			result = ((EnergyAgent) agent).getGlobalProduction();
 		}
 		if (result != null) {
 			return result.clone();
@@ -1442,24 +1417,29 @@ public class Sapere {
 		return result;
 	}
 
-	public AgentForm modifyEnergyAgent(AgentInputForm agentInputForm) {
+	public AgentForm modifyEnergyAgent(AgentInputForm agentInputForm) throws HandlingException {
+		agentInputForm.checkContent();
 		resolveAgentsNotInsapce();
 		String agentName = agentInputForm.getAgentName();
-		EnergySupply energySupply = agentInputForm.retrieveEnergyRequest();
-		if (!SapereUtil.checkIsRound(agentInputForm.getPower(), NB_DEC_POWER, logger)) {
+		ProsumerRole prosumerRole = agentInputForm.getProsumerRole();
+		EnergyFlow energySupply = (ProsumerRole.PRODUCER.equals(prosumerRole)) ?
+				  agentInputForm.retrieveEnergySupply()
+				: agentInputForm.retrieveEnergyRequest();
+		if (!SapereUtil.checkPowerRounded(agentInputForm.getPower(), logger)) {
 			logger.info("---- modifyAgent : power = " + agentInputForm.getPower());
-			double powerToSet = SapereUtil.round(agentInputForm.getPower(), NB_DEC_POWER);
+			double powerToSet = SapereUtil.roundPower(agentInputForm.getPower());
 			agentInputForm.setPowers(powerToSet, powerToSet, powerToSet);
 		}
 		agentInputForm.setTimeShiftMS(getTimeShiftMS());
-		// Use the regulator agent to send a user interruption
-		if (energySupply.getIssuerLocation() == null) {
-			energySupply.setIssuerLocation(nodeContext.getNodeConfig());
+		if (energySupply.getIssuerProperties().getLocation() == null) {
+			energySupply.getIssuerProperties().setLocation(nodeContext.getNodeLocation());
 		}
 		SapereAgent regAgent = getAgent(regulatorAgentName);
 		if (regAgent instanceof RegulatorAgent) {
+			// Use the regulator agent to send a user interruption
 			RegulatorAgent regulatorAgent = (RegulatorAgent) regAgent;
-			regulatorAgent.modifyAgent(agentName, energySupply);
+			ChangeRequest changeRequest = new ChangeRequest(agentName, energySupply, prosumerRole);
+			regulatorAgent.modifyAgent(changeRequest);
 		}
 		try {
 			Thread.sleep(1000);
@@ -1480,175 +1460,118 @@ public class Sapere {
 						&& (Math.abs(newAgentSpply.getPower() - energySupply.getPower()) < 0.001);
 				nbWait++;
 			} catch (InterruptedException e) {
-				e.printStackTrace();
 				logger.error(e);
 			}
 		}
-		SapereAgent agent = this.getAgent(agentName);
+		SapereAgent agent = getAgent(agentName);
 		return generateAgentForm(agent);
 	}
 
-	public PredictionData getPrediction(PredictionRequest predictionRequest) {
+	public PredictionData getPrediction(PredictionRequest predictionRequest) throws HandlingException {
 		checkInitialisation();
-		if (nodeContext.isPredictionsActivated()) {
+		if (nodeContext.isPredictionsActivated(predictionRequest.getScopeEnum())) {
 			LearningAgent learningAgent = this.getLearningAgent();
-			Date targetDate = new Date(predictionRequest.getLongTargetDate());
-			List<Date> targetDates = new ArrayList<Date>();
-			targetDates.add(targetDate);
-			Date initDate = new Date(predictionRequest.getLongInitDate());
-			boolean useCorrections = predictionRequest.isUseCorrections();
-			logger.info("targetDate = " + targetDate);
-			PredictionContext predictionContext = learningAgent.getPredictionContextCopy();
-			PredictionData result = PredictionHelper.getInstance().computePrediction2(predictionContext, initDate,
-					targetDates, learningAgent.getVariables(), useCorrections);
-			return result;
+			return learningAgent.computePrediction2(predictionRequest);
 		}
 		return new PredictionData();
 	}
 
-	public MultiPredictionsData generateMassivePredictions(MassivePredictionRequest massivePredictionRequest) {
+	public MultiPredictionsData generateMassivePredictions(MassivePredictionRequest massivePredictionRequest) throws HandlingException {
 		checkInitialisation();
-		if (nodeContext.isPredictionsActivated()) {
+		if (nodeContext.isPredictionsActivated(massivePredictionRequest.getScopeEnum())) {
 			LearningAgent learningAgent = this.getLearningAgent();
-			PredictionContext predictionContext = learningAgent.getPredictionContextCopy();
-			TimeSlot targetDateSlot = massivePredictionRequest.getTimeSlot();
-			// NodeConfig nodeLocation = massivePredictionRequest.getNodeLocation();
-			String variableName = massivePredictionRequest.getVariableName();
-			logger.info("targetDateMin = " + targetDateSlot.getBeginDate() + ", targetDateMax = "
-					+ targetDateSlot.getEndDate());
-			int horizonInMinutes = massivePredictionRequest.getHorizonInMinutes();
-			boolean useCorrections = massivePredictionRequest.isUseCorrections();
-			boolean generateCorrections = massivePredictionRequest.isGenerateCorrections();
-			return PredictionHelper.getInstance().generateMassivePredictions(predictionContext, targetDateSlot,
-					horizonInMinutes, variableName, useCorrections, generateCorrections);
+			return learningAgent.generateMassivePredictions(massivePredictionRequest);
 		}
 		return new MultiPredictionsData();
 	}
 
-	public List<PredictionStatistic> computePredictionStatistics(StatisticsRequest statisticsRequest) {
+	public List<PredictionStatistic> computePredictionStatistics(StatisticsRequest statisticsRequest) throws HandlingException {
 		List<PredictionStatistic> result = new ArrayList<PredictionStatistic>();
-		if (nodeContext.isPredictionsActivated()) {
+		if (nodeContext.isPredictionsActivated(statisticsRequest.getScopeEnum())) {
 			try {
 				LearningAgent learningAgent = this.getLearningAgent();
-				PredictionContext predictionContext = learningAgent.getPredictionContextCopy();
-				Date minComputeDay = new Date(statisticsRequest.getLongMinComputeDay());
-				Date maxComputeDay = new Date(statisticsRequest.getLongMaxComputeDay());
-				Date minTargetDate = new Date();// statisticsRequest.getLongMinTargetDay());
-				Date maxTargetDate = new Date();// statisticsRequest.getLongMaxTargetDay());
-				// NodeConfig nodeLocation = statisticsRequest.getNodeLocation();
-				String variableName = statisticsRequest.getVariableName();
-				Boolean useCorrectionFilter = statisticsRequest.getUseCorrectionFilter();
-				Integer minHour = statisticsRequest.getMinTargetHour();
-				Integer maxHour = statisticsRequest.getMaxTargetHour();
-				String[] fieldsToMerge = statisticsRequest.getFieldsToMerge();
-				Map<String, PredictionStatistic> mapStatistics = PredictionHelper.getInstance()
-						.computePredictionStatistics(predictionContext, minComputeDay, maxComputeDay, minTargetDate,
-								maxTargetDate, minHour, maxHour, useCorrectionFilter, variableName, fieldsToMerge);
-				for (PredictionStatistic stat : mapStatistics.values()) {
-					result.add(stat);
-				}
-				Collections.sort(result, new Comparator<PredictionStatistic>() {
-					public int compare(PredictionStatistic predictionStatistic1,
-							PredictionStatistic predictionStatistic2) {
-						return predictionStatistic1.compareTo(predictionStatistic2);
-					}
-				});
+				result = learningAgent.computePredictionStatistics(statisticsRequest);
 			} catch (Exception e) {
 				logger.error(e);
+				throw e;
 			}
 		}
 		return result;
 	}
 
-	public FedAvgResult checkupFedAVG(FedAvgCheckupRequest fedAvgCheckupRequest) {
-		// Map<String, TransitionMatrix> result = new HashMap<String,
-		// TransitionMatrix>();
-		FedAvgResult result = new FedAvgResult();
-		String variableName = fedAvgCheckupRequest.getVariableName();
-		result.setVariableName(variableName);
-		// Map<String, TransitionMatrix> mapAggregation = new HashMap<>();
-		boolean aggregationSet = false;
-		if (nodeContext.isPredictionsActivated()) {
-			try {
-				for (Lsa lsa : NodeManager.instance().getSpace().getAllLsa().values()) {
-					if (AgentType.LEARNING_AGENT.getLabel().equals(lsa.getAgentAuthentication().getAgentType())) {
-						String agentNode = lsa.getAgentAuthentication().getNodeLocation().getName();
-						for (Property prop : lsa.getProperties()) {
-							Object value = prop.getValue();
-							if (value instanceof NodeTransitionMatrices) {
-								NodeTransitionMatrices nodeTrMatrices = (NodeTransitionMatrices) value;
-								TransitionMatrix trMatrix = nodeTrMatrices.getTransitionMatrix(variableName);
-								String propName = prop.getName();
-								if ("MODEL_AGGR".equals(propName)) {
-									if (nodeContext.getNodeConfig().getName().equals(agentNode)) {
-										result.setAggregateTransitionMatrix(trMatrix);
-										logger.info("checkupFedAVG : add AGGREGATION");
-										aggregationSet = true;
-									}
-								} else if ("MODEL".equals(propName)) {
-									result.addNodeTransitionMatrix(agentNode, trMatrix);
-									logger.info("checkupFedAVG : add MODEL of " + propName);
-								}
-							}
-						}
-					}
-				}
-			} catch (Throwable e) {
-				logger.error(e);
-			}
-		}
-		if (!aggregationSet && result.getNodeTransitionMatrices().size() == 1) {
-			for (TransitionMatrix trMatrix : result.getNodeTransitionMatrices().values()) {
-				result.setAggregateTransitionMatrix(trMatrix);
-			}
-		}
-		logger.info("after loop1");
-		return result;
+	public AbstractAggregationResult checkupModelAggregation(AggregationCheckupRequest fedAvgCheckupRequest) {
+		LearningAgent learningAgent = getLearningAgent();
+		return learningAgent.checkupModelAggregation(fedAvgCheckupRequest);
 	}
 
-	public List<MarkovStateHistory> retrieveLastMarkovHistoryStates(StateHistoryRequest stateHistoryRequest) {
+	public List<VariableStateHistory> retrieveLastHistoryStates(StateHistoryRequest stateHistoryRequest) throws HandlingException {
 		checkInitialisation();
-		if (nodeContext.isPredictionsActivated()) {
+		PredictionScope scope = stateHistoryRequest.getScopeEnum();
+		if (nodeContext.isPredictionsActivated(scope)) {
 			LearningAgent learningAgent = this.getLearningAgent();
 			Date minCreationDate = stateHistoryRequest.getMinDate();
 			String variableName = stateHistoryRequest.getVariableName();
 			boolean observationUpdated = stateHistoryRequest.getObservationUpdated();
-			List<MarkovStateHistory> result = learningAgent.retrieveLastMarkovHistoryStates(minCreationDate,
+			List<VariableStateHistory> result = learningAgent.retrieveLastHistoryStates(
+					stateHistoryRequest.getScopeEnum(),
+					minCreationDate,
 					variableName, observationUpdated);
 			return result;
 		}
-		return new ArrayList<MarkovStateHistory>();
+		return new ArrayList<VariableStateHistory>();
 	}
 
-	public ProducerAgent restartProducer(String agentName, EnergySupply supply) {
-		logger.info("restartProducer " + agentName);
-		if (supply.getIssuerLocation() == null) {
-			supply.setIssuerLocation(nodeContext.getNodeConfig());
-			// supply.setIssuerLocation(NodeManager.getNodeConfig());
+	public ProsumerAgent restartProsumer(String agentName, EnergySupply supply, EnergyRequest need) {
+		if (!isRunning) {
+			return null;
+		}
+		if (!(getAgent(agentName) instanceof ProsumerAgent)) {
+			return null;
+		}
+		if (supply != null && supply.getIssuerProperties() != null && supply.getIssuerProperties().getLocation() == null) {
+			supply.getIssuerProperties().setLocation(nodeContext.getNodeLocation());
+		}
+		if (need != null && need.getIssuerProperties() != null && need.getIssuerProperties().getLocation() == null) {
+			need.getIssuerProperties().setLocation(nodeContext.getNodeLocation());
 		}
 		if (!isInSpace(agentName)) {
-			supply.checkBeginNotPassed();
+			logger.info("restartProsumer : restart agent " + agentName);
+			// Restart consuer agent
+			SapereAgent agent = getAgent(agentName);
 			NodeManager.instance().getNotifier().unsubscribe(agentName);
-			SapereAgent agent = this.getAgent(agentName);
-			if (agent instanceof ProducerAgent) {
-				ProducerAgent producerAgent = (ProducerAgent) agent;
-				synchronized (producerAgent) {
-					int id = producerAgent.getId();
-					// ServiceAgents.remove(producerAgent);
-					AgentAuthentication authentication = producerAgent.getAuthentication();
-					producerAgent.reinitialize(id, authentication, supply);
-					producerAgent.initFields(supply, producerAgent.getProducerPolicy());
-					if (!serviceAgents.contains(producerAgent)) {
-						serviceAgents.add(producerAgent);
+			AgentAuthentication prosumerAuthentication = agent.getAuthentication();
+			if(supply != null) {
+				supply.checkBeginNotPassed();
+			}
+			if(need != null) {
+				need.checkBeginNotPassed();
+			}
+			ProsumerAgent prosumerAgent = (ProsumerAgent) agent;
+			IProducerPolicy producerPolicy = prosumerAgent.getProducerPolicy();
+			IConsumerPolicy consumerPolicy = prosumerAgent.getConsumerPolicy();
+			synchronized (prosumerAgent) {
+				try {
+					// Re-initialize consumer agent
+					Integer id = prosumerAgent.getId();
+					prosumerAgent.reinitialize(id, prosumerAuthentication, supply, need, producerPolicy, consumerPolicy,
+							nodeContext);
+					if (!serviceAgents.contains(prosumerAgent)) {
+						serviceAgents.add(prosumerAgent);
 					}
-					producerAgent.setInitialLSA();
+					prosumerAgent.setInitialLSA();
+					// Wait untill contract agent is in space
+				} catch (Exception e) {
+					logger.error(e);
 				}
 			}
+		} else {
+			logger.info("restartProsumer : " + agentName + " is already in tupple splace");
 		}
-		// Wait untill contract agent is in sapce
+
+		// Wait untill consumer agent is in sapce
 		int nbWait = 0;
 		while (!isInSpace(agentName) && nbWait < 30) {
-			logger.info("restartProducer : agent " + agentName + " not in sapce : Waiting ");
+			logger.info("restartProsumer : agent " + agentName + " not in sapce : Waiting ");
 			try {
 				Thread.sleep(100);
 			} catch (InterruptedException e) {
@@ -1656,27 +1579,38 @@ public class Sapere {
 			}
 			nbWait++;
 		}
-		logger.info("restartProducer : end : " + agentName + " in space = " + isInSpace(agentName));
-		SapereAgent agent = this.getAgent(agentName);
-		if (agent instanceof ProducerAgent) {
-			return (ProducerAgent) agent;
+		logger.info("restartProsumer : agent " + agentName + " isInSpace = " + isInSpace(agentName));
+		nbWait = 0;
+		// Return consumer agent
+		SapereAgent consumerAgent1 = getAgent(agentName);
+		if (consumerAgent1 instanceof ProsumerAgent) {
+			return (ProsumerAgent) (getAgent(agentName));
 		}
 		return null;
+	}
+
+	public ProsumerAgent restartConsumer(String consumerAgentName, EnergyRequest need) {
+		EnergySupply supply = null;
+		logger.info("restartConsumer : needed power = " + need.getPower());
+		return restartProsumer(consumerAgentName, supply, need);
+	}
+
+	public ProsumerAgent restartProducer(String agentName, EnergySupply supply) {
+		EnergyRequest need = null;
+		return restartProsumer(agentName, supply, need);
 	}
 
 	public boolean isLocalAgent(String agentName) {
 		boolean isLocal = false;
 		if (mapAgentAuthentication.containsKey(agentName)) {
-			AgentAuthentication authentication = this.mapAgentAuthentication.get(agentName);
-			isLocal = (NodeManager.getLocation().equals(authentication.getNodeLocation().getMainServiceAddress()));
+			AgentAuthentication authentication = mapAgentAuthentication.get(agentName);
+			isLocal = (NodeManager.getLocationAddress().equals(authentication.getNodeLocation().getMainServiceAddress()));
 		}
 		return isLocal;
 	}
 
 	public boolean isInSpace(String agentName) {
-		boolean isLocal = isLocalAgent(agentName);
-		String agentName2 = agentName + (isLocal ? "" : "*");
-		boolean result = NodeManager.instance().getSpace().getAllLsa().containsKey(agentName2);
+		boolean result = NodeManager.instance().getSpace().getAllLsa().containsKey(agentName);
 		if (!result) {
 			// logger.info("isInSpace : for debug : " + agentName + " not in space");
 		}
@@ -1691,7 +1625,7 @@ public class Sapere {
 		AgentForm result = null;
 		// boolean isLocal =
 		// NodeManager.isLocal(agent.getAuthentication().getNodeLocation());
-		int distance = NodeManager.instance().getDistance(agent.getAuthentication().getNodeLocation());
+		int distance = NodeManager.getDistance(agent.getAuthentication().getNodeLocation());
 		if (agent instanceof EnergyAgent) {
 			EnergyAgent energyAgent = (EnergyAgent) agent;
 			isInSpace = isInSpace(energyAgent.getAgentName());
@@ -1705,18 +1639,21 @@ public class Sapere {
 		return retrieveNodeContent(filter);
 	}
 
-	public MultiNodesContent retrieveAllNodesContent(AgentFilter filter) {
+	public MultiNodesContent retrieveAllNodesContent(AgentFilter filter) throws HandlingException {
 		if (nodeContext == null) {
-			return new MultiNodesContent(new NodeConfig(), null, 0);
+			return new MultiNodesContent(new NodeContext(), null, 0);
 		}
 		long nodeTimeShiftMS = nodeContext.getTimeShiftMS();
 		// NodeContent content = new NodeContent(null, nodeContext==null? 0 :
 		// nodeContext.getTimeShiftMS());
-		MultiNodesContent content = new MultiNodesContent(nodeContext.getNodeConfig(), filter, nodeTimeShiftMS);
-		content.setMapNeighborNodes(getMapAllNodeConfigs(false));
+		MultiNodesContent content = new MultiNodesContent(nodeContext, filter, nodeTimeShiftMS);
+		content.setMapNeighborNodes(getMapAllNodeLocations(false));
 		NodeContent currentNodeContent = retrieveNodeContent(filter);
 		content.merge(currentNodeContent, 0);
 		LearningAgent learningAgent = getLearningAgent();
+		if(learningAgent == null) {
+			throw new HandlingException("Service not initialized");
+		}
 		String[] filterNodes = filter.getNeighborNodeNames();
 		Set<String> setFilterNodes = new HashSet<String>();
 		if (filterNodes != null) {
@@ -1726,23 +1663,22 @@ public class Sapere {
 		 * if(setFilterNodes.size() > 0) {
 		 * logger.info("retrieveAllNodesContent : for debug"); }
 		 */
-		Collection<NodeConfig> neighborNodeConfigs = learningAgent.getMapNeighborNodeConfigs().values();
-		for (NodeConfig nextNodeConfig : neighborNodeConfigs) {
-			// call distant web service
-			String nextNodeName = nextNodeConfig.getName();
+		Collection<NodeLocation> neighborNodeLocations = NodeManager.getAllLocations(false);
+		for (NodeLocation nextNodeLocation : neighborNodeLocations) {
+			// call distant web service			
+			String nextNodeName = nextNodeLocation.getName();
 			if (setFilterNodes.contains(nextNodeName) || setFilterNodes.size() == 0) {
-				String nextNodeUrl = nextNodeConfig.getUrl();
+				String nextNodeUrl = nextNodeLocation.getUrl();
 				if (nextNodeUrl != null) {
 					Map<String, Object> params = UtilHttp.generateRequestParams(filter, UtilDates.format_json_datetime,
 							logger, UtilHttp.METHOD_GET);
 					// params = new HashMap<>();
 					String postResponse = UtilHttp.sendGetRequest(nextNodeUrl + "retrieveNodeContent", params, logger,
-							debugLevel);
+							nodeContext.getDebugLevel());
 					if (postResponse != null) {
 						JSONObject jsonNodeContent = new JSONObject(postResponse);
 						NodeContent neighbourNodeContant = UtilJsonParser.parseNodeContent(jsonNodeContent, logger);
-						int neighbourDistance = NodeManager.instance()
-								.getDistance(neighbourNodeContant.getNodeConfig());
+						int neighbourDistance = NodeManager.getDistance(neighbourNodeContant.getNodeContext().getNodeLocation());
 						content.merge(neighbourNodeContant, neighbourDistance);
 					}
 				}
@@ -1753,11 +1689,13 @@ public class Sapere {
 
 	public NodeContent retrieveNodeContent(AgentFilter filter) {
 		if (nodeContext == null) {
-			return new NodeContent(new NodeConfig(), null, 0);
+			return new NodeContent(new NodeContext(), null, 0);
 		}
 		long nodeTimeShiftMS = nodeContext == null ? 0 : nodeContext.getTimeShiftMS();
-		NodeContent content = new NodeContent(nodeContext.getNodeConfig(), filter, nodeTimeShiftMS);
-		content.setMapNeighborNodes(getMapAllNodeConfigs(false));
+		NodeContent content = new NodeContent(nodeContext, filter, nodeTimeShiftMS);
+		content.setMapNodeDistance(NodeManager.getMapDistanceByNode());
+		content.setCurrentDate(getCurrentDate());
+		content.setMapNeighborNodes(getMapAllNodeLocations(false));
 		Map<String, Lsa> lsaInSpace = NodeManager.instance().getSpace().getAllLsa();
 		content.setNoFilter(true);
 		/*
@@ -1768,10 +1706,15 @@ public class Sapere {
 		for (SapereAgent agent : serviceAgents) {
 			if (filter.applyFilter(agent)) {
 				//String agentNode = agent.getAuthentication().getNodeLocation().getName();
-				NodeConfig agentLocation = agent.getAuthentication().getNodeLocation();
-				// boolean isLocal = nodeContext.getNodeConfig().getName().equals(agentNode);
-				int distance = NodeManager.instance().getDistance(agentLocation);
+				NodeLocation agentLocation = agent.getAuthentication().getNodeLocation();
+				int distance = NodeManager.getDistance(agentLocation);
 				boolean inSpace = lsaInSpace.containsKey(agent.getAgentName());
+				if (agent instanceof ProsumerAgent) {
+					ProsumerAgent prosumerAgent = (ProsumerAgent) agent;
+					// producer.setInSpace(inSpace);
+					content.addProsumer(prosumerAgent, inSpace, distance);
+				}
+				/*
 				if (agent instanceof ProducerAgent) {
 					ProducerAgent producer = (ProducerAgent) agent;
 					// producer.setInSpace(inSpace);
@@ -1781,7 +1724,7 @@ public class Sapere {
 					// consumer.getLinkedAgents();
 					// consumer.setInSpace(inSpace);
 					content.addConsumer(consumer, inSpace, distance);
-				}
+				}*/
 			} else {
 				content.setNoFilter(false);
 			}
@@ -1791,40 +1734,41 @@ public class Sapere {
 		return content;
 	}
 
-	public NodeContent restartLastNodeContent() {
-		List<ExtendedEnergyEvent> events = EnergyDbHelper.retrieveLastSessionEvents();
+	public NodeContent restartLastNodeContent() throws HandlingException {
 		Date current = getCurrentDate();
+		List<ExtendedEnergyEvent> events = EnergyDbHelper.retrieveLastSessionEvents(current);
 		this.checkInitialisation();
 		for (EnergyEvent event : events) {
 			if (EventType.PRODUCTION_START.equals(event.getType())) {
+				PricingTable pricingTable = new PricingTable(nodeContext.getTimeShiftMS());
 				EnergySupply supply = generateSupply(event.getPower(), getCurrentDate(), event.getEndDate(),
-						event.getDeviceProperties(), event.getPricingTable());
-				IProducerPolicy producerPolicy = initDefaultProducerPolicy();
-				this.addServiceProducer(supply, producerPolicy);
+						event.getIssuerProperties().getDeviceProperties(), pricingTable);
+				IProducerPolicy producerPolicy = policyFactory.initDefaultProducerPolicy();
+				this.addServiceProducer(supply, producerPolicy, policyFactory.initDefaultConsumerPolicy());
 			} else if (EventType.REQUEST_START.equals(event.getType())) {
 				current = getCurrentDate();
-				double _delayToleranceMinutes = UtilDates.computeDurationMinutes(current, event.getEndDate());
+				double delayToleranceMinutes = UtilDates.computeDurationMinutes(current, event.getEndDate());
+				//PricingTable pricingTable = new PricingTable(nodeContext.getTimeShiftMS());
 				EnergyRequest request = generateRequest(event.getPower(), current, event.getEndDate(),
-						_delayToleranceMinutes, PriorityLevel.LOW, event.getDeviceProperties(),
-						event.getPricingTable());
-				this.addServiceConsumer(request, null);
+						delayToleranceMinutes, PriorityLevel.LOW, event.getIssuerProperties().getDeviceProperties());
+				this.addServiceConsumer(request, policyFactory.initDefaultProducerPolicy(), policyFactory.initDefaultConsumerPolicy());
 			}
 		}
 		return this.retrieveNodeContent();
 	}
 
-	public ConsumerAgent getConsumerAgent(String agentName) {
+	public ProsumerAgent getProsumerAgent(String agentName) {
 		SapereAgent agent = getAgent(agentName);
-		if (agent instanceof ConsumerAgent) {
-			ConsumerAgent consumer = (ConsumerAgent) agent;
+		if (agent instanceof ProsumerAgent) {
+			ProsumerAgent consumer = (ProsumerAgent) agent;
 			return consumer;
 		}
 		return null;
 	}
 
 	public boolean isConsumerSatified(String agentName) {
-		ConsumerAgent agent = getConsumerAgent(agentName);
-		if (agent != null) {
+		ProsumerAgent agent = getProsumerAgent(agentName);
+		if (agent != null && agent.isConsumer()) {
 			return agent.isSatisfied();
 		}
 		return false;
@@ -1835,55 +1779,53 @@ public class Sapere {
 	 * } return null; }
 	 */
 
-	public NodeTransitionMatrices getCurrentNodeTransitionMatrices() {
+	public PredictionContext getPredictionContext(PredictionScopeFilter scopeFilter) {
 		LearningAgent learningAgent = getLearningAgent();
-		if (learningAgent != null && nodeContext.isPredictionsActivated()) {
-			return learningAgent.getNodeTransitionMatrices();
+		PredictionScope scope = scopeFilter.getScopeEnum();
+		if (learningAgent != null && nodeContext.isPredictionsActivated(scope)) {
+			return learningAgent.getPredictionContext(scope);
 		}
 		return null;
 	}
 
-	private static final Comparator<NodeTransitionMatrices> timeWindowComparator = new Comparator<NodeTransitionMatrices>() {
-		public int compare(NodeTransitionMatrices trMatrix1, NodeTransitionMatrices trMatrix2) {
-			return trMatrix1.getTimeWindowId() - trMatrix2.getTimeWindowId();
-		}
-	};
-
-	public List<NodeTransitionMatrices> getAllNodeTransitionMatrices(MatrixFilter matrixFilter) {
+	public ILearningModel getLearningModel(MatrixFilter matrixFilter) {
 		if (matrixFilter.getNodeName() == null || matrixFilter.getNodeName() == "" && nodeContext != null) {
-			matrixFilter.setNodeName(nodeContext.getNodeConfig().getName());
+			matrixFilter.setNodeName(nodeContext.getNodeLocation().getName());
 		}
 		LearningAgent learningAgent = getLearningAgent();
-		if (learningAgent != null && nodeContext.isPredictionsActivated()) {
-			List<NodeTransitionMatrices> result = new ArrayList<NodeTransitionMatrices>();
-			List<MarkovTimeWindow> listTimeWindows = new ArrayList<MarkovTimeWindow>();
-			for (MarkovTimeWindow nextTimeWindow : LearningAgent.ALL_TIME_WINDOWS) {
-				if (matrixFilter.applyFilter(nextTimeWindow)) {
-					listTimeWindows.add(nextTimeWindow);
-				}
-			}
-			PredictionContext predictionCtx = learningAgent.getPredictionContextCopy();
-			String[] variables = learningAgent.getVariables();
-			if (matrixFilter.getVariableName() != null && !"".equals(matrixFilter.getVariableName())) {
-				String[] filterVariables = new String[] { matrixFilter.getVariableName() };
-				variables = filterVariables;
-			}
-			Map<Integer, NodeTransitionMatrices> mapResult = PredictionDbHelper
-					.loadListNodeTransitionMatrice(predictionCtx, variables, listTimeWindows, getCurrentDate());
-			for (NodeTransitionMatrices next : mapResult.values()) {
-				result.add(next);
-			}
-			Collections.sort(result, timeWindowComparator);
+		if (learningAgent != null && nodeContext.isPredictionsActivated(matrixFilter.getScopeEnum())) {
+			ILearningModel result = learningAgent.getLearningModelCopy(matrixFilter);
 			return result;
 		}
-		return new ArrayList<NodeTransitionMatrices>();
+		return null;
 	}
 
-	public void logProdAgents() {
+	public ILearningModel initNodeHistory(HistoryInitializationForm historyInitForm) throws HandlingException {
+		LearningAgent learningAgent = getLearningAgent();
+		if (learningAgent != null) {
+			ILearningModel result1 = learningAgent.initNodeHistory(historyInitForm);
+			return result1;
+		}
+		return null;
+	}
+
+	public ILearningModel initNodeHistory(HistoryInitializationRequest historyInitRequest) throws HandlingException {
+		LearningAgent learningAgent = getLearningAgent();
+		if (learningAgent != null) {
+			ILearningModel result1 = learningAgent.initNodeHistory(historyInitRequest);
+			return result1;
+		}
+		return null;
+	}
+
+
+	public void logProducerAgents(boolean onlyProducer) {
 		for (SapereAgent agent : serviceAgents) {
-			if (agent instanceof ProducerAgent) {
-				ProducerAgent prodAgent = (ProducerAgent) agent;
-				prodAgent.logAgent();
+			if (agent instanceof ProsumerAgent) {
+				ProsumerAgent prosumerAgent = (ProsumerAgent) agent;
+				if(!onlyProducer  || prosumerAgent.isProducer()) {
+					prosumerAgent.logAgent();
+				}
 			}
 		}
 	}
@@ -1950,11 +1892,11 @@ public class Sapere {
 		logger.info("after cleanSubscriptions : nbSubscriptions = " + totalSubscriptions);
 	}
 
-	public void checkupProdAgents() {
+	public void checkupProsumerAgents() {
 		for (SapereAgent agent : serviceAgents) {
-			if (agent instanceof ProducerAgent) {
-				ProducerAgent prodAgent = (ProducerAgent) agent;
-				prodAgent.checkup();
+			if (agent instanceof ProsumerAgent) {
+				ProsumerAgent prosumerAgent = (ProsumerAgent) agent;
+				prosumerAgent.checkup();
 			}
 		}
 	}
@@ -1977,17 +1919,22 @@ public class Sapere {
 	 * if(lsa.getAgentName().equals(agentName)) { lsa.removeAllProperties(); } } }
 	 */
 
-	public EndUserForcastingResult getForcasting(EndUserForcastingRequest endUserForcastingRequest) {
+	public EndUserForcastingResult getForcasting(EndUserForcastingRequest endUserForcastingRequest) throws HandlingException {
 		LearningAgent learningAgent = getLearningAgent();
 		return learningAgent.getForcasting(endUserForcastingRequest);
 	}
 
-	public ForcastingResult generateMockForcasting(Map<String, Double> /*ForcastingRequest*/ forcastingRequest) {
+	public ForcastingResult1 generateMockForcasting1(Map<String, Double> forcastingRequest) {
 		LearningAgent learningAgent = getLearningAgent();
-		return learningAgent.generateMockForcasting(forcastingRequest);
+		return learningAgent.generateMockForcasting1(forcastingRequest);
 	}
 
-	public EndUserForcastingRef getEndUserForcastingRef() {
+	public ForcastingResult2 generateMockForcasting2(Map<String, Double> forcastingRequest) {
+		LearningAgent learningAgent = getLearningAgent();
+		return learningAgent.generateMockForcasting2(forcastingRequest);
+	}
+
+	public EndUserForcastingRef getEndUserForcastingRef() throws HandlingException {
 		String[] tab_min = {"00", "15", "30", "45"};
 		EndUserForcastingRef result = new EndUserForcastingRef();
 		List<OptionItem> listTimes = new ArrayList<>();
@@ -2012,15 +1959,19 @@ public class Sapere {
 		sDefaultDate = sDefaultDate.substring(0,5);
 		result.setDefaultTime(sDefaultDate);
 		TimeSlot interval = EnergyDbHelper.getInstance().retrieveTValueInterval();
-		result.setDatesInterval(interval);
+		if(interval != null) {
+			result.setDatesInterval(interval);
+		}
 		// List of years
 		List<OptionItem> listOfYears = new ArrayList<>();
-		calendar.setTime(interval.getBeginDate());
-		int year = calendar.get(Calendar.YEAR);
-		while(calendar.getTime().before(interval.getEndDate())) {
-			listOfYears.add(new OptionItem(""+year, ""+year));
-			calendar.add(Calendar.YEAR, 1);
-			year = calendar.get(Calendar.YEAR);
+		if(interval != null) {
+			calendar.setTime(interval.getBeginDate());
+			int year = calendar.get(Calendar.YEAR);
+			while(calendar.getTime().before(interval.getEndDate())) {
+				listOfYears.add(new OptionItem(""+year, ""+year));
+				calendar.add(Calendar.YEAR, 1);
+				year = calendar.get(Calendar.YEAR);
+			}
 		}
 		result.setListOfYears(listOfYears);
 		// List of months

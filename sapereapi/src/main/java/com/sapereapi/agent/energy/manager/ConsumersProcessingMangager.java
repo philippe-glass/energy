@@ -12,15 +12,18 @@ import com.sapereapi.agent.energy.EnergyAgent;
 import com.sapereapi.db.EnergyDbHelper;
 import com.sapereapi.exception.PermissionException;
 import com.sapereapi.log.SapereLogger;
+import com.sapereapi.model.HandlingException;
 import com.sapereapi.model.Sapere;
 import com.sapereapi.model.energy.ConfirmationItem;
 import com.sapereapi.model.energy.ConfirmationTable;
 import com.sapereapi.model.energy.EnergyRequest;
 import com.sapereapi.model.energy.EnergySupply;
-import com.sapereapi.model.energy.NodeTotal;
 import com.sapereapi.model.energy.PowerSlot;
+import com.sapereapi.model.energy.ProsumerProperties;
 import com.sapereapi.model.energy.ReducedContract;
 import com.sapereapi.model.energy.SingleOffer;
+import com.sapereapi.model.energy.node.NodeTotal;
+import com.sapereapi.model.energy.policy.IProducerPolicy;
 import com.sapereapi.model.protection.ProtectedConfirmationTable;
 import com.sapereapi.model.protection.ProtectedContract;
 import com.sapereapi.model.protection.ProtectedSingleOffer;
@@ -30,7 +33,6 @@ import com.sapereapi.util.UtilDates;
 
 import eu.sapere.middleware.lsa.Lsa;
 import eu.sapere.middleware.lsa.Property;
-import eu.sapere.middleware.lsa.SyntheticPropertyName;
 
 public class ConsumersProcessingMangager {
 	private ConsumersProcessingTable mainProcessingTable = null;
@@ -260,30 +262,21 @@ public class ConsumersProcessingMangager {
 	}
 
 	public void refreshWaitingOffersProperty(EnergyAgent producerAgent) {
-		producerAgent.getLsa().removePropertiesByName("DEBUG_WAITING_OFFERS");
 		if(showWaitingOffers) {
 			Collection<SingleOffer> tableWaitingOffers = getWaitingOffers();
 			if(tableWaitingOffers!=null) {
-				producerAgent.addProperty(new Property("DEBUG_WAITING_OFFERS", tableWaitingOffers.toString()));
+				producerAgent.replacePropertyWithName(new Property("DEBUG_WAITING_OFFERS", tableWaitingOffers.toString()));
 			}
 		}
 	}
 
-	public void addOffer(EnergyAgent producerAgent, SingleOffer newOffer) {
+	public void addOffer(EnergyAgent producerAgent, SingleOffer newOffer) throws HandlingException {
 		String consumer = newOffer.getConsumerAgent();
-		Lsa chosenLSA = producerAgent.getChosenLsa(consumer);
-		String ipSource = (chosenLSA==null)? "" : chosenLSA.getSyntheticProperty(SyntheticPropertyName.SOURCE).toString();
-		String sState = "";
+		String ipSource = producerAgent.getIpSource();
 		removeOffer(producerAgent, consumer, newOffer.isComplementary(), "addOffer");
-		/*
-		try {
-			sState = SapereUtil.addOutputsToLsaState(chosenLSA, new String[] { "OFFER" });
-		} catch (Exception e) {
-			logger.error(e);
-		}*/
 		// add offer in OFFER property
 		ProtectedSingleOffer protectedOffer = new ProtectedSingleOffer(newOffer.clone());
-		Property pOffer = new Property("OFFER", protectedOffer.clone(), consumer, consumer, sState,	ipSource, false);
+		Property pOffer = new Property("OFFER", protectedOffer.clone(), consumer, consumer, "",	ipSource, false);
 		producerAgent.addProperty(pOffer);
 		// add offer in WAITING_OFFERS property
 		if(newOffer.isComplementary()) {
@@ -296,7 +289,7 @@ public class ConsumersProcessingMangager {
 		checkup(producerAgent);
 	}
 
-	public void removeOffer(EnergyAgent producerAgent, String consumer, boolean isComplementary, String logTag) {
+	public void removeOffer(EnergyAgent producerAgent, String consumer, boolean isComplementary, String logTag) throws HandlingException {
 		// For debug
 		debug_checkOfferAcquitted(producerAgent, consumer);
 		producerAgent.getLsa().removePropertiesByQueryAndName(consumer, "OFFER");
@@ -309,7 +302,7 @@ public class ConsumersProcessingMangager {
 		refreshWaitingOffersProperty(producerAgent);
 	}
 
-	public void debug_checkOfferAcquitted(EnergyAgent producerAgent, String consumer) {
+	public void debug_checkOfferAcquitted(EnergyAgent producerAgent, String consumer) throws HandlingException {
 		ProtectedSingleOffer protectedOffer = (ProtectedSingleOffer) producerAgent.getLsa().getOnePropertyValueByQueryAndName(consumer, "OFFER");
 		if(protectedOffer!=null && protectedOffer.hasAccesAsProducer(producerAgent)) {
 			try {
@@ -399,7 +392,7 @@ public class ConsumersProcessingMangager {
 				} else {
 					mainProcessingTable.removeContract(producerAgent, consumer, log);
 				}
-				if (reducedContract != null && producerAgent.containsChosenLsa(consumer)) {
+				if (reducedContract != null) {
 					sendConfirmation(producerAgent, reducedContract, false, producerAgent.getAgentName() + " : " + log);
 					checkup(producerAgent);
 				}
@@ -420,8 +413,7 @@ public class ConsumersProcessingMangager {
 		try {
 			if(protectedConfirmationTable.hasExpiredItem(producerAgent)) {
 				protectedConfirmationTable.cleanExpiredDate(producerAgent);
-				producerAgent.getLsa().removePropertiesByName("PROD_CONFIRM");
-				producerAgent.addProperty(new Property("PROD_CONFIRM", protectedConfirmationTable));
+				producerAgent.replacePropertyWithName(new Property("PROD_CONFIRM", protectedConfirmationTable));
 			}
 		} catch (PermissionException e) {
 			logger.error(e);
@@ -507,8 +499,7 @@ public class ConsumersProcessingMangager {
 		try {
 			ProtectedConfirmationTable protectedConfirmationTable = getProtectedConfirmationTable(producerAgent);
 			protectedConfirmationTable.confirm(producerAgent, reducedContract.getConsumerAgent(), reducedContract.isComplementary(), ok, comment, timeShiftMS);
-			producerAgent.getLsa().removePropertiesByName("PROD_CONFIRM");
-			producerAgent.addProperty(new Property("PROD_CONFIRM", protectedConfirmationTable));
+			producerAgent.replacePropertyWithName(new Property("PROD_CONFIRM", protectedConfirmationTable));
 		} catch (PermissionException e) {
 			logger.error(e);
 		}
@@ -516,10 +507,10 @@ public class ConsumersProcessingMangager {
 			// Remove the consumer agent from the received confirmation
 			boolean isComplementary = reducedContract.isComplementary();
 			String consumer = reducedContract.getConsumerAgent();
-			// Remove confirmaitons for for complementary contract
+			// Remove confirmations for the complementary contract
 			this.secondProcessingTable.removeConfirmation(consumer);
 			if(!isComplementary) {
-				// remove confirmaiton for main contract
+				// remove confirmations for the main contract
 				this.mainProcessingTable.removeConfirmation(consumer);;
 			}
 		}
@@ -578,11 +569,14 @@ public class ConsumersProcessingMangager {
 	}
 
 	public Double computeAvailablePower(EnergyAgent produceragent, boolean ignoreOffers, boolean ignoreWaitingContracts) {
-		EnergySupply supply = produceragent.getEnergySupply();
-		return supply.getPower()
-				- mainProcessingTable.computeUsedPower(produceragent, ignoreOffers, ignoreWaitingContracts)
-				- secondProcessingTable.computeUsedPower(produceragent, ignoreOffers, ignoreWaitingContracts)
-				;
+		EnergySupply supply = produceragent.getGlobalProduction();
+		if(supply != null) {
+			return supply.getPower()
+					- mainProcessingTable.computeUsedPower(produceragent, ignoreOffers, ignoreWaitingContracts)
+					- secondProcessingTable.computeUsedPower(produceragent, ignoreOffers, ignoreWaitingContracts)
+					;
+		}
+		return 0.0;
 	}
 
 	public ConfirmationItem checkAvailabilityAndExpiration(EnergyAgent producerAgent, ReducedContract reducedContract) {
@@ -615,12 +609,12 @@ public class ConsumersProcessingMangager {
 		isOK = (powerLeft >=-0.001);
 		if(!isOK) {
 			double missing = -1*powerLeft;
-			comment = agentName + " availablePower not sufficient (availablePower = " + UtilDates.df2.format(availablePower)
+			comment = agentName + " availablePower not sufficient (availablePower = " + UtilDates.df5.format(availablePower)
 					+ " isContractAlreadyInTable=" +isContractAlreadyInTable
-					+  " ,missing = " + UtilDates.df2.format(missing);
+					+  " ,missing = " + UtilDates.df5.format(missing);
 			if(!isContractAlreadyInTable) {
 				double contractMargin = contractPowerSlot.getMax() - contractPowerSlot.getCurrent();
-				comment = comment +  ", contractPower = " + contractPowerSlot + ", contractMargin = " + UtilDates.df2.format(contractMargin);
+				comment = comment +  ", contractPower = " + contractPowerSlot + ", contractMargin = " + UtilDates.df5.format(contractMargin);
 			}
 			comment = comment + ")";
 			logger.warning("checkAvailabilityAndExpiration " + comment);
@@ -659,8 +653,9 @@ public class ConsumersProcessingMangager {
 						warningLog = "*(" + warningDuraction + ")";
 					}*/
 				}
-				int idx = request.getIssuer().lastIndexOf("_");
-				String consumerNumber = request.getIssuer().substring(1+idx);
+				String reIssuer = request.getIssuer();
+				int idx = reIssuer.lastIndexOf("_");
+				String consumerNumber = reIssuer.substring(1+idx);
 				String sReq = consumerNumber;
 				if(warningDuraction>=5) {
 					sReq = sReq + "[" + warningDuraction + "s]";
@@ -674,6 +669,9 @@ public class ConsumersProcessingMangager {
 
 	public String generateNodeTotalLog(EnergyAgent producerAgent, NodeTotal nodeTotal) {
 		StringBuffer result = new StringBuffer();
+		if(nodeTotal == null) {
+			return "";
+		}
 		long maxWarningDuration =  nodeTotal.getMaxWarningDuration();
 		if(maxWarningDuration>=8) {
 			result.append("     nodeTotal={id:").append(nodeTotal.getId())
@@ -703,7 +701,8 @@ public class ConsumersProcessingMangager {
 		logger.info(tab1 + "Waiting Requests : ");
 		List<EnergyRequest> requestList = producerAgent.getProducerPolicy().sortRequests(getWaitingRequest());
 		for(EnergyRequest request : requestList) {
-			logger.info(tab2 +  request.getIssuer() + " " + request);
+			String reqIssuer = request.getIssuer();
+			logger.info(tab2 +  reqIssuer + " " + request);
 		}
 		logger.info(tab1 + "Waiting offers : ");
 		Collection<SingleOffer> waitingOffers = getWaitingOffers();
@@ -723,20 +722,43 @@ public class ConsumersProcessingMangager {
 		// producerAgent.logLsaProperties();
 	}
 
+	public void releaseEnergyForUrgentRequest(EnergyAgent producerAgent, NodeTotal nodeTotal, EnergyRequest request) throws HandlingException {
+		double nodeTotalAvailable = nodeTotal==null? 0 : nodeTotal.getAvailable();
+		double availablePower = computeAvailablePower(producerAgent,false,false);
+		// Check if the request has a high priority level and cannot be provided with the local
+		if (PriorityLevel.HIGH.equals(request.getPriorityLevel()) && availablePower < request.getPower()) {
+			String agentName = producerAgent.getAgentName();
+			logger.info(agentName +" High priority request found " + request);
+			 // Check if we can meet this demand globaly (with other producers linked to this node)
+			 if(nodeTotalAvailable < request.getPower()) {
+				// Break current offers until there is enough energy left to meet this demand
+				Map<String, List<SingleOffer>> tableOffers = getTableWaitingOffers();
+				SingleOffer offerToCancel = SapereUtil.getOfferToCancel(tableOffers, OFFER_EXPIRATION_MARGIN_SEC);
+				while (availablePower < request.getPower() && offerToCancel != null) {
+					removeOffer(producerAgent, offerToCancel.getConsumerAgent(), offerToCancel.isComplementary(), "generateNewOffers:urent request");
+					tableOffers = getTableWaitingOffers();
+					offerToCancel = SapereUtil.getOfferToCancel(tableOffers, OFFER_EXPIRATION_MARGIN_SEC);
+					availablePower = computeAvailablePower(producerAgent, false,false);
+				}
 
-	public int generateNewOffers(EnergyAgent producerAgent, NodeTotal nodeTotal) {
-		int nbNewOFfers = 0;		
+				// Break current contracts until there is enough energy left to meet this demand
+				Map<String, List<ReducedContract>> tableValidContracts = getTableValidContracts();
+				ReducedContract contractToCancel = SapereUtil.getContractToCancel(tableValidContracts);
+				while (availablePower < request.getPower() && contractToCancel.getConsumerAgent() != null) {
+					stopContract(producerAgent, contractToCancel.getConsumerAgent(), contractToCancel.isComplementary(), "The agent must respond to a higher priority request.");
+					tableValidContracts = getTableValidContracts();
+					contractToCancel = SapereUtil.getContractToCancel(tableValidContracts);
+					availablePower = computeAvailablePower(producerAgent,false,false);
+				}
+			 } else {
+				 // This demand can be meet globaly
+				 nodeTotalAvailable-= request.getPower();
+			 }
+		}
+	}
+
+	private String logWarningDurations(EnergyAgent producerAgent, NodeTotal nodeTotal) {
 		String agentName = producerAgent.getAgentName();
-		boolean toLog = "Prod_N2_1".equals(agentName);
-		//int usedPolicy2 = POLICY_MAXWARNING_MINPOWER;
-		Map<String, List<EnergyRequest>> tableWaitingRequest = getTableWaitingRequest();
-		if(toLog) {
-			logger.info("generateNewOffers  " + agentName + " : begin waitingoffers = " + getTableWaitingOffers().keySet() + " tableWaitingRequest keys = " + tableWaitingRequest.keySet());
-		}
-		if(producerAgent.hasExpired()) {
-			logger.info("generateNewOffers " + agentName + " has expired");
-			return nbNewOFfers;
-		}
 		String firstWarningConsumer = nodeTotal==null? "" : nodeTotal.getMaxWarningConsumer();
 		if(producerAgent.hasHighWarningDuration()) {
 			String beginTag = "#########  " + agentName + " ";
@@ -761,7 +783,25 @@ public class ConsumersProcessingMangager {
 				}
 			}
 		}
-		double nodeTotalAvailable = nodeTotal==null? 0 : nodeTotal.getAvailable();
+		return firstWarningConsumer;
+	}
+
+	public int generateNewOffers(EnergyAgent producerAgent, NodeTotal nodeTotal) throws HandlingException {
+		int nbNewOFfers = 0;
+		String agentName = producerAgent.getAgentName();
+		boolean toLog = "Prod_N2_1".equals(agentName);
+		Map<String, List<EnergyRequest>> tableWaitingRequest = getTableWaitingRequest();
+		if(toLog) {
+			logger.info("generateNewOffers  " + agentName + " : begin waitingoffers = " + getTableWaitingOffers().keySet() + " tableWaitingRequest keys = " + tableWaitingRequest.keySet());
+		}
+		if(producerAgent.hasExpired()) {
+			logger.info("generateNewOffers " + agentName + " has expired");
+			return nbNewOFfers;
+		}
+		// Log high warning durations
+		String firstWarningConsumer = logWarningDurations(producerAgent, nodeTotal);
+
+		//double nodeTotalAvailable = nodeTotal==null? 0 : nodeTotal.getAvailable();
 		if (tableWaitingRequest.size() > 0 && !producerAgent.hasExpired() && !producerAgent.isDisabled()) {
 			// Wait untill all offers has expired ?
 			Map<String, List<SingleOffer>> waitingOffers = getTableWaitingOffers();
@@ -772,22 +812,25 @@ public class ConsumersProcessingMangager {
 				logger.info(" generateNewOffers "+ agentName + " : step1");
 			}
 			// Debug requests under available
-			Double availablePower = computeAvailablePower(producerAgent, false,false);
-			if(producerAgent.getProducerPolicy() == null) {
-				logger.error("producerPolicy is null for agent " + producerAgent.getAgentName());
-				return nbNewOFfers;
+			IProducerPolicy producerPolicy = producerAgent.getProducerPolicy();
+			if(producerPolicy == null) {
+				//logger.error("producerPolicy is null for agent " + producerAgent.getAgentName());
+				throw new HandlingException("producerPolicy of agent " + producerAgent.getAgentName() + " is not set");
+				//return nbNewOFfers;
 			}
 			List<EnergyRequest> requestList = producerAgent.getProducerPolicy().sortRequests(getWaitingRequest());
+			// For debug : check if the first request is the same as the highest warning request in nodeTotal
 			if(producerAgent.hasHighWarningDuration() && requestList.size() > 0) {
-				// For debug : check if the first request is the same as the highest warning request in nodeTotal
-				EnergyRequest fistRequest = requestList.get(0);
-				if(!firstWarningConsumer.equals(fistRequest.getIssuer())) {
+				EnergyRequest firstRequest = requestList.get(0);
+				String firstReqIssuer = firstRequest.getIssuer();
+				if(!firstWarningConsumer.equals(firstReqIssuer)) {
 					logger.warning("#########  " + agentName + " " + firstWarningConsumer + " not in first position in waiting request list ");
 					for(EnergyRequest nextRequest : requestList) {
 						logger.warning("       " + nextRequest);
 					}
 				}
 			}
+			// End for debug
 			String logConsumerList = generateRequestLog(producerAgent, requestList, nodeTotal);
 			if(toLog) {
 				logger.info(" generateNewOffers "+ agentName + " : step2 " + logConsumerList);
@@ -799,37 +842,10 @@ public class ConsumersProcessingMangager {
 				if(hasWaitingOffer(consumer, isComplementary) || hasCanceledContract(consumer, isComplementary)) {
 					logger.info(agentName + " generateNewOffers For debug has waiting offer or canceled contract for consumer " + consumer);
 				}
-				if (canProvideRequest(request)) {
+				if (canProvideRequest(request) && producerPolicy.confirmSupply(producerAgent, request)) {
 					// Check if the request has a high priority level and cannot be provided with the local
-					if (PriorityLevel.HIGH.equals(request.getPriorityLevel()) && availablePower < request.getPower()) {
-						logger.info(agentName +" High priority request found " + request);
-						 // Check if we can meet this demand globaly (with other producers linked to this node)
-						 if(nodeTotalAvailable < request.getPower()) {
-							// Break current offers until there is enough energy left to meet this demand
-							Map<String, List<SingleOffer>> tableOffers = getTableWaitingOffers();
-							SingleOffer offerToCancel = SapereUtil.getOfferToCancel(tableOffers, OFFER_EXPIRATION_MARGIN_SEC);
-							while (availablePower < request.getPower() && offerToCancel != null) {
-								removeOffer(producerAgent, offerToCancel.getConsumerAgent(), offerToCancel.isComplementary(), "generateNewOffers:urent request");
-								tableOffers = getTableWaitingOffers();
-								offerToCancel = SapereUtil.getOfferToCancel(tableOffers, OFFER_EXPIRATION_MARGIN_SEC);
-								availablePower = computeAvailablePower(producerAgent, false,false);
-							}
-
-							// Break current contracts until there is enough energy left to meet this demand
-							Map<String, List<ReducedContract>> tableValidContracts = getTableValidContracts();
-							ReducedContract contractToCancel = SapereUtil.getContractToCancel(tableValidContracts);
-							while (availablePower < request.getPower() && contractToCancel.getConsumerAgent() != null) {
-								stopContract(producerAgent, contractToCancel.getConsumerAgent(), contractToCancel.isComplementary(), "The agent must respond to a higher priority request.");
-								tableValidContracts = getTableValidContracts();
-								contractToCancel = SapereUtil.getContractToCancel(tableValidContracts);
-								availablePower = computeAvailablePower(producerAgent,false,false);
-							}
-						 } else {
-							 // This demand can be meet globaly
-							 nodeTotalAvailable-= request.getPower();
-						 }
-					}
-					availablePower = computeAvailablePower(producerAgent,false,false);
+					releaseEnergyForUrgentRequest(producerAgent, nodeTotal, request);
+					double availablePower = computeAvailablePower(producerAgent,false,false);
 					if (availablePower > 0) {
 						// Generate a new single offer
 						Date requestedBeginDate = request.getBeginDate();
@@ -841,62 +857,49 @@ public class ConsumersProcessingMangager {
 						Double providedPower = Math.min(availablePower, requestedPower);
 						Double providedPowerMax = Math.min(availablePower, requestedPower + offerMargin);
 						Double providedPowerMin =  Math.min(availablePower, requestedPower - offerMargin);
+						PowerSlot providedPowerSlot = new PowerSlot(providedPower, providedPowerMin, providedPowerMax);
 						// boolean respondToConsumer = false;
 						if (producerAgent.isInActiveSlot(providedBeginDate) && providedPower >= 0.001) {
 							// Prepare the offer
-							//String consumer = request.getIssuer();
-							if (producerAgent.containsChosenLsa(consumer)) {
-								//Lsa chosenLSA = tableChosenLsa.get(consumer);
-								// String pName =
-								// lsa.getSyntheticProperty(SyntheticPropertyName.OUTPUT).toString();
-								// Lsa bondedLsa = tableBondedLsa.get(consumer);
-								//String ipSource = chosenLSA.getSyntheticProperty(SyntheticPropertyName.SOURCE).toString();
-								EnergySupply supply0 = producerAgent.getEnergySupply();
-								Date providedEndDate = request.getEndDate().after(supply0.getEndDate()) ?
-										supply0.getEndDate()
-										: request.getEndDate();
-								EnergySupply supply = new EnergySupply(agentName, supply0.getIssuerLocation()
-										, supply0.getIssuerDistance()
-										, false /*isComplementary*/
-										, providedPower, providedPowerMin, providedPowerMax
-										, providedBeginDate, providedEndDate
-										, supply0.getDeviceProperties()
-										, supply0.getPricingTable(), supply0.getTimeShiftMS()
-										);
-								try {
-									// For debug : log contracts
-									/*
-									String filterPower = "single_offer.power BETWEEN " + Math.floor(supply.getPower()) + " AND " + (1+Math.floor(supply.getPower())); 
-									List<SingleOffer> alreadyGeneatedOffers=EnergyDbHelper.retrieveOffers(SapereUtil.shiftDateSec(getCurrentDate(), -8), getCurrentDate(), consumer, null,  filterPower);
-									if(alreadyGeneatedOffers.size()>0) {
-										double testAvl = computeAvailablePower(false, false);
-										logger.info("---  Befor creation a new offer : available = " + testAvl);
-										for(SingleOffer nextOffer : alreadyGeneatedOffers) {
-											logger.info("Already generated  " + nextOffer);
-										}
-										for(ReducedContract contract : getTableAllContracts2().values()) {
-											logger.info(this.agentName + " : next contrat : " + contract);
-										}
-									}*/
-									SingleOffer newOffer = new SingleOffer(agentName, supply, OFFER_VALIDITY_SECONDS, request.clone());
-									newOffer.setLog(logConsumerList);
-									String logTotal = generateNodeTotalLog(producerAgent, nodeTotal);
-									newOffer.setLog2(logTotal + "  avb="+ UtilDates.df3.format(availablePower));
-									Long offerId = EnergyDbHelper.registerSingleOffer(newOffer, producerAgent.getStartEvent(), nodeTotal.getId());
-									newOffer.setId(offerId);
-									addOffer(producerAgent,newOffer);
-
-									nbNewOFfers++;
-									//addOffer = true;
-									// For debug : check availability
-									if(toLog) {
-										logger.info("newOffer : " + newOffer);
+							ProsumerProperties isseurProperties = producerAgent.getGlobalProduction().getIssuerProperties().clone();
+							EnergySupply supply0 = producerAgent.getGlobalProduction();
+							Date providedEndDate = request.getEndDate().after(supply0.getEndDate()) ?
+									supply0.getEndDate()
+									: request.getEndDate();
+							EnergySupply supply = new EnergySupply(isseurProperties, false,
+									providedPowerSlot, providedBeginDate,
+									providedEndDate, producerPolicy.getDefaultPricingTable());
+							try {
+								// For debug : log contracts
+								/*
+								String filterPower = "single_offer.power BETWEEN " + Math.floor(supply.getPower()) + " AND " + (1+Math.floor(supply.getPower())); 
+								List<SingleOffer> alreadyGeneatedOffers=EnergyDbHelper.retrieveOffers(SapereUtil.shiftDateSec(getCurrentDate(), -8), getCurrentDate(), consumer, null,  filterPower);
+								if(alreadyGeneatedOffers.size()>0) {
+									double testAvl = computeAvailablePower(false, false);
+									logger.info("---  Befor creation a new offer : available = " + testAvl);
+									for(SingleOffer nextOffer : alreadyGeneatedOffers) {
+										logger.info("Already generated  " + nextOffer);
 									}
-								} catch (Exception e) {
-									logger.error(e);
+									for(ReducedContract contract : getTableAllContracts2().values()) {
+										logger.info(this.agentName + " : next contrat : " + contract);
+									}
+								}*/
+								SingleOffer newOffer = new SingleOffer(agentName, supply, OFFER_VALIDITY_SECONDS, request.clone());
+								newOffer =  producerPolicy.priceOffer(producerAgent, newOffer);
+								newOffer.setLog(logConsumerList);
+								String logTotal = generateNodeTotalLog(producerAgent, nodeTotal);
+								newOffer.setLog2(logTotal + "  avb="+ UtilDates.df3.format(availablePower));
+								Long offerId = EnergyDbHelper.registerSingleOffer(newOffer, producerAgent.getStartEvent(), nodeTotal.getId());
+								newOffer.setId(offerId);
+								addOffer(producerAgent,newOffer);
+								nbNewOFfers++;
+								//addOffer = true;
+								// For debug : check availability
+								if(toLog) {
+									logger.info("newOffer : " + newOffer);
 								}
-							} else {
-								logger.info("Chosen lsa not found in table");
+							} catch (Exception e) {
+								logger.error(e);
 							}
 						} else {
 							//logger.info("### For Debug2 : providedBeginDate " + providedBeginDate + " , providedPower = " + providedPower); 
@@ -917,19 +920,22 @@ public class ConsumersProcessingMangager {
 
 	public void handleConsumerRequest(EnergyAgent producerAgent, EnergyRequest request, String consumer, Lsa bondedLsa) {
 		try {
-			request.setIssuerDistance(bondedLsa.getSourceDistance());
+			if(request.getIssuerProperties() != null) {
+				request.getIssuerProperties().setDistance(bondedLsa.getSourceDistance());
+			}
 			String agentName = producerAgent.getAgentName();
 			if(producerAgent.hasHighWarningDuration() && request.getWarningDurationSec() >= ConsumersProcessingMangager.WARNING_DURATION_THRESHOLD) {
 				logger.warning("handleConsumerRequest " + request);
 			}
 			// Check if a valid contract exists for this consumer
-			ReducedContract contract = this.getReducedContract(request.getIssuer(), request.isComplementary());
+			String reqIssuer = request.getIssuer();
+			ReducedContract contract = this.getReducedContract(reqIssuer, request.isComplementary());
 			if(contract!=null) {
 				// Request found on ongoing contract
 				logger.info("handleConsumerRequest " + agentName + " contract found for consumer " + consumer + " : " + contract);
 				if(contract.hasAllAgreements() || contract.waitingValidation()) {
 					// Stop the contract
-					logger.warning(agentName + " receives a request of " + request.getIssuer() + " but a contract is ongoing : stop the contract");
+					logger.warning(agentName + " receives a request of " + reqIssuer + " but a contract is ongoing : stop the contract");
 					/*
 					Date dateMin = SapereUtil.shiftDateSec(getCurrentDate(), -30);
 					Date dateMax = getCurrentDate();
@@ -937,13 +943,12 @@ public class ConsumersProcessingMangager {
 					if(dbOffers.size()>0) {
 						logger.warning("handleConsumerRequest for debug1 : " +  "The agent receives a request of " + request.getIssuer());
 					}*/
-					this.stopContract(producerAgent,request.getIssuer(), contract.isComplementary(), "The agent receives a request of " + request.getIssuer());
+					this.stopContract(producerAgent,reqIssuer, contract.isComplementary(), "The agent receives a request of " + reqIssuer);
 				}
 			}
 			if (request.canBeSupplied()) {
 				// add waiting request
 				addOrUpdateRequest(producerAgent, consumer, request);
-				producerAgent.setPropertyChosen(consumer, "REQ");
 			} else {
 				logger.info("Agent " + producerAgent.getAgentName() + " cannot supply request " + request );
 			}
@@ -955,7 +960,7 @@ public class ConsumersProcessingMangager {
 	public boolean isConcerned(EnergyAgent producerAgent, ProtectedContract protectedContract) {
 		boolean result = false;
 		try {
-			if(protectedContract!=null && protectedContract.hasAccesAsProducer(producerAgent)) {
+			if(protectedContract!=null && protectedContract.hasAccesAsProducer(producerAgent) && producerAgent.isProducer()) {
 				result = protectedContract.hasProducer(producerAgent);
 			}
 		} catch (PermissionException e) {
@@ -1031,6 +1036,6 @@ public class ConsumersProcessingMangager {
 	}
 
 	public Date getCurrentDate() {
-		return UtilDates.getNewDate(timeShiftMS);
+		return UtilDates.getNewDateNoMilliSec(timeShiftMS);
 	}
 }

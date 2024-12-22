@@ -1,12 +1,15 @@
 package com.sapereapi.model;
 
+import java.io.Serializable;
 import java.util.Date;
 
 import com.sapereapi.util.UtilDates;
 
-public class TimeSlot {
-	private Date beginDate;
-	private Date endDate;
+public class TimeSlot implements Cloneable, Serializable {
+
+	private static final long serialVersionUID = 1L;
+	protected Date beginDate;
+	protected Date endDate;
 
 	public TimeSlot() {
 		super();
@@ -48,6 +51,9 @@ public class TimeSlot {
 				+ "]";
 	}
 
+	public double getDurationSeconds() {
+		return UtilDates.computeDurationSeconds(beginDate, endDate);
+	}
 
 	@Override
 	public int hashCode() {

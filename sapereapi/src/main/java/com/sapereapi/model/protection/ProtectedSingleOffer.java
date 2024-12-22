@@ -1,6 +1,5 @@
 package com.sapereapi.model.protection;
 
-import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -11,11 +10,12 @@ import com.sapereapi.model.referential.AgentType;
 
 import eu.sapere.middleware.agent.AgentAuthentication;
 import eu.sapere.middleware.agent.SapereAgent;
-import eu.sapere.middleware.lsa.IPropertyObject;
+import eu.sapere.middleware.log.AbstractLogger;
 import eu.sapere.middleware.lsa.Lsa;
-import eu.sapere.middleware.node.NodeConfig;
+import eu.sapere.middleware.lsa.values.IAggregateable;
+import eu.sapere.middleware.node.NodeLocation;
 
-public class ProtectedSingleOffer extends ProtectedObject implements Serializable, IPropertyObject {
+public class ProtectedSingleOffer extends ProtectedObject {
 	private static final long serialVersionUID = 7L;
 	private SingleOffer singleOffer;
 
@@ -34,8 +34,8 @@ public class ProtectedSingleOffer extends ProtectedObject implements Serializabl
 
 	@Override
 	boolean checkAccessAsProducer(AgentAuthentication authentication) {
-		if (AgentType.PRODUCER.getLabel().equals(authentication.getAgentType())
-				&& singleOffer.getProducerAgent().equals((authentication.getAgentName()))) {
+		boolean hasTypeProducer = AgentType.PROSUMER.name().equals(authentication.getAgentType());
+		if (hasTypeProducer && singleOffer.getProducerAgent().equals((authentication.getAgentName()))) {
 			return checkAuthentication(authentication);
 		}
 		return false;
@@ -43,8 +43,8 @@ public class ProtectedSingleOffer extends ProtectedObject implements Serializabl
 
 	@Override
 	boolean checkAccessAsConsumer(AgentAuthentication authentication) {
-		if (AgentType.CONSUMER.getLabel().equals(authentication.getAgentType())
-				&& singleOffer.getConsumerAgent().equals((authentication.getAgentName()))) {
+		boolean hasTypeConsumer = AgentType.PROSUMER.name().equals(authentication.getAgentType());
+		if (hasTypeConsumer && singleOffer.getConsumerAgent().equals((authentication.getAgentName()))) {
 			return checkAuthentication(authentication);
 		}
 		return false;
@@ -72,7 +72,7 @@ public class ProtectedSingleOffer extends ProtectedObject implements Serializabl
 	}
 
 	@Override
-	public ProtectedSingleOffer copyForLSA() {
+	public ProtectedSingleOffer copyForLSA(AbstractLogger logger) {
 		SingleOffer offerClone = singleOffer.copyForLSA();
 		return new ProtectedSingleOffer(offerClone);
 	}
@@ -83,17 +83,26 @@ public class ProtectedSingleOffer extends ProtectedObject implements Serializabl
 	}
 
 	@Override
-	public void completeContent(Lsa bondedLsa, Map<String, NodeConfig> mapNodeLocation) {
+	public void completeInvolvedLocations(Lsa bondedLsa, Map<String, NodeLocation> mapNodeLocation, AbstractLogger logger) {
 		if(singleOffer != null) {
-			singleOffer.completeContent(bondedLsa, mapNodeLocation);
+			singleOffer.completeInvolvedLocations(bondedLsa, mapNodeLocation, logger);
 		}
 	}
 
 	@Override
-	public List<NodeConfig> retrieveInvolvedLocations() {
+	public List<NodeLocation> retrieveInvolvedLocations() {
 		if(singleOffer != null) {
 			return singleOffer.retrieveInvolvedLocations();
 		}
 		return new ArrayList<>();
 	}
+
+
+
+	public static IAggregateable aggregate2(String operator, List<IAggregateable> listObjects,
+			AgentAuthentication agentAuthentication, AbstractLogger logger) {
+		// TODO Auto-generated method stub
+		return null;
+	}
+
 }

@@ -8,6 +8,7 @@ import com.sapereapi.log.SapereLogger;
 import com.sapereapi.model.referential.DeviceCategory;
 import com.sapereapi.model.referential.EnvironmentalImpact;
 import com.sapereapi.model.referential.PhaseNumber;
+import com.sapereapi.model.referential.PriorityLevel;
 
 public class DeviceProperties implements Cloneable, Serializable {
 	/**
@@ -15,8 +16,7 @@ public class DeviceProperties implements Cloneable, Serializable {
 	 */
 	private static final long serialVersionUID = 1L;
 	protected String name;
-	protected int priorityLevel;
-	protected boolean isProducer;
+	protected PriorityLevel priorityLevel;
 	protected DeviceCategory category;
 	protected EnvironmentalImpact environmentalImpact;
 	protected String location;
@@ -32,20 +32,26 @@ public class DeviceProperties implements Cloneable, Serializable {
 		this.name = name;
 	}
 
-	public int getPriorityLevel() {
+	public PriorityLevel getPriorityLevel() {
 		return priorityLevel;
 	}
 
-	public void setPriorityLevel(int priorityLvel) {
+	public void setPriorityLevel(PriorityLevel priorityLvel) {
 		this.priorityLevel = priorityLvel;
 	}
 
 	public boolean isProducer() {
-		return isProducer;
+		if(category != null) {
+			return category.isProducer();
+		}
+		return false;
 	}
 
-	public void setProducer(boolean isProducer) {
-		this.isProducer = isProducer;
+	public boolean isConsumer() {
+		if (category != null) {
+			return category.isConsumer();
+		}
+		return false;
 	}
 
 	public DeviceCategory getCategory() {
@@ -146,22 +152,19 @@ public class DeviceProperties implements Cloneable, Serializable {
 		super();
 	}
 
-	public DeviceProperties(String name, DeviceCategory category, EnvironmentalImpact _environmentalImpact,
-			boolean _isProducer) {
+	public DeviceProperties(String name, DeviceCategory category, EnvironmentalImpact _environmentalImpact
+			//,boolean _isProducer
+			) {
 		super();
 		this.name = name;
 		this.category = category;
-		this.environmentalImpact = EnvironmentalImpact.getByLevel(_environmentalImpact.getLevel());
-		this.isProducer = _isProducer;
-		this.priorityLevel = 0;
+		this.environmentalImpact = _environmentalImpact;
+		//this.isProducer = _isProducer;
+		this.priorityLevel = PriorityLevel.UNKNOWN;
 		this.phases = new HashSet<PhaseNumber>();
 		if(category == null) {
 			SapereLogger.getInstance()
 			.error("DeviceProperties Constructor : category is null for device name " + name);
-		} else if (isProducer != category.isProducer()) {
-			SapereLogger.getInstance()
-					.error("DeviceProperties Constructor : isProducer value not consistent with the category : " + name
-							+ "," + category + ",isProducer :" + _isProducer);
 		}
 	}
 
@@ -176,9 +179,9 @@ public class DeviceProperties implements Cloneable, Serializable {
 	}
 
 	public DeviceProperties copy(boolean addIds) {
-		DeviceProperties result = new DeviceProperties(name, category, environmentalImpact, isProducer);
+		DeviceProperties result = new DeviceProperties(name, category, environmentalImpact);
 		result.setPriorityLevel(priorityLevel);
-		result.setProducer(isProducer);
+		//result.setProducer(isProducer);
 		result.setLocation(location);
 		result.setPhases(phases);
 		result.setElectricalPanel(electricalPanel);

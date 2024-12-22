@@ -2,8 +2,8 @@ package com.sapereapi.model.energy.forcasting.input;
 
 import java.util.List;
 
+import com.sapereapi.model.OptionItem;
 import com.sapereapi.model.TimeSlot;
-import com.sapereapi.model.energy.OptionItem;
 
 import java.util.ArrayList;
 

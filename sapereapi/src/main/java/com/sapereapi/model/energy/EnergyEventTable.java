@@ -5,6 +5,7 @@ import java.util.Collection;
 import java.util.HashMap;
 import java.util.Map;
 
+import com.sapereapi.model.HandlingException;
 import com.sapereapi.util.SapereUtil;
 
 public class EnergyEventTable implements Serializable {
@@ -30,7 +31,7 @@ public class EnergyEventTable implements Serializable {
 		mapEvents.clear();
 	}
 
-	public void putEvent(EnergyEvent event) throws Exception {
+	public void putEvent(EnergyEvent event) throws HandlingException {
 		String key = event.getKey();
 		if (mapEvents.containsKey(key)) {
 			EnergyEvent eventIn = mapEvents.get(key);
@@ -38,7 +39,7 @@ public class EnergyEventTable implements Serializable {
 				// Same event already posted : nothing to do
 			} else {
 				// Another event already posted
-				throw new Exception("putEvent : cannot put the event " + event + " in LSA properties. Another event " +  SapereUtil.addDoubleQuote(key) + " is already in put on the same key : " + eventIn);
+				throw new HandlingException("putEvent : cannot put the event " + event + " in LSA properties. Another event " +  SapereUtil.addDoubleQuote(key) + " is already in put on the same key : " + eventIn);
 			}
 		}
 		mapEvents.put(key, event);
@@ -53,7 +54,7 @@ public class EnergyEventTable implements Serializable {
 		StringBuffer result = new StringBuffer();
 		for (String key : mapEvents.keySet()) {
 			EnergyEvent event = mapEvents.get(key);
-			result.append(key).append(" : ").append(event);
+			result.append("").append(" : ").append(event);
 		}
 		return result.toString();
 	}

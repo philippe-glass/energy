@@ -12,26 +12,29 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-import com.sapereapi.util.UtilDates;
+import com.sapereapi.model.HandlingException;
 
 import eu.sapere.middleware.log.AbstractLogger;
 
 public class DBConnection {
 	public final static String CR = System.getProperty("line.separator");	// Cariage return
-	private static AbstractLogger logger = null;
 	private static int debugLevel = 0;
-	private static int slowQueryThresholdMS = 500;
-	private static String sessionId = null;
-	private static String reqSeparator = "§";
-	private static String reqSeparator2 = CR + "§";
+
+	private AbstractLogger logger = null;
+	private static int slowQueryThresholdMS = 2000;
+	private String reqSeparator = "§";
+	private String reqSeparator2 = CR + "§";
+
+	private String OP_DATETIME = "NOW";
+	private String OP_CURRENT_DATETIME = "NOW()";
+	private String OP_TEMPORARY = "TEMPORARY";
+	private String OP_GREATEST = "GREATEST";
+	private String OP_LEAST = "LEAST";
+	private String OP_IF = "IF";
 
 	// Database credentials
-	static DBConfig dbConfig = null;
-	static Connection connection = null;
-
-	static {
-		sessionId = UtilDates.generateSessionId();
-	}
+	private DBConfig dbConfig = null;
+	private Connection connection = null;
 
 	/**
 	 * Constructor
@@ -39,10 +42,10 @@ public class DBConnection {
 	 * @param _user
 	 * @param _password
 	 */
-	public DBConnection(DBConfig aDBConfig, AbstractLogger _aLogger) {
+	DBConnection(DBConfig aDBConfig, AbstractLogger _aLogger) {
 		super();
-		dbConfig = aDBConfig;
-		logger = _aLogger;
+		this.dbConfig = aDBConfig;
+		this.logger = _aLogger;
 		try {
 			Class.forName(dbConfig.getDriverClassName());
 			logger.info("Connecting to " + dbConfig.getUrl() + " database...");
@@ -53,13 +56,30 @@ public class DBConnection {
 		} catch (ClassNotFoundException e) {
 			logger.error(e);
 		}
-		if(useSQLLite()) {
+		boolean sqlite = useSQLLite();
+		if(sqlite) {
 			reqSeparator = ";";
 			reqSeparator2 = CR + reqSeparator;
 		}
+		OP_DATETIME = (sqlite ? "datetime" : "NOW");
+		OP_CURRENT_DATETIME = (sqlite ? "DATETIME('now', 'localtime')" : "NOW()");
+		OP_TEMPORARY = (sqlite ? "" : "TEMPORARY");
+		OP_GREATEST = (sqlite ? "MAX" : "GREATEST");
+		OP_LEAST = (sqlite ? "MIN" : "LEAST");
+		OP_IF = (sqlite ? "IIF" : "IF");
 	}
 
-	public  void init() throws SQLException, ClassNotFoundException {
+	public DBConnection init(DBConfig aDBConfig, AbstractLogger _aLogger) {
+		dbConfig = aDBConfig;
+		logger = _aLogger;
+		DBConnection newConnection = new DBConnection(dbConfig, logger);
+		return newConnection;
+		//instances.put(newConnection.get, newConnection)
+	}
+
+
+
+	public void initConnection() throws SQLException, ClassNotFoundException {
 		if (connection == null) {
 			// STEP 1: Register JDBC driver
 			Class.forName(dbConfig.getDriverClassName());
@@ -71,11 +91,11 @@ public class DBConnection {
 		}
 	}
 
-	public static String getReqSeparator() {
+	public String getReqSeparator() {
 		return reqSeparator;
 	}
 
-	public static String getReqSeparator2() {
+	public String getReqSeparator2() {
 		return reqSeparator2;
 	}
 
@@ -87,24 +107,13 @@ public class DBConnection {
 		debugLevel = _debugLevel;
 	}
 
-	public static String getSessionId() {
-		return sessionId;
-	}
-
-	public static void setSessionId(String sessionId) {
-		DBConnection.sessionId = sessionId;
-	}
-
-	public static void changeSessionId() {
-		sessionId = UtilDates.generateSessionId();
-	}
-
-	public  long execUpdate(String queries) {
+	public  long execUpdate(String queries) throws HandlingException {
+		HandlingException exceptionToThrow = null;
 		long result = 0;
 		long timeBefore = new Date().getTime();
 		String currentQuery = null;
 		try {
-			init();
+			initConnection();
 		} catch (Throwable e1) {
 			logger.error(e1);
 		}
@@ -112,37 +121,56 @@ public class DBConnection {
 		if(debugLevel>0) {
 			logger.info("execUpdate ...");
 		}
-		Statement stmt = null;
-		try {
-			stmt = connection.createStatement();
-			String[] array_query = queries.split(reqSeparator);
-			for (String nextQuery : array_query) {
-				currentQuery = nextQuery;
-				result = stmt.executeUpdate(nextQuery, PreparedStatement.RETURN_GENERATED_KEYS);
-			}
-			if (result > 0) {
-				ResultSet generatedKeys = stmt.getGeneratedKeys();
-				if (generatedKeys.next()) {
-					result = generatedKeys.getLong(1);
+		synchronized (connection) {
+			Statement stmt = null;
+			try {
+				stmt = connection.createStatement();
+				String[] array_query = queries.split(reqSeparator);
+				int resultExec = 0;
+				for (String nextQuery : array_query) {
+					currentQuery = nextQuery;
+					resultExec = stmt.executeUpdate(nextQuery, PreparedStatement.RETURN_GENERATED_KEYS);
+				}
+				if (resultExec > 0) {
+					int step = 0;
+					try {
+						ResultSet generatedKeys = stmt.getGeneratedKeys();
+						step++;
+						if (generatedKeys.next()) {
+							result = generatedKeys.getLong(1);
+						}
+						step++;
+						generatedKeys.close();
+						step++;
+					} catch (Exception e1) {
+						logger.error("execUpdate : error using ResultSet generatedKeys at step " + step + " :" + e1 + " : \r\n" + currentQuery);
+					}
+				}
+				if(debugLevel>0) {
+					logger.info("--- Execute SQL query : \r\n" + currentQuery);
+				}
+			} catch (SQLException se) {
+				// Handle errors for JDBC
+				logger.error("execUpdate : error executing query : \r\n" + currentQuery + "\r\n" + se);
+				String exceptionMsg = ""+se.getMessage() + ((currentQuery == null)? "" : " : on query " + currentQuery);
+				exceptionToThrow = new HandlingException(exceptionMsg);
+				result = -1;
+			} catch (Exception e) {
+				// Handle errors for Class.forName
+				logger.error(e);
+				String exceptionMsg = ""+e.getMessage() + ((currentQuery == null)? "" : " : on query " + currentQuery);
+				exceptionToThrow = new HandlingException(exceptionMsg);
+				result = -1;
+			} finally {
+				try {
+					stmt.close();
+				} catch (SQLException e) {
+					logger.error(e);
 				}
 			}
-			if(debugLevel>0) {
-				logger.info("--- Execute SQL query : \r\n" + currentQuery);
-			}
-		} catch (SQLException se) {
-			// Handle errors for JDBC
-			logger.error("SQL Error executing query : \r\n" + currentQuery + "\r\n" + se);
-			result = -1;
-		} catch (Exception e) {
-			// Handle errors for Class.forName
-			logger.error(e);
-			result = -1;
-		} finally {
-			try {
-				stmt.close();
-			} catch (SQLException e) {
-				logger.error(e);
-			}
+		}
+		if(exceptionToThrow != null && false) {
+			throw exceptionToThrow;
 		}
 		long timeAfter = new Date().getTime();
 		long duration = timeAfter -timeBefore ;
@@ -152,94 +180,104 @@ public class DBConnection {
 		return result;
 	}
 
-	public  Map<String, Object> executeSingleRowSelect(String queries) {
+	public  Map<String, Object> executeSingleRowSelect(String queries) throws HandlingException {
 		List<Map<String, Object>> rows = executeSelect(queries);
-		if(rows.size()>0) {
+		if(rows!=null && rows.size()>0) {
 			return rows.get(0);
 		}
 		return null;
 	}
 
-	public  List<Map<String, Object>> executeSelect(String queries) {
+	public  List<Map<String, Object>> executeSelect(String queries) throws HandlingException {
 		try {
-			init();
+			initConnection();
 		} catch (Throwable e1) {
 			logger.error(e1);
 		}
+		HandlingException exceptionToThrow = null;
+		List<Map<String, Object>> result = null;
 		long timeBefore = new Date().getTime();
 		Statement stmt = null;
-		try {
-			stmt = connection.createStatement();
-			if(debugLevel>0) {
-				// logger.info("--- Execute SQL query : \r\n" + queries);
-			}
-			String[] array_query = queries.split(reqSeparator);
-			ResultSet rs = null;
-			int queryIndex = 1;
-			for (String nextQuery : array_query) {
-				boolean isLast = (array_query.length ==  queryIndex);
-				Date before = new Date();
-				if(isLast) {
-					rs = stmt.executeQuery(nextQuery);
-				} else {
-					stmt.executeUpdate(nextQuery);
-				}
-				if(debugLevel>0) {
-					Date after = new Date();
-					long requestTime = after.getTime() - before.getTime();
-					logger.info("--- Execute SQL query : (" + requestTime + " MS) " + CR + nextQuery );
-				}
-				queryIndex++;
-			}
-			// ResultSet rs = stmt.executeQuery(queries);
-			int columnCount = rs.getMetaData().getColumnCount();
-			List<Map<String, Object>> result = new ArrayList<Map<String, Object>>();
-			Map<Integer, String> mapColumns = new HashMap<Integer, String>();
-			// Extract data from result set
-			while (rs.next()) {
-				// Retrieve by column name
-				Map<String, Object> nextRow = new HashMap<String, Object>();
-				for (int colIdx = 1; colIdx <= columnCount; colIdx++) {
-					if (!mapColumns.containsKey(colIdx)) {
-						String colName = rs.getMetaData().getColumnName(colIdx);
-						mapColumns.put(colIdx, colName);
-						String colLabel = rs.getMetaData().getColumnLabel(colIdx);
-						if (!colLabel.equals(colName)) {
-							mapColumns.put(colIdx, colLabel);
-						}
-					}
-					Object obj = rs.getObject(colIdx);
-					String colName = mapColumns.get(colIdx);
-					nextRow.put(colName, obj);
-				}
-				result.add(nextRow);
-			}
-			long timeAfter = new Date().getTime();
-			long duration = timeAfter -timeBefore ;
-			if(duration >= slowQueryThresholdMS) {
-				logger.warning("executeSelect : slow SQL request (" + duration + " MS): " + queries);
-			}
-			return result;
-		} catch (SQLException e) {
-			logger.error(e);
-		} finally {
+		String partialQueryToLog = null;
+		synchronized (connection) {
 			try {
-				stmt.close();
+				stmt = connection.createStatement();
+				if(debugLevel>0) {
+					// logger.info("--- Execute SQL query : \r\n" + queries);
+				}
+				String[] array_query = queries.split(reqSeparator);
+				ResultSet rs = null;
+				int queryIndex = 1;
+				for (String nextQuery : array_query) {
+					boolean isLast = (array_query.length ==  queryIndex);
+					if(array_query.length > 1) {
+						partialQueryToLog = nextQuery;
+					}
+					Date before = new Date();
+					if(isLast) {
+						rs = stmt.executeQuery(nextQuery);
+					} else {
+						stmt.executeUpdate(nextQuery);
+					}
+					if(debugLevel>0) {
+						Date after = new Date();
+						long requestTime = after.getTime() - before.getTime();
+						logger.info("--- Execute SQL query : (" + requestTime + " MS) " + CR + nextQuery );
+					}
+					queryIndex++;
+				}
+				int columnCount = rs.getMetaData().getColumnCount();
+				result = new ArrayList<Map<String, Object>>();
+				Map<Integer, String> mapColumns = new HashMap<Integer, String>();
+				// Extract data from result set
+				while (rs.next()) {
+					// Retrieve by column name
+					Map<String, Object> nextRow = new HashMap<String, Object>();
+					for (int colIdx = 1; colIdx <= columnCount; colIdx++) {
+						if (!mapColumns.containsKey(colIdx)) {
+							String colName = rs.getMetaData().getColumnName(colIdx);
+							mapColumns.put(colIdx, colName);
+							String colLabel = rs.getMetaData().getColumnLabel(colIdx);
+							if (!colLabel.equals(colName)) {
+								mapColumns.put(colIdx, colLabel);
+							}
+						}
+						Object obj = rs.getObject(colIdx);
+						String colName = mapColumns.get(colIdx);
+						nextRow.put(colName, obj);
+					}
+					result.add(nextRow);
+				}
+				long timeAfter = new Date().getTime();
+				long duration = timeAfter -timeBefore ;
+				if(duration >= slowQueryThresholdMS) {
+					logger.warning("executeSelect : slow SQL request (" + duration + " MS): " + queries);
+				}
 			} catch (SQLException e) {
-				logger.error(e);
+				logger.error(e + CR + " request = " + queries + CR + " partialQueryToLog = " + partialQueryToLog);
+				String exceptionMsg = ""+e.getMessage() + ((partialQueryToLog == null)? "" : " : on query " + partialQueryToLog);
+				exceptionToThrow = new HandlingException(exceptionMsg);
+			} finally {
+				try {
+					stmt.close();
+				} catch (SQLException e) {
+					logger.error(e);
+				}
 			}
 		}
-		return null;
+		if(exceptionToThrow != null) {
+			throw exceptionToThrow;
+		}
+		return result;
 	}
 
-	public static void closeConnection() {
+	public void closeConnection() {
 		// finally block used to close resources
 		try {
 			if (connection != null) {
 				connection.close();
 			}
 		} catch (SQLException se) {
-			//se.printStackTrace();
 			logger.error(se);
 		} // end
 	}
@@ -247,13 +285,7 @@ public class DBConnection {
 	public boolean useSQLLite() {
 		return dbConfig.getDriverClassName().contains("sqlite");
 	}
-/*
-	public static void main(String[] args) {
-		execUpdate("INSERT INTO energy.history(date, learning_agent, location) "
-				+ "	SELECT NOW(), 'FOO_1', '192.168.179.1:10001'");
-		closeConnection();
-	}// end main
-	*/
+
 
 	public static String aux_affectationsToSql( Map<String, String> affectation) {
 		String sep = "";
@@ -297,7 +329,7 @@ public class DBConnection {
 		return query.toString();
 	}
 
-	public static String generateQueryCreateVariableTable() {
+	public String generateQueryCreateVariableTable() {
 		StringBuffer query = new StringBuffer();
 		query.append("DROP TABLE IF EXISTS _variables").append(reqSeparator2);
 		query.append(CR).append("CREATE TEMPORARY TABLE _variables("
@@ -306,5 +338,60 @@ public class DBConnection {
 				+ ", int_value INTEGER"
 				+ ", date_value DATETIME)");
 		return query.toString();
+	}
+
+	public String generateQueryDropTable(String tableName) {
+		StringBuffer query = new StringBuffer();
+		query.append("DROP TABLE IF EXISTS ").append(tableName);
+		return query.toString();
+	}
+
+	public String generateQueryDropTmpTable(String tableName) {
+		StringBuffer query = new StringBuffer();
+		query.append("DROP ").append(OP_TEMPORARY).append(" TABLE IF EXISTS ").append(tableName);
+		return query.toString();
+	}
+
+	public String getOP_DATETIME() {
+		return OP_DATETIME;
+	}
+
+	public String getOP_CURRENT_DATETIME() {
+		return OP_CURRENT_DATETIME;
+	}
+
+	public String getOP_TEMPORARY() {
+		return OP_TEMPORARY;
+	}
+
+	public String getOP_GREATEST() {
+		return OP_GREATEST;
+	}
+
+	public String getOP_LEAST() {
+		return OP_LEAST;
+	}
+
+	public String getOP_IF() {
+		return OP_IF;
+	}
+
+	public void logVariables() throws HandlingException {
+		if (useSQLLite()) {
+			List<Map<String, Object>> rows = executeSelect("SELECT * FROM _variables");
+			Map<String, Object> mapVariables = new HashMap<>();
+			for (Map<String, Object> nextRow : rows) {
+				String variable = "" + nextRow.get("name");
+				for (String field : nextRow.keySet()) {
+					if (!field.equalsIgnoreCase("name")) {
+						Object value = nextRow.get(field);
+						if (value != null) {
+							mapVariables.put(variable, value);
+						}
+					}
+				}
+			}
+			logger.info("logVariables : " + mapVariables);
+		}
 	}
 }

@@ -8,6 +8,7 @@ import java.util.HashMap;
 import java.util.Random;
 
 import com.sapereapi.log.SapereLogger;
+import com.sapereapi.util.SapereUtil;
 
 import eu.sapere.middleware.agent.AgentAuthentication;
 import eu.sapere.middleware.agent.SapereAgent;
@@ -18,8 +19,8 @@ import eu.sapere.middleware.lsa.SyntheticPropertyName;
 import eu.sapere.middleware.node.NodeManager;
 import eu.sapere.middleware.node.notifier.event.BondEvent;
 import eu.sapere.middleware.node.notifier.event.DecayedEvent;
-import eu.sapere.middleware.node.notifier.event.LsaUpdatedEvent;
-import eu.sapere.middleware.node.notifier.event.PropagationEvent;
+import eu.sapere.middleware.node.notifier.event.AggregationEvent;
+import eu.sapere.middleware.node.notifier.event.SpreadingEvent;
 import eu.sapere.middleware.node.notifier.event.RewardEvent;
 
 public class ServiceAgentWeb extends SapereAgent {
@@ -90,15 +91,13 @@ public class ServiceAgentWeb extends SapereAgent {
 			}
 			this.removeBondedLsasOfQuery(query);
 		}
-
-		lsa.addSyntheticProperty(SyntheticPropertyName.DIFFUSE, "1");
-		lsa.addSyntheticProperty(SyntheticPropertyName.GRADIENT_HOP, "3");
+		addGradient(3);
 		logger.info("boundedLsa" + bondedLsa.toVisualString());
 		logger.info("this.lsa" + lsa.toVisualString());
 	}
 
 	@Override
-	public void onPropagationEvent(PropagationEvent event) {
+	public void onSpreadingEvent(SpreadingEvent event) {
 	}
 
 	@Override
@@ -106,8 +105,8 @@ public class ServiceAgentWeb extends SapereAgent {
 	}
 
 	@Override
-	public void onLsaUpdatedEvent(LsaUpdatedEvent event) {
-		logger.info("onLsaUpdatedEvent:" + agentName);
+	public void onAggregationEvent(AggregationEvent event) {
+		logger.info("onAggregationEvent:" + agentName);
 	}
 
 	@Override
@@ -124,9 +123,9 @@ public class ServiceAgentWeb extends SapereAgent {
 		Lsa lsaReward = NodeManager.instance().getSpace().getLsa(previousAgent);
 		if (lsaReward != null && lsaReward.getSyntheticProperty(SyntheticPropertyName.TYPE).equals(LsaType.Service)) {
 			rewardLsa(lsaReward, event.getQuery(), event.getReward(),
-					getBestActionQvalue(getPreviousState(newState, this.output))); // maxQSt1
+					getBestActionQvalue(SapereUtil.getPreviousState(newState, this.output))); // maxQSt1
 		}
-		addState(getPreviousState(newState, this.output), 1, event.getReward(), event.getMaxSt1());
+		addState(SapereUtil.getPreviousState(newState, this.output), 1, event.getReward(), event.getMaxSt1());
 		printQ();
 		printR();
 	}
@@ -187,7 +186,6 @@ public class ServiceAgentWeb extends SapereAgent {
 		} catch (Exception e) {
 			logger.info("in");
 			logger.error(e);
-			//e.printStackTrace();
 		}
 		return null;
 

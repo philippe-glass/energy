@@ -7,7 +7,8 @@ import java.net.URL;
 import java.util.Random;
 
 import com.sapereapi.log.SapereLogger;
-import com.sapereapi.model.Blood;
+import com.sapereapi.model.spatial_services.Blood;
+import com.sapereapi.util.SapereUtil;
 
 import eu.sapere.middleware.agent.AgentAuthentication;
 import eu.sapere.middleware.agent.SapereAgent;
@@ -18,8 +19,8 @@ import eu.sapere.middleware.lsa.SyntheticPropertyName;
 import eu.sapere.middleware.node.NodeManager;
 import eu.sapere.middleware.node.notifier.event.BondEvent;
 import eu.sapere.middleware.node.notifier.event.DecayedEvent;
-import eu.sapere.middleware.node.notifier.event.LsaUpdatedEvent;
-import eu.sapere.middleware.node.notifier.event.PropagationEvent;
+import eu.sapere.middleware.node.notifier.event.AggregationEvent;
+import eu.sapere.middleware.node.notifier.event.SpreadingEvent;
 import eu.sapere.middleware.node.notifier.event.RewardEvent;
 
 public class AgentBloodSearch extends SapereAgent {
@@ -90,9 +91,9 @@ public class AgentBloodSearch extends SapereAgent {
 		Lsa lsaReward = NodeManager.instance().getSpace().getLsa(previousAgent);
 		if (lsaReward != null && lsaReward.getSyntheticProperty(SyntheticPropertyName.TYPE).equals(LsaType.Service)) {
 			rewardLsa(lsaReward, event.getQuery(), event.getReward(),
-					getBestActionQvalue(getPreviousState(newState, this.output))); // maxQSt1
+					getBestActionQvalue(SapereUtil.getPreviousState(newState, this.output))); // maxQSt1
 		}
-		addState(getPreviousState(newState, this.output), 1, event.getReward(), event.getMaxSt1());
+		addState(SapereUtil.getPreviousState(newState, this.output), 1, event.getReward(), event.getMaxSt1());
 
 		printQ();
 	}
@@ -129,7 +130,7 @@ public class AgentBloodSearch extends SapereAgent {
 	}
 
 	@Override
-	public void onPropagationEvent(PropagationEvent event) {
+	public void onSpreadingEvent(SpreadingEvent event) {
 	}
 
 	@Override
@@ -137,7 +138,7 @@ public class AgentBloodSearch extends SapereAgent {
 	}
 
 	@Override
-	public void onLsaUpdatedEvent(LsaUpdatedEvent event) {
+	public void onAggregationEvent(AggregationEvent event) {
 	}
 
 	public String[] getInput() {

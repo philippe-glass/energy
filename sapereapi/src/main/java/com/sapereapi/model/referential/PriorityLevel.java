@@ -3,7 +3,7 @@ package com.sapereapi.model.referential;
 import java.util.ArrayList;
 import java.util.List;
 
-import com.sapereapi.model.energy.OptionItem;
+import com.sapereapi.model.OptionItem;
 
 public enum PriorityLevel {
 	  UNKNOWN("", 0)
@@ -23,15 +23,15 @@ public enum PriorityLevel {
 		return label;
 	}
 
-	public Integer getId() {
+	public Integer getLevel() {
 		return level;
 	}
 
-	public static PriorityLevel getByLabel(String label) {
-		String label2 = (label == null) ? "" : label;
-		for (PriorityLevel pLevel : PriorityLevel.values()) {
-			if (pLevel.getLabel().equals(label2)) {
-				return pLevel;
+	public static PriorityLevel getByLevel(Integer level) {
+		Integer level2 = (level == null) ? -1 : level;
+		for (PriorityLevel priorityLevel : PriorityLevel.values()) {
+			if (priorityLevel.getLevel().equals(level2)) {
+				return priorityLevel;
 			}
 		}
 		return null;
@@ -47,22 +47,6 @@ public enum PriorityLevel {
 
 	public int compare(PriorityLevel other) {
 		return this.level - other.level;
-	}
-
-	public static List<String> getLabels() {
-		List<String> result = new ArrayList<>();
-		for (PriorityLevel pLevel : PriorityLevel.values()) {
-			result.add(pLevel.getLabel());
-		}
-		return result;
-	}
-
-	public static List<PriorityLevel> getList() {
-		List<PriorityLevel> result = new ArrayList<PriorityLevel>();
-		for (PriorityLevel pLevel : PriorityLevel.values()) {
-			result.add(pLevel);
-		}
-		return result;
 	}
 
 	public static List<OptionItem> getOptionList() {

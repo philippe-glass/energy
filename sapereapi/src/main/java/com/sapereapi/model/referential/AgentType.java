@@ -1,15 +1,11 @@
 package com.sapereapi.model.referential;
 
-import java.util.ArrayList;
-import java.util.List;
-
-import com.sapereapi.model.energy.OptionItem;
-
 import eu.sapere.middleware.lsa.Lsa;
 
 public enum AgentType {
 	 CONSUMER("Consumer", "Consumer")
 	,PRODUCER("Producer", "Prod")
+	,PROSUMER("Prosumer", "Prosumer")
 	,CONTRACT("Contract", "Contract")
 	,LEARNING_AGENT("LearningAgent","Learning_agent")
 	,REGULATOR("Regulator","Regulator_agent")
@@ -18,7 +14,8 @@ public enum AgentType {
 	,WEB_SERVICE("WebService","WebService")
 	,GENERIC_SERVICE("GenericService","GenericService")
 	,GENERIC_QUERY("GenericQuery","GenericQuery")
-;
+	;
+
 	private String label;
 	private String preffix;
 
@@ -35,59 +32,12 @@ public enum AgentType {
 		return preffix;
 	}
 
-	public static AgentType getByName(String name) {
-		String name2 = (name == null) ? "" : name;
-		for (AgentType deviceCategory : AgentType.values()) {
-			if (deviceCategory.name().equals(name2)) {
-				return deviceCategory;
-			}
-		}
-		return null;
-	}
-
-	public static AgentType getByLabel(String label) {
-		String label2 = (label == null) ? "" : label;
-		for (AgentType pLevel : AgentType.values()) {
-			if (pLevel.getLabel().equals(label2)) {
-				return pLevel;
-			}
-		}
-		return null;
-	}
-
 	public static AgentType getFromLSA(Lsa lsa) {
-		if(lsa!=null && lsa.getAgentAuthentication()!=null && lsa.getAgentAuthentication().getAgentType()!=null) {
+		if (lsa != null && lsa.getAgentAuthentication() != null
+				&& lsa.getAgentAuthentication().getAgentType() != null) {
 			String sType = lsa.getAgentAuthentication().getAgentType();
-			return AgentType.getByLabel(sType) ;
+			return AgentType.valueOf(sType);
 		}
 		return null;
-	}
-
-	public static List<String> getLabels() {
-		List<String> result = new ArrayList<>();
-		for (AgentType pLevel : AgentType.values()) {
-			result.add(pLevel.getLabel());
-		}
-		return result;
-	}
-
-	public static List<AgentType> getList() {
-		List<AgentType> result = new ArrayList<AgentType>();
-		for (AgentType pLevel : AgentType.values()) {
-			result.add(pLevel);
-		}
-		return result;
-	}
-
-	public OptionItem getOptionItem() {
-		return new OptionItem(this.name(), label);
-	}
-
-	public static List<OptionItem> getOptionList() {
-		List<OptionItem> result = new ArrayList<OptionItem>();
-		for (AgentType item : AgentType.values()) {
-			result.add(item.getOptionItem());
-		}
-		return result;
 	}
 }

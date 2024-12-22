@@ -12,6 +12,7 @@ import java.util.Set;
 import com.sapereapi.agent.energy.EnergyAgent;
 import com.sapereapi.db.EnergyDbHelper;
 import com.sapereapi.log.SapereLogger;
+import com.sapereapi.model.HandlingException;
 import com.sapereapi.model.Sapere;
 import com.sapereapi.model.energy.ConfirmationItem;
 import com.sapereapi.model.energy.EnergyRequest;
@@ -24,7 +25,7 @@ import com.sapereapi.util.UtilDates;
 
 import eu.sapere.middleware.log.AbstractLogger;
 import eu.sapere.middleware.lsa.Property;
-import eu.sapere.middleware.node.NodeConfig;
+import eu.sapere.middleware.node.NodeLocation;
 
 public class ConsumersProcessingTable {
 	private Map<String, IEnergyObject> tableConsumersProcessing = null;
@@ -242,7 +243,7 @@ public class ConsumersProcessingTable {
 		PowerSlot power = new PowerSlot();
 		for (ReducedContract contract : getValidContracts()) {
 			if (!contract.hasExpired()) {
-				NodeConfig consumerLocation = contract.getConsumerLocation();
+				NodeLocation consumerLocation = contract.getConsumerLocation();
 				if(location==null || location.equals(consumerLocation.getMainServiceAddress())) {
 					power.add(contract.getForcastProducerPowerSlot(aDate));
 				} else {
@@ -257,7 +258,7 @@ public class ConsumersProcessingTable {
 		PowerSlot power = new PowerSlot();
 		for (ReducedContract contract : getValidContracts()) {
 			if (!contract.hasExpired()) {
-				NodeConfig consumerLocation = contract.getConsumerLocation();
+				NodeLocation consumerLocation = contract.getConsumerLocation();
 				if(location==null || location.equals(consumerLocation.getMainServiceAddress())) {
 					power.add(contract.getProducerPowerSlot());
 				} else {
@@ -381,7 +382,7 @@ public class ConsumersProcessingTable {
 		try {
 			if(!this.hasConsumer(consumer)) {
 				request.setAux_expiryDate(getCurrentDate());
-				if(request.getIssuerDistance() > 0) {
+				if(request.getIssuerProperties() != null && request.getIssuerProperties().getDistance() > 0) {
 					// id from an external database : DO NOT USE IT (constraint integrity)
 					request.setEventId(null);
 				}
@@ -422,14 +423,14 @@ public class ConsumersProcessingTable {
 		Map<String, EnergyRequest> tableWaitingRequest = getTableWaitingRequest();
 		for(EnergyRequest request : tableWaitingRequest.values()) {
 			if(request.getWarningDate()!=null) {
-				warnings.put(request.getIssuer(), request.getWarningDate());
+				String reqIssuer = request.getIssuerProperties() == null ? "" : request.getIssuerProperties().getAgentName();
+				warnings.put(reqIssuer, request.getWarningDate());
 			}
 		}
 		return warnings;
 	}
 
 	public void refreshAggrementsProperty(EnergyAgent produceragent) {
-		produceragent.getLsa().removePropertiesByName("DEBUG_AGREEMENTS");
 		if(showAgreements) {
 			Map<String, ReducedContract> tableContracts = getTableAllContracts();
 			if(tableContracts!=null) {
@@ -440,7 +441,7 @@ public class ConsumersProcessingTable {
 					content.append(nextContract);
 					sep = "    -----------------    ";
 				}
-				produceragent.addProperty(new Property("DEBUG_AGREEMENTS", content));
+				produceragent.replacePropertyWithName(new Property("DEBUG_AGREEMENTS", content));
 			}
 		}
 	}
@@ -457,7 +458,7 @@ public class ConsumersProcessingTable {
 		addLogOperation(consumer, "put offer " + newOffer);
 	}
 
-	public void removeOffer(EnergyAgent producerAgent, String consumer, String logTag, boolean activateOfferRemoveLog) {
+	public void removeOffer(EnergyAgent producerAgent, String consumer, String logTag, boolean activateOfferRemoveLog) throws HandlingException {
 		if(hasWaitingOffer(consumer)) {
 			SingleOffer offer = getWaitingOffer(consumer);
 			if(activateOfferRemoveLog) {
@@ -493,7 +494,7 @@ public class ConsumersProcessingTable {
 		tableConsumersProcessing.put(consumer, aContract.clone());
 		addLogOperation(consumer, "update contract " + tag);
 		if(aContract.getIssuerDistance()>1) {
-			// TODO : set id null
+			// reset eventId
 			aContract.getRequest().setEventId(null);
 		}
 		// Refresh AGREEMENTS property
@@ -567,6 +568,12 @@ public class ConsumersProcessingTable {
 			IEnergyObject consumerObj = tableConsumersProcessing.get(consumerKey);
 			if (consumerObj instanceof EnergyRequest) {
 				EnergyRequest energyRequest = (EnergyRequest) consumerObj;
+				if(energyRequest.getAux_expiryDate().after(current)) {
+					logger.info("getExpiredObjectKey this energyRequest will expire : " + "aux_expiryDate = "
+							+ UtilDates.format_time.format(energyRequest.getAux_expiryDate()) + ", current = "
+							+ UtilDates.format_time.format(current)
+							+ ", energyRequest = " + energyRequest);
+				}
 				if (energyRequest.getAux_expiryDate().after(current) || !energyRequest.canBeSupplied()) {
 					return consumerKey;
 				}
@@ -587,6 +594,6 @@ public class ConsumersProcessingTable {
 	}
 
 	public Date getCurrentDate() {
-		return UtilDates.getNewDate(timeShiftMS);
+		return UtilDates.getNewDateNoMilliSec(timeShiftMS);
 	}
 }

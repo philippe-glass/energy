@@ -10,6 +10,8 @@ import eu.sapere.middleware.agent.SapereAgent;
 import eu.sapere.middleware.lsa.IPropertyObject;
 
 public abstract class ProtectedObject implements IPropertyObject {
+
+	private static final long serialVersionUID = 1L;
 	protected Set<AgentAuthentication> validAuthentications = new HashSet<AgentAuthentication>();
 
 	protected boolean checkAuthentication(AgentAuthentication authentication) {
@@ -22,6 +24,8 @@ public abstract class ProtectedObject implements IPropertyObject {
 		}
 		return authenticated;
 	}
+
+
 
 	abstract boolean hasAccesAsConsumer(SapereAgent consumerAgent);
 

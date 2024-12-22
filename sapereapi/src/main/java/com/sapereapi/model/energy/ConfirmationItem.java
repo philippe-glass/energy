@@ -70,7 +70,7 @@ public class ConfirmationItem implements Serializable {
 	}
 
 	public Date getCurrentDate() {
-		return UtilDates.getNewDate(timeShiftMS);
+		return UtilDates.getNewDateNoMilliSec(timeShiftMS);
 	}
 
 	public Date getExpiryDeadline() {
@@ -90,6 +90,7 @@ public class ConfirmationItem implements Serializable {
 	@Override
 	public String toString() {
 		StringBuffer result = new StringBuffer();
+		//result.append(receiver).append(":");
 		result.append(isOK);
 		if (comment != null && comment.length() > 0) {
 			result.append(" ").append(comment);

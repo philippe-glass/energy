@@ -1,6 +1,5 @@
 package com.sapereapi.model.energy;
 
-import java.io.Serializable;
 import java.util.Date;
 import java.util.List;
 import java.util.Map;
@@ -9,10 +8,11 @@ import com.sapereapi.log.SapereLogger;
 import com.sapereapi.model.referential.PriorityLevel;
 import com.sapereapi.util.UtilDates;
 
+import eu.sapere.middleware.log.AbstractLogger;
 import eu.sapere.middleware.lsa.Lsa;
-import eu.sapere.middleware.node.NodeConfig;
+import eu.sapere.middleware.node.NodeLocation;
 
-public class SingleOffer extends EnergySupply implements IEnergyObject, Cloneable, Serializable {
+public class SingleOffer extends EnergySupply implements IEnergyObject, Cloneable {
 	private static final long serialVersionUID = 17L;
 	private String producerAgent;
 	private EnergyRequest request;
@@ -31,22 +31,21 @@ public class SingleOffer extends EnergySupply implements IEnergyObject, Cloneabl
 	private String logCancel;
 	private Long histoId;
 
-	public SingleOffer(String producerAgent, EnergySupply energySupply,
-			int _validityDurationSeconds, EnergyRequest _request) {
-		super(producerAgent, energySupply.getIssuerLocation(), energySupply.getIssuerDistance()
-				, _request.isComplementary(), energySupply.getPower(), energySupply.getPowerMin(), energySupply.getPowerMax()
-				, energySupply.getBeginDate(), energySupply.getEndDate(), energySupply.getDeviceProperties()
-				, energySupply.getPricingTable()
-				, energySupply.getTimeShiftMS());
+	public SingleOffer(String producerAgent
+			, EnergySupply energySupply
+			,int validityDurationSeconds
+			, EnergyRequest request) {
+		super(energySupply.getIssuerProperties(), request.isComplementary(), energySupply.getPowerSlot(),
+				energySupply.getBeginDate(), energySupply.getEndDate(), energySupply.getPricingTable());
 		Date current = getCurrentDate();
 		if (beginDate.before(current)) {
 			beginDate = current;
 		}
 		this.producerAgent = producerAgent;
-		this.request = _request;
+		this.request = request;
 		//this.isComplementary = _request.isComplementary();
 		this.creationTime = getCurrentDate();
-		this.deadline = UtilDates.shiftDateSec(creationTime, _validityDurationSeconds);
+		this.deadline = UtilDates.shiftDateSec(creationTime, validityDurationSeconds);
 		this.acquitted = Boolean.FALSE;;
 		this.used = Boolean.FALSE;
 		this.log = "";
@@ -61,7 +60,7 @@ public class SingleOffer extends EnergySupply implements IEnergyObject, Cloneabl
 	}
 
 	public String getConsumerAgent() {
-		if(request==null) {
+		if(request==null ) {
 			return null;
 		}
 		return this.request.getIssuer();
@@ -211,16 +210,6 @@ public class SingleOffer extends EnergySupply implements IEnergyObject, Cloneabl
 		}
 	}
 
-	public int compareDistance(SingleOffer other) {
-		return this.issuerDistance - other.getIssuerDistance();
-	}
-
-	public int compareEnvironmentImpact(SingleOffer other) {
-		int impact = this.deviceProperties.getEnvironmentalImpactLevel();
-		int otherImpact = other.getDeviceProperties().getEnvironmentalImpactLevel();
-		return impact - otherImpact;
-	}
-
 	/*
 	public int compareDistanceAndEnvImpact(SingleOffer other) {
 		int compareDistance = compareDistance(other);
@@ -252,6 +241,19 @@ public class SingleOffer extends EnergySupply implements IEnergyObject, Cloneabl
 		return current.after(this.endDate) || current.after(this.deadline);
 	}
 
+	public long getExpirationDurationSec() {
+		Date current = getCurrentDate();
+		Date expiration = deadline;
+		if(endDate.before(expiration)) {
+			expiration = endDate;
+		}
+		if (current.after(expiration)) {
+			long duration_ms = current.getTime() - expiration.getTime();
+			return duration_ms/1000;
+		}
+		return 0;
+	}
+
 	/**
 	 * We apply a margin for the producing agent. The offer expires a few seconds later for the producer agent: it guarantees its availability at all times
 	 * (the margin corresponds to the time limit for acceptance of the offer by the consumer after the selection of the offers)
@@ -272,7 +274,7 @@ public class SingleOffer extends EnergySupply implements IEnergyObject, Cloneabl
 	@Override
 	public String toString() {
 		return "[" + this.id + "] "  + this.producerAgent + "->" + this.getConsumerAgent() + " at " +  UtilDates.format_time.format(creationTime) + " until " + UtilDates.format_time.format(deadline)
-				+ " W = " + UtilDates.df3.format(this.power) + " from "
+				+ " W = " + UtilDates.df3.format(this.getPower()) + " from "
 				+ UtilDates.format_time.format(beginDate) + " to "	+ UtilDates.format_time.format(endDate)
 				+ " (" + UtilDates.df.format(this.getTimeCoverRate()) + ")"
 				+ (acquitted!=null && this.acquitted? " acquitted " : "### NOT ACQUITTED ###")
@@ -305,7 +307,6 @@ public class SingleOffer extends EnergySupply implements IEnergyObject, Cloneabl
 		copy.setLog(this.log);
 		copy.setLog2(this.log2);
 		copy.setLogCancel(this.logCancel);
-		copy.setTimeShiftMS(this.timeShiftMS);
 		return copy;
 	}
 
@@ -319,20 +320,20 @@ public class SingleOffer extends EnergySupply implements IEnergyObject, Cloneabl
 	}
 
 	@Override
-	public void completeContent(Lsa bondedLsa, Map<String, NodeConfig> mapNodeLocation) {
-		super.completeContent(bondedLsa, mapNodeLocation);
+	public void completeInvolvedLocations(Lsa bondedLsa, Map<String, NodeLocation> mapNodeLocation, AbstractLogger logger) {
+		super.completeInvolvedLocations(bondedLsa, mapNodeLocation, logger);
 		if(request != null) {
-			request.completeContent(bondedLsa, mapNodeLocation);
+			request.completeInvolvedLocations(bondedLsa, mapNodeLocation, logger);
 		}
 	}
 
 	@Override
-	public List<NodeConfig> retrieveInvolvedLocations() {
-		List<NodeConfig> result= super.retrieveInvolvedLocations();
+	public List<NodeLocation> retrieveInvolvedLocations() {
+		List<NodeLocation> result= super.retrieveInvolvedLocations();
 		if(request != null) {
-			for(NodeConfig nodeConfig : request.retrieveInvolvedLocations()) {
-				if(!result.contains(nodeConfig)) {
-					result.add(nodeConfig);
+			for(NodeLocation nodeLocation : request.retrieveInvolvedLocations()) {
+				if(!result.contains(nodeLocation)) {
+					result.add(nodeLocation);
 				}
 			}
 		}

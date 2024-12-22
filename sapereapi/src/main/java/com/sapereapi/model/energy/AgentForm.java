@@ -9,26 +9,26 @@ import java.util.Map;
 import com.sapereapi.agent.energy.EnergyAgent;
 import com.sapereapi.log.SapereLogger;
 import com.sapereapi.model.energy.input.AgentInputForm;
-import com.sapereapi.model.referential.AgentType;
+import com.sapereapi.model.energy.pricing.PricingTable;
 import com.sapereapi.model.referential.DeviceCategory;
 import com.sapereapi.model.referential.EnvironmentalImpact;
 import com.sapereapi.model.referential.PriorityLevel;
+import com.sapereapi.model.referential.ProsumerRole;
 import com.sapereapi.util.UtilDates;
 
-import eu.sapere.middleware.agent.SapereAgent;
-import eu.sapere.middleware.node.NodeConfig;
+import eu.sapere.middleware.node.NodeLocation;
 
 public class AgentForm {
-	private AgentType agentType;
+	private ProsumerRole prosumerRole;
 	private int id;
 	private String url;
 	private String agentName;
-	private NodeConfig location;
+	private NodeLocation location;
 	private String deviceName;
 	//private boolean isLocal;
 	private int distance;
-	private OptionItem deviceCategory;
-	private Integer environmentalImpact;
+	private DeviceCategory deviceCategory;
+	private EnvironmentalImpact environmentalImpact;
 	private String electricalPanel;
 	private String sensorNumber;
 	private String deviceLocation;
@@ -50,7 +50,7 @@ public class AgentForm {
 	private Double delayToleranceRatio;
 	private Double availablePower;
 	private Double missingPower;
-	private String priorityLevel;
+	private PriorityLevel priorityLevel;
 	private PowerSlot waitingContractsPower;
 	private List<String> waitingContractsConsumers;
 	private Boolean isSatisfied;
@@ -82,7 +82,7 @@ public class AgentForm {
 		this.isInSpace = false;
 		//this.mapPrices = new HashMap<>();
 		this.price = 0.0;
-		this.environmentalImpact = 0;
+		this.environmentalImpact = null;
 		ongoingContractsRepartition = new HashMap<>();
 		waitingContractsConsumers = new ArrayList<>();
 		linkedAgents = new String[] {};
@@ -112,19 +112,19 @@ public class AgentForm {
 		this.ongoingContractsTotalLocal = contractsTotalLocal;
 	}
 
-	public AgentType getAgentType() {
-		return agentType;
+	public ProsumerRole getProsumerRole() {
+		return prosumerRole;
 	}
 
-	public void setAgentType(AgentType agentType) {
-		this.agentType = agentType;
+	public void setProsumerRole(ProsumerRole prosumerRole) {
+		this.prosumerRole = prosumerRole;
 	}
 
-	public NodeConfig getLocation() {
+	public NodeLocation getLocation() {
 		return location;
 	}
 
-	public void setLocation(NodeConfig location) {
+	public void setLocation(NodeLocation location) {
 		this.location = location;
 	}
 /*
@@ -262,11 +262,11 @@ public class AgentForm {
 		this.missingPower = _missingPower;
 	}
 
-	public String getPriorityLevel() {
+	public PriorityLevel getPriorityLevel() {
 		return priorityLevel;
 	}
 
-	public void setPriorityLevel(String priorityLevel) {
+	public void setPriorityLevel(PriorityLevel priorityLevel) {
 		this.priorityLevel = priorityLevel;
 	}
 
@@ -278,11 +278,11 @@ public class AgentForm {
 		this.isInSpace = isInSpace;
 	}
 
-	public Integer getEnvironmentalImpact() {
+	public EnvironmentalImpact getEnvironmentalImpact() {
 		return environmentalImpact;
 	}
 
-	public void setEnvironmentalImpact(Integer environmentalImpact) {
+	public void setEnvironmentalImpact(EnvironmentalImpact environmentalImpact) {
 		this.environmentalImpact = environmentalImpact;
 	}
 
@@ -337,8 +337,8 @@ public class AgentForm {
 
 	public void updateDeviceProperties(DeviceProperties deviceProperties) {
 		this.deviceName = deviceProperties.getName();
-		this.deviceCategory = deviceProperties.getCategory().getOptionItem();
-		this.environmentalImpact = deviceProperties.getEnvironmentalImpact().getLevel();
+		this.deviceCategory = deviceProperties.getCategory();
+		this.environmentalImpact = deviceProperties.getEnvironmentalImpact();
 		this.electricalPanel = deviceProperties.getElectricalPanel();
 		this.sensorNumber = deviceProperties.getSensorNumber();
 		this.deviceLocation = deviceProperties.getLocation();
@@ -348,22 +348,33 @@ public class AgentForm {
 		if(deviceCategory==null)  {
 			SapereLogger.getInstance().error("retrieveDeviceProperties " + this.deviceName + " : deviceCategory is null");
 		}
-		DeviceProperties result = new DeviceProperties(this.deviceName
-				, deviceCategory == null ? null : DeviceCategory.getByName(deviceCategory.getValue())
-				, EnvironmentalImpact.getByLevel(environmentalImpact)
-				, isProducer());
+		DeviceProperties result = new DeviceProperties(this.deviceName, deviceCategory, environmentalImpact);
 		result.setLocation(deviceLocation);
 		result.setElectricalPanel(electricalPanel);
 		result.setSensorNumber(sensorNumber);
 		return result;
 	}
 
+	public ProsumerProperties retrieveProsumerProperties() {
+		ProsumerProperties issuerProperties = new ProsumerProperties(agentName, location, distance, timeShiftMS, retrieveDeviceProperties());
+		return issuerProperties;
+	}
+
+	public PowerSlot generatePowerSlot() {
+		PowerSlot result = PowerSlot.create(power);
+		if(powerMin != null && powerMin > 0) {
+			result.setMin(powerMin);
+		}
+		if(powerMax != null && powerMax > 0) {
+			result.setMax(powerMax);
+		}
+		return result;
+	}
+
 	public EnergySupply getEnergySupply() {
-		return new EnergySupply(this.agentName, this.location, this.distance, false, this.power, this.powerMin, this.powerMax, this.beginDate, this.endDate
-				, retrieveDeviceProperties()
-				, generatePricingTable()
-				, this.timeShiftMS
-				);
+		ProsumerProperties issuerProperties = retrieveProsumerProperties();
+		return new EnergySupply(issuerProperties, false, generatePowerSlot(), this.beginDate,
+				this.endDate, generatePricingTable());
 	}
 
 	public EnergyRequest getEnergyRequest() {
@@ -377,11 +388,9 @@ public class AgentForm {
 		if(this.delayToleranceMinutes==0 && delayToleranceRatio > 0) {
 			delayToleranceMinutes = delayToleranceRatio * UtilDates.computeDurationMinutes(beginDate, endDate);
 		}
-		return new EnergyRequest(this.agentName, this.location, this.distance, false, this.power, this.powerMin, this.powerMax, this.beginDate, this.endDate, this.delayToleranceMinutes,
-				PriorityLevel.getByLabel(this.priorityLevel), retrieveDeviceProperties(),
-				generatePricingTable(),
-				this.timeShiftMS
-				);
+		ProsumerProperties issuerProperties = retrieveProsumerProperties();
+		return new EnergyRequest(issuerProperties, false, generatePowerSlot(), this.beginDate, this.endDate, this.delayToleranceMinutes,
+				this.priorityLevel);
 	}
 
 	public PowerSlot getWaitingContractsPower() {
@@ -469,11 +478,11 @@ public class AgentForm {
 		this.deviceName = deviceName;
 	}
 
-	public OptionItem getDeviceCategory() {
+	public DeviceCategory getDeviceCategory() {
 		return deviceCategory;
 	}
 
-	public void setDeviceCategory(OptionItem deviceCategory) {
+	public void setDeviceCategory(DeviceCategory deviceCategory) {
 		this.deviceCategory = deviceCategory;
 	}
 
@@ -494,11 +503,11 @@ public class AgentForm {
 	}
 
 	public boolean isProducer() {
-		return  AgentType.PRODUCER.equals(agentType);
+		return  ProsumerRole.PRODUCER.equals(prosumerRole);
 	}
 
 	public boolean isConsumer() {
-		return  AgentType.CONSUMER.equals(agentType);
+		return  ProsumerRole.CONSUMER.equals(prosumerRole);
 	}
 
 	public boolean checkInSpace() {
@@ -523,9 +532,9 @@ public class AgentForm {
 		return !hasExpired && !isDisabled;
 	}
 
-	public boolean hasDeviceCategory(String deviceCategoryValue) {
+	public boolean hasDeviceCategory(DeviceCategory aDeviceCategoryValue) {
 		if(deviceCategory != null) {
-			return deviceCategory.equals(deviceCategory.getValue().equals(deviceCategoryValue));
+			return deviceCategory.equals(aDeviceCategoryValue);
 		}
 		return false;
 	}
@@ -544,15 +553,15 @@ public class AgentForm {
 		return current.before(beginDate);
 	}
 
-	public AgentForm(AgentType _agentType, String _agentName, String _deviceName, DeviceCategory _deviceCategory, EnvironmentalImpact _envImpact,
+	public AgentForm(ProsumerRole _prosumerRole, String _agentName, String _deviceName, DeviceCategory _deviceCategory, EnvironmentalImpact _envImpact,
 			Map<Long, Double> _mapPrices,
 			Double _power, Date _beginDate, Date _enDate, long _timeShiftMS) {
 		super();
-		this.agentType = _agentType;
+		this.prosumerRole = _prosumerRole;
 		this.agentName = _agentName;
 		this.deviceName = _deviceName;
-		this.deviceCategory = _deviceCategory.getOptionItem();
-		this.environmentalImpact = _envImpact.getLevel();
+		this.deviceCategory = _deviceCategory;
+		this.environmentalImpact = _envImpact;
 		this.power = _power;
 		this.powerMin = _power;
 		this.powerMax = _power;
@@ -569,13 +578,17 @@ public class AgentForm {
 	}
 
 
-	public void init(SapereAgent agent, boolean _isInSpace) {
-		this.agentName = agent.getAgentName();
-		this.url = agent.getAgentName();
+	public void init(EnergyAgent energyAgent, boolean _isInSpace) {
+		this.agentName = energyAgent.getAgentName();
+		this.url = energyAgent.getAgentName();
 		this.isInSpace = _isInSpace;
-		if(agent.getAuthentication()!=null) {
-			this.agentType = AgentType.getByLabel(agent.getAuthentication().getAgentType());
-			this.location = agent.getAuthentication().getNodeLocation();
+		if(energyAgent.isProducer()) {
+			this.prosumerRole = ProsumerRole.PRODUCER;
+		} else if (energyAgent.isConsumer()) {
+			this.prosumerRole = ProsumerRole.CONSUMER;
+		}
+		if(energyAgent.getAuthentication()!=null) {
+			this.location = energyAgent.getAuthentication().getNodeLocation();
 		}
 	}
 
@@ -583,27 +596,27 @@ public class AgentForm {
 		super();
 		init(agent, isInSpace);
 		this.id = agent.getId();
-		EnergySupply supply = agent.getEnergySupply();
-		if (supply != null) {
-			DeviceProperties deviceProperties = supply.getDeviceProperties();
+		EnergyFlow supplyOrRequest = agent.getProductionOrNeed();
+		if (supplyOrRequest != null) {
+			DeviceProperties deviceProperties = supplyOrRequest.getIssuerProperties().getDeviceProperties();
 			this.updateDeviceProperties(deviceProperties);
 		}
 		this.power = (agent.hasExpired() || agent.isDisabled() || agent.isStartInFutur()) ? 0.0
-				: supply.getPower();
-		this.disabledPower = (agent.hasExpired() || agent.isDisabled()) ? supply.getPower()
+				: supplyOrRequest.getPower();
+		this.disabledPower = (agent.hasExpired() || agent.isDisabled()) ? supplyOrRequest.getPower()
 				: Double.valueOf(0);
-		this.beginDate = supply.getBeginDate();
-		this.endDate = supply.getEndDate();
-		this.duration = supply.getDuration();
+		this.beginDate = supplyOrRequest.getBeginDate();
+		this.endDate = supplyOrRequest.getEndDate();
+		this.duration = supplyOrRequest.getDuration();
 		this.delayToleranceRatio = Double.valueOf(0);
 		this.delayToleranceMinutes = Double.valueOf(0);
 		this.location = agent.getAuthentication().getNodeLocation();
 		this.distance = _distance;
-		this.priorityLevel = "";
-		if(supply instanceof EnergyRequest) {
-			EnergyRequest request = (EnergyRequest) supply;
+		this.priorityLevel = PriorityLevel.LOW;
+		if(supplyOrRequest instanceof EnergyRequest) {
+			EnergyRequest request = (EnergyRequest) supplyOrRequest;
 			this.delayToleranceMinutes = request.getDelayToleranceMinutes();
-			this.priorityLevel = request.getPriorityLevel().getLabel();
+			this.priorityLevel = request.getPriorityLevel();
 			this.warningDurationSec = request.getWarningDurationSec();
 			//SapereLogger.getInstance().info("AgentForm constructor : warningDurationSec = " + warningDurationSec);
 		}
@@ -630,8 +643,8 @@ public class AgentForm {
 		this.waitingContractsPower = agent.getWaitingContratsPowerSlot();
 		this.waitingContractsConsumers = agent.getConsumersOfWaitingContrats();
 		this.isSatisfied = agent.isSatisfied();
-		if(this.agentType == null) {
-			System.out.println("AgentForm ctr : for debug");
+		if(this.prosumerRole == null) {
+			System.err.println("AgentForm constructor : prosumerRole is null");
 		}
 	}
 
@@ -643,11 +656,14 @@ public class AgentForm {
 	 * @return
 	 */
 	public int compareTo(AgentForm other) {
-		int compareType = this.agentType.compareTo(other.getAgentType());
-		if (compareType == 0) {
+		int compareRoles = 0;
+		if(this.prosumerRole != null && other.getProsumerRole() != null) {
+			compareRoles = this.prosumerRole.name().compareTo(other.getProsumerRole().name());
+		}
+		if (compareRoles == 0) {
 			return this.id - other.getId();
 		} else {
-			return compareType;
+			return compareRoles;
 		}
 	}
 
@@ -670,7 +686,7 @@ public class AgentForm {
 				result = result && (this.isDisabled == agentForm.getIsDisabled());
 				result = result && (this.isSatisfied == agentForm.getIsSatisfied());
 				result = result && (this.isInSpace == agentForm.getIsInSpace());
-				result = result && ((this.agentType==null)? (agentForm.getAgentType()==null) : this.agentType.equals(agentForm.getAgentType()));
+				result = result && ((this.prosumerRole==null)? (agentForm.getProsumerRole()==null) : this.prosumerRole.equals(agentForm.getProsumerRole()));
 				result = result && ((this.deviceName==null)? (agentForm.getDeviceName()==null) :this.deviceName.equals(agentForm.getDeviceName()));
 				result = result && ((this.deviceCategory==null)? (agentForm.getDeviceCategory()==null) :this.deviceCategory.equals(agentForm.getDeviceCategory()));
 				result = result	&& ((this.availablePower==null)? (agentForm.getAvailablePower()==null) : this.availablePower.floatValue() == agentForm.getAvailablePower().floatValue());
@@ -682,7 +698,8 @@ public class AgentForm {
 				result = result && ((this.offersRepartition==null)? (agentForm.getOffersRepartition()==null) : this.offersRepartition.equals(agentForm.getOffersRepartition()));
 				result = result	&& ((this.ongoingContractsRepartition==null)? (agentForm.getOngoingContractsRepartition()==null) : this.ongoingContractsRepartition.equals(agentForm.getOngoingContractsRepartition()));
 			} catch (Exception e) {
-				e.printStackTrace();
+				SapereLogger.getInstance().error(e);
+				//e.printStackTrace();
 				return false;
 			}
 			return result;
@@ -691,15 +708,15 @@ public class AgentForm {
 	}
 
 	public Date getCurrentDate() {
-		return UtilDates.getNewDate(timeShiftMS);
+		return UtilDates.getNewDateNoMilliSec(timeShiftMS);
 	}
 
 	public AgentInputForm generateInputForm() {
 		 Map<Long, Double> mapPrices = new HashMap<>();
 		 mapPrices.put(beginDate.getTime(), this.price);
 		 AgentInputForm result = new AgentInputForm();
-		 if(agentType != null) {
-			 result.setAgentType(agentType.getOptionItem());
+		 if(prosumerRole != null) {
+			 result.setProsumerRole(prosumerRole);
 		 }
 		 result.setAgentName(agentName);
 		 result.setDeviceCategory(deviceCategory);

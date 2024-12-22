@@ -3,6 +3,7 @@ package com.sapereapi.agent;
 import java.util.Random;
 
 import com.sapereapi.log.SapereLogger;
+import com.sapereapi.util.SapereUtil;
 
 import eu.sapere.middleware.agent.AgentAuthentication;
 import eu.sapere.middleware.agent.SapereAgent;
@@ -13,8 +14,8 @@ import eu.sapere.middleware.lsa.SyntheticPropertyName;
 import eu.sapere.middleware.node.NodeManager;
 import eu.sapere.middleware.node.notifier.event.BondEvent;
 import eu.sapere.middleware.node.notifier.event.DecayedEvent;
-import eu.sapere.middleware.node.notifier.event.LsaUpdatedEvent;
-import eu.sapere.middleware.node.notifier.event.PropagationEvent;
+import eu.sapere.middleware.node.notifier.event.AggregationEvent;
+import eu.sapere.middleware.node.notifier.event.SpreadingEvent;
 import eu.sapere.middleware.node.notifier.event.RewardEvent;
 
 public class ServiceAgent extends SapereAgent {
@@ -74,15 +75,12 @@ public class ServiceAgent extends SapereAgent {
 				this.removeBondedLsasOfQuery(query);
 
 		}
-	
-
-		lsa.addSyntheticProperty(SyntheticPropertyName.DIFFUSE, "1");
-		lsa.addSyntheticProperty(SyntheticPropertyName.GRADIENT_HOP, "3");
+		addGradient(3);
 		
 	}
 
 	@Override
-	public void onPropagationEvent(PropagationEvent event) {
+	public void onSpreadingEvent(SpreadingEvent event) {
 	}
 
 	@Override
@@ -90,8 +88,8 @@ public class ServiceAgent extends SapereAgent {
 	}
 
 	@Override
-	public void onLsaUpdatedEvent(LsaUpdatedEvent event) {
-		logger.info("onLsaUpdatedEvent:" + agentName);
+	public void onAggregationEvent(AggregationEvent event) {
+		logger.info("onAggregationEvent:" + agentName);
 	}
 
 	@Override
@@ -107,18 +105,18 @@ public class ServiceAgent extends SapereAgent {
 		}
 		logger.info("State to reward "+newState +" by "+event.getReward() +" - "+event.getMaxSt1());
 		if(!newState.equals(""))
-			addState(getPreviousState(newState, this.output), 1, event.getReward(), event.getMaxSt1());
+			addState(SapereUtil.getPreviousState(newState, this.output), 1, event.getReward(), event.getMaxSt1());
 	
 		logger.info("reward previous service "+previousAgent);
 
 		Lsa lsaReward = NodeManager.instance().getSpace().getLsa(previousAgent);
 		if (lsaReward != null && lsaReward.getSyntheticProperty(SyntheticPropertyName.TYPE).equals(LsaType.Service)) {
-				rewardLsa(lsaReward, event.getQuery(), event.getReward(),getBestActionQvalue(getPreviousState(newState, this.output))); //  maxQSt1
+				rewardLsa(lsaReward, event.getQuery(), event.getReward(),getBestActionQvalue(SapereUtil.getPreviousState(newState, this.output))); //  maxQSt1
 				lsaReward.addSyntheticProperty(SyntheticPropertyName.DIFFUSE, "1");
 		}
 		
 		if (lsaReward != null) {
-			if (previousAgent.contains("*") && !lsaReward.getSyntheticProperty(SyntheticPropertyName.TYPE).equals(LsaType.Query)) {
+			if (lsaReward.isPropagated() && !lsaReward.getSyntheticProperty(SyntheticPropertyName.TYPE).equals(LsaType.Query)) {
 				lsaReward.addSyntheticProperty(SyntheticPropertyName.TYPE, LsaType.Reward);
 				lsaReward.addSyntheticProperty(SyntheticPropertyName.QUERY, event.getQuery());
 				logger.info("lsaReward "+lsaReward.toVisualString());

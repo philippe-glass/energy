@@ -20,16 +20,15 @@ import java.util.Map;
 import org.json.JSONArray;
 import org.json.JSONObject;
 
-import com.sapereapi.model.LaunchConfig;
+import com.sapereapi.model.HandlingException;
+import com.sapereapi.model.OptionItem;
+import com.sapereapi.model.PredictionSetting;
+import com.sapereapi.model.TimestampedValue;
 import com.sapereapi.model.energy.AgentForm;
-import com.sapereapi.model.energy.OptionItem;
-import com.sapereapi.model.energy.TimestampedValue;
 import com.sapereapi.model.referential.AgentType;
-import com.sapereapi.model.referential.DeviceCategory;
-import com.sapereapi.model.referential.EnvironmentalImpact;
 
 import eu.sapere.middleware.log.AbstractLogger;
-import eu.sapere.middleware.node.NodeConfig;
+import eu.sapere.middleware.node.NodeLocation;
 
 public class UtilHttp {
 	public final static String METHOD_GET = "GET";
@@ -43,7 +42,7 @@ public class UtilHttp {
 		Object postedValue = "" + value; // By default : tut the string representation of the value
 		if(value instanceof Date) {
 			postedValue = format_datetime.format(value);
-		} else if(value instanceof OptionItem || value instanceof NodeConfig || value instanceof HashMap || value instanceof AgentType ) {
+		} else if(value instanceof OptionItem || value instanceof NodeLocation || value instanceof HashMap || value instanceof AgentType ) {
 			postedValue = value;
 		} else if (value instanceof List<?> ) {
 			//JSONArray jsonList = new JSONArray(value);
@@ -64,7 +63,7 @@ public class UtilHttp {
 		Object postedValue = "" + value; // By default : tut the string representation of the value
 		if(value instanceof Date) {
 			postedValue = format_datetime.format(value);
-		} else if(value instanceof OptionItem || value instanceof NodeConfig || value instanceof HashMap || value instanceof AgentType ) {
+		} else if(value instanceof OptionItem || value instanceof NodeLocation || value instanceof HashMap || value instanceof AgentType ) {
 			postedValue = value;
 		} else if (value instanceof List || value instanceof Object[] || value instanceof Boolean || value instanceof Double
 				|| value instanceof Integer || value instanceof Long || value instanceof Float || value instanceof Short) {
@@ -108,6 +107,16 @@ public class UtilHttp {
 		return parameters;
 	}
 
+	public static Object auxGetEnumValue2(Class enumClass, String fieldName, Object value) {
+		if (value != null && enumClass.isEnum()) {
+			String svalue = "" + value;
+			Object result = Enum.valueOf(enumClass, svalue);
+			return result;
+		}
+		return null;
+	}
+
+	// TODO : check similarities with parseJSONObject(Object targetObject, JSONObject jsonObject, AbstractLogger logger)
 	public static Object fillObject(Object targetObject, String httpMethod, Map<String, Object> params, AbstractLogger logger) {
 		Class<?> targetObjectClass = targetObject.getClass();
 		//boolean useJson = METHOD_POST.equals(httpMethod);
@@ -119,8 +128,11 @@ public class UtilHttp {
 					Object value = params.get(fieldName);
 					Class<?> paramType = param.getType();
 					Object valueToSet = null;
+					Object enumValue = auxGetEnumValue2(paramType, fieldName, value);
 					try {
-						if(paramType.equals(String.class)) {
+						if(enumValue != null) {
+							valueToSet = enumValue;
+						} else if(paramType.equals(String.class)) {
 							valueToSet = ""+value;
 						} else if(paramType.equals(Double.class) || paramType.equals(double.class)) {
 							valueToSet = Double.valueOf(""+value);
@@ -151,6 +163,14 @@ public class UtilHttp {
 								toSet[i] = ""+valueItem;
 							}
 							valueToSet = toSet;
+						} else if(Date[].class.equals(paramType) && value instanceof JSONArray) {
+							JSONArray jsonArray = (JSONArray) value;
+							Date[] toSet = new Date[jsonArray.length()];
+							for (int i = 0; i < jsonArray.length() ; i++) {
+								Object valueItem = jsonArray.get(i);
+								toSet[i] = UtilJsonParser.parseJsonDate(""+valueItem);
+							}
+							valueToSet = toSet;
 						} else if(String[].class.equals(paramType) && !(value instanceof JSONArray)) {
 							String sValue = ""+value;
 							if(sValue.length() > 0) {
@@ -159,12 +179,6 @@ public class UtilHttp {
 									valueToSet = toSet;
 								}
 							}
-						//} else if(paramType.equals(Map.class)) {
-							/*
-						} else if(paramType.isEnum()) {
-							String svalue =  "" + value;
-							Enum foo = Enum.valueOf(paramType.getClass(), svalue);
-							Enum<?> enumClass = Enum.valueOf(paramType, svalue); */
 						} else if(Integer[].class.equals(paramType) && value instanceof JSONArray) {
 							JSONArray jsonArray = (JSONArray) value;
 							Integer[] toSet = new Integer[jsonArray.length()];
@@ -172,10 +186,23 @@ public class UtilHttp {
 								Object valueItem = jsonArray.get(i);
 								toSet[i] = Integer.valueOf(""+valueItem);
 							}
+							valueToSet = toSet;
 						} else if(Double[].class.equals(paramType) && value instanceof JSONArray) {
-							logger.error("fillObject : Double[] not implemented ");
+							JSONArray jsonArray = (JSONArray) value;
+							Double[] toSet = new Double[jsonArray.length()];
+							for (int i = 0; i < jsonArray.length() ; i++) {
+								Object valueItem = jsonArray.get(i);
+								toSet[i] = Double.valueOf(""+valueItem);
+							}
+							valueToSet = toSet;
 						} else if(Float[].class.equals(paramType) && value instanceof JSONArray) {
-							logger.error("fillObject : Float[] not implemented ");
+							logger.warning("fillObject : Float[] not tested ");
+							JSONArray jsonArray = (JSONArray) value;
+							Float[] toSet = new Float[jsonArray.length()];
+							for (int i = 0; i < jsonArray.length() ; i++) {
+								Object valueItem = jsonArray.get(i);
+								toSet[i] = Float.valueOf(""+valueItem);
+							}
 						} else if(Long[].class.equals(paramType) && value instanceof JSONArray) {
 							JSONArray jsonArray = (JSONArray) value;
 							Long[] toSet = new Long[jsonArray.length()];
@@ -184,23 +211,48 @@ public class UtilHttp {
 								toSet[i] = Long.valueOf(""+valueItem);;
 							}
 							valueToSet = toSet;
-						} else if(paramType.equals(EnvironmentalImpact.class)) {
-							String svalue =  "" + value;
-							valueToSet = EnvironmentalImpact.getByName(svalue);
-						} else if(paramType.equals(DeviceCategory.class)) {
-							String svalue =  "" + value;
-							valueToSet = DeviceCategory.getByName(svalue);
-						} else if(paramType.equals(AgentType.class)) {
-							String svalue = "" + value;
-							valueToSet = AgentType.getByName(svalue);
+						/*
+						} else if(DeviceCategory[].class.equals(paramType) && value instanceof String) {
+							if("".equals(value)) {
+								valueToSet = new DeviceCategory[0];
+							} else {
+								String sValue = (String) value;
+								String[] array = sValue.split(",");
+								DeviceCategory[] toSet = new DeviceCategory[array.length];
+								int i = 0;
+								for(String valueItem : array) {
+									toSet[i] = DeviceCategory.valueOf(""+valueItem);
+									i++;
+								}
+								valueToSet = toSet;
+							}
+							*/
 						} else if(paramType.equals(OptionItem.class)) {
 							JSONObject jsonObject = (JSONObject) value;
 							valueToSet = UtilJsonParser.parseOptionItem(jsonObject, logger);
 						} else if(paramType.equals(TimestampedValue.class)) {
 							JSONObject jsonObject = (JSONObject) value;
 							valueToSet = UtilJsonParser.parseTimeStampedValue(jsonObject, logger);
+						} else if(paramType.equals(NodeLocation.class)) {
+							JSONObject jsonObject = (JSONObject) value;
+							valueToSet = UtilJsonParser.parseNodeLocationg(jsonObject, logger);
+						} else if(paramType.equals(PredictionSetting.class)) {
+							JSONObject jsonObject = (JSONObject) value;
+							valueToSet = UtilJsonParser.parsePredictionSetting(jsonObject, logger);
+						/*
+						} else if(NodeTransitionMatrices[].class.equals(paramType)) {
+							JSONArray jsonArray = (JSONArray) value;
+							NodeTransitionMatrices[] toSet = new NodeTransitionMatrices[jsonArray.length()];
+							for (int i = 0; i < jsonArray.length() ; i++) {
+								JSONObject valueItem = (JSONObject) jsonArray.get(i);
+								toSet[i] = UtilJsonParser.parseNodeTransitionMatrices(valueItem, logger);
+							}
+							valueToSet = toSet;
+						*/
 						} else {
-							logger.error("fillObject : paramtype not handled " + paramType);
+							if(!paramType.isEnum()) {
+								logger.error("UtilHttp.fillObject : paramtype not handled : " + paramType);
+							}
 						}
 					} catch (Throwable e) {
 						logger.error(e);
@@ -228,7 +280,7 @@ public class UtilHttp {
 				String fieldName = null;
 				if(UtilJsonParser.excludeMethodList.contains(method.getName())) {
 					// Do nothing
-					logger.info("generateRequestParams : do nothing");
+					logger.info("UtilHttp.generateRequestParams : do nothing");
 				} else if(method.getName().startsWith("get")) {
 					fieldName = SapereUtil.firstCharToLower(method.getName().substring(3));
 				} else if(method.getName().startsWith("is")) {
@@ -252,7 +304,7 @@ public class UtilHttp {
 						if(anObject instanceof AgentForm) {
 							AgentForm agentForm = (AgentForm) anObject;
 							boolean isRunning = agentForm.isRunning();
-							logger.info("generateRequestParams isRunning = " + isRunning);
+							logger.info("UtilHttp.generateRequestParams isRunning = " + isRunning);
 						}
 					}
 				}
@@ -312,8 +364,8 @@ public class UtilHttp {
 						response.append(readLine);
 					}
 					// print result
-					if (debugLevel > 2) {
-						logger.info("JSON String Result " + response.toString());
+					if (debugLevel > 2 || responseCode == HttpURLConnection.HTTP_BAD_REQUEST) {
+						logger.info("Http response = " + response.toString());
 					}
 					return response.toString();
 				} catch (Throwable e) {
@@ -329,71 +381,19 @@ public class UtilHttp {
 		return null;
 	}
 
-	private static StringBuilder buildParams(Map<String, Object> params) {
-		StringBuilder bPostParams = new StringBuilder();
-		bPostParams.append("{");
-		String sep = "";
-		for (String field : params.keySet()) {
-			Object pvalue = params.get(field);
-			boolean isString = pvalue instanceof String; // true;
-			String pvalueStr = ""+pvalue;
-			if(pvalue instanceof LaunchConfig || pvalue instanceof NodeConfig || pvalue instanceof OptionItem
-					|| pvalue instanceof AgentType) {
-				pvalueStr = convertToJson(pvalue);
-				isString=false;
-			} else if(pvalue instanceof Map<?, ?>) {
-				// Clone the map object
-				Map<Object, Object> test = new HashMap<Object, Object>();
-				Map<Object, Object> map = (Map<Object, Object>) pvalue;
-				for(Object key : map.keySet()) {
-					Object value = map.get(key);
-					test.put(key, value);
-				}
-				JSONObject jsonPvalue = new JSONObject(test);
-				pvalueStr = jsonPvalue.toString();
-				isString=false;
-			}
-			/*
-			 * if(pvalue!=null && pvalue.indexOf("TV ") >=0 ) { logger.info("For debug " +
-			 * pvalue); }
-			 */
-			if (isString && pvalueStr != null && pvalueStr.indexOf("\"") >= 0) {
-				String replace = "\\" + "\"";
-				pvalueStr = pvalueStr.replace("\"", replace);
-			}
-			bPostParams.append(sep).append(SapereUtil.addDoubleQuote(field)).append(":")
-				.append(isString ? SapereUtil.addDoubleQuote(pvalueStr) : pvalueStr);
-			sep = ",";
-		}
-		bPostParams.append("}");
-		return bPostParams;
-	}
-
-	public static String sendPostRequest(String sUrl, Object toPost, AbstractLogger logger, int debugLevel) throws Exception {
+	public static String sendPostRequest(String sUrl, Object toPost, AbstractLogger logger, int debugLevel) throws HandlingException {
 		StringBuffer jsonContent = UtilJsonParser.toJsonStr(toPost, logger, 0);
 		return aux_sendPostRequest(sUrl, jsonContent.toString(), logger, debugLevel);
 	}
 
-	@Deprecated
-	public static String sendPostRequest(String sUrl, Map<String, Object> params, AbstractLogger logger, int debugLevel) throws Exception {
-		try {
-			StringBuilder bPostParams = buildParams(params);
-			String sParams = bPostParams.toString();
-			if (debugLevel > 2) {
-				logger.info(bPostParams.toString());
-			}
-			return aux_sendPostRequest(sUrl, sParams, logger, debugLevel);
-		} catch (Exception e1) {
-			e1.printStackTrace();
-			logger.error(e1);
-			throw e1;
-		}
-	}
-
-	public static String aux_sendPostRequest(String sUrl, String sparams, AbstractLogger logger, int debugLevel) throws Exception {
+	public static String aux_sendPostRequest(String sUrl, String sparams, AbstractLogger logger, int debugLevel) throws HandlingException {
 		boolean encodeUtf8 = true;
 		try {
-			logger.info("aux_sendPostRequest " + sUrl + " params: " + sparams);
+			if(sparams.length() > 1000) {
+				logger.info("aux_sendPostRequest " + sUrl + " params: " + sparams.substring(0, 1000) + SapereUtil.CR + " (...)");
+			} else {
+				logger.info("aux_sendPostRequest " + sUrl + " params: " + sparams);
+			}
 			URL url = new URL(sUrl);
 			byte[] postDataBytes = encodeUtf8 ? sparams.getBytes("UTF-8") : sparams.getBytes();
 			HttpURLConnection postConnection = (HttpURLConnection) url.openConnection();
@@ -409,7 +409,7 @@ public class UtilHttp {
 			postConnection.setDoOutput(true);
 			postConnection.getOutputStream().write(postDataBytes);
 			int responseCode = postConnection.getResponseCode();
-			if (debugLevel > 0) {
+			if (debugLevel > 0 || responseCode == HttpURLConnection.HTTP_BAD_REQUEST) {
 				logger.info("POST Response Code :  " + responseCode);
 				logger.info("POST Response Message : " + postConnection.getResponseMessage());
 			}
@@ -432,16 +432,31 @@ public class UtilHttp {
 					throw e;
 				}
 			} else {
-				if (responseCode == HttpURLConnection.HTTP_BAD_REQUEST) {
-					System.out.print("For debug request = " + sparams);
+				if (responseCode == HttpURLConnection.HTTP_BAD_REQUEST || responseCode == HttpURLConnection.HTTP_INTERNAL_ERROR) {
+					logger.error("responseCode = " + responseCode);
+					try(BufferedReader in = new BufferedReader(new InputStreamReader(postConnection.getErrorStream()))) {
+						String inputLine;
+						StringBuffer response = new StringBuffer();
+						while ((inputLine = in.readLine()) != null) {
+							response.append(inputLine);
+						}
+						in.close();
+						// print result
+						if (debugLevel > 2) {
+							logger.info(response.toString());
+						}
+						throw new HandlingException("Internal error " + responseCode + " " + response.toString());
+					} catch(Throwable e) {
+						logger.error(e);
+						throw e;
+					}
 				}
 				logger.error("POST NOT WORKED " + sparams );
-				throw new Exception("Post request failed : code " + responseCode);
+				throw new HandlingException("Post request failed : code " + responseCode);
 			}
 		} catch (Exception e1) {
-			e1.printStackTrace();
 			logger.error(e1);
-			throw e1;
+			throw new HandlingException("" + e1);
 		}
 	}
 

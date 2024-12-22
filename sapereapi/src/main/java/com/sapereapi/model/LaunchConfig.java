@@ -3,38 +3,38 @@ package com.sapereapi.model;
 import java.util.HashMap;
 import java.util.Map;
 
-import eu.sapere.middleware.node.NodeConfig;
+import eu.sapere.middleware.node.NodeLocation;
 
 public class LaunchConfig {
-	Map<String, NodeConfig> mapNodes = new HashMap<String, NodeConfig>();
-	Map<String, String> mapLocationByNode = new HashMap<String, String>();
+	Map<String, NodeLocation> mapNodes = new HashMap<String, NodeLocation>();
+	Map<String, String> mapNodeByLocation = new HashMap<String, String>();
 
-	public Map<String, NodeConfig> getMapNodes() {
+	public Map<String, NodeLocation> getMapNodes() {
 		return mapNodes;
 	}
 
-	public void setMapNodes(Map<String, NodeConfig> mapNodes) {
+	public void setMapNodes(Map<String, NodeLocation> mapNodes) {
 		this.mapNodes = mapNodes;
 	}
 
-	public Map<String, String> getMapLocationByNode() {
-		return mapLocationByNode;
+	public Map<String, String> getMapNodeByLocation() {
+		return mapNodeByLocation;
 	}
 
-	public void setMapLocationByNode(Map<String, String> mapLocationByNode) {
-		this.mapLocationByNode = mapLocationByNode;
+	public void setMapNodeByLocation(Map<String, String> mapNodeByLocation) {
+		this.mapNodeByLocation = mapNodeByLocation;
 	}
 
 	public LaunchConfig() {
 		super();
 	}
 
-	public void addNodeConfig(NodeConfig nodeConfig) {
-		mapNodes.put(nodeConfig.getName(), nodeConfig);
+	public void addNodeLocation(NodeLocation nodeLocation) {
+		mapNodes.put(nodeLocation.getName(), nodeLocation);
 	}
 
-	public NodeConfig getFirstNode() {
-		NodeConfig result = null;
+	public NodeLocation getFirstNode() {
+		NodeLocation result = null;
 		for (String nodeName : mapNodes.keySet()) {
 			if (result == null) {
 				result = mapNodes.get(nodeName);
@@ -44,7 +44,7 @@ public class LaunchConfig {
 	}
 
 	public String getBaseUrl() {
-		NodeConfig firstNode = getFirstNode();
+		NodeLocation firstNode = getFirstNode();
 		if (firstNode != null) {
 			return firstNode.getUrl();
 		}

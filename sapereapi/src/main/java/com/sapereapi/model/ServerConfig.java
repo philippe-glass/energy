@@ -2,25 +2,59 @@ package com.sapereapi.model;
 
 import java.util.List;
 
-import eu.sapere.middleware.node.NodeConfig;
+import com.sapereapi.db.DBConfig;
+
+import eu.sapere.middleware.node.NodeLocation;
 
 public class ServerConfig {
-	private String initSqlScript = null;
+	private String environment = null;
+	private String propertiesFileName = null;
+	private List<String> initSqlScripts = null;
+	private String scenario = "default";
 	private boolean modeAuto = false;
 	private String csvFile = null;
 	private String urlForcasting = null;
-	private List<NodeConfig> defaultNeighbours = null;
-	private NodeConfig nodeConfig = null;
+	private List<NodeLocation> defaultNeighbours = null;
+	private NodeLocation nodeLocation = null;
+	private DBConfig dbConfig = null;
+	private DBConfig clemapDbConfig = null;
+	private PredictionSetting nodePredicitonSetting = new PredictionSetting();
+	private PredictionSetting clusterPredictionSetting = new PredictionSetting();
 	private boolean useStressTest = false;
 	private boolean useFooHandler = false;
 	private boolean sendFooJsonResponse = false;
+	private int debugLevel = 0;
 
-	public String getInitSqlScript() {
-		return initSqlScript;
+	public String getEnvironment() {
+		return environment;
 	}
 
-	public void setInitSqlScript(String initSqlScript) {
-		this.initSqlScript = initSqlScript;
+	public void setEnvironment(String environment) {
+		this.environment = environment;
+	}
+
+	public String getPropertiesFileName() {
+		return propertiesFileName;
+	}
+
+	public void setPropertiesFileName(String propertiesFileName) {
+		this.propertiesFileName = propertiesFileName;
+	}
+
+	public List<String> getInitSqlScripts() {
+		return initSqlScripts;
+	}
+
+	public void setInitSqlScripts(List<String> initSqlScripts) {
+		this.initSqlScripts = initSqlScripts;
+	}
+
+	public String getScenario() {
+		return scenario;
+	}
+
+	public void setScenario(String scenario) {
+		this.scenario = scenario;
 	}
 
 	public boolean isModeAuto() {
@@ -47,20 +81,28 @@ public class ServerConfig {
 		this.urlForcasting = urlForcasting;
 	}
 
-	public List<NodeConfig> getDefaultNeighbours() {
+	public List<NodeLocation> getDefaultNeighbours() {
 		return defaultNeighbours;
 	}
 
-	public void setDefaultNeighbours(List<NodeConfig> defaultNeighbours) {
+	public void setDefaultNeighbours(List<NodeLocation> defaultNeighbours) {
 		this.defaultNeighbours = defaultNeighbours;
 	}
 
-	public NodeConfig getNodeConfig() {
-		return nodeConfig;
+	public NodeLocation getNodeLocation() {
+		return nodeLocation;
 	}
 
-	public void setNodeConfig(NodeConfig nodeConfig) {
-		this.nodeConfig = nodeConfig;
+	public void setNodeLocation(NodeLocation nodeLocation) {
+		this.nodeLocation = nodeLocation;
+	}
+
+	public DBConfig getDbConfig() {
+		return dbConfig;
+	}
+
+	public void setDbConfig(DBConfig dbConfig) {
+		this.dbConfig = dbConfig;
 	}
 
 	public boolean isUseStressTest() {
@@ -85,6 +127,38 @@ public class ServerConfig {
 
 	public void setSendFooJsonResponse(boolean sendFooJsonResponse) {
 		this.sendFooJsonResponse = sendFooJsonResponse;
+	}
+
+	public int getDebugLevel() {
+		return debugLevel;
+	}
+
+	public void setDebugLevel(int debugLevel) {
+		this.debugLevel = debugLevel;
+	}
+
+	public PredictionSetting getNodePredicitonSetting() {
+		return nodePredicitonSetting;
+	}
+
+	public void setNodePredicitonSetting(PredictionSetting nodePredicitonSetting) {
+		this.nodePredicitonSetting = nodePredicitonSetting;
+	}
+
+	public PredictionSetting getClusterPredictionSetting() {
+		return clusterPredictionSetting;
+	}
+
+	public void setClusterPredictionSetting(PredictionSetting clusterPredictionSetting) {
+		this.clusterPredictionSetting = clusterPredictionSetting;
+	}
+
+	public DBConfig getClemapDbConfig() {
+		return clemapDbConfig;
+	}
+
+	public void setClemapDbConfig(DBConfig clemapDbConfig) {
+		this.clemapDbConfig = clemapDbConfig;
 	}
 
 }

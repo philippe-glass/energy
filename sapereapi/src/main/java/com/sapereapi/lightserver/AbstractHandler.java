@@ -1,22 +1,21 @@
 package com.sapereapi.lightserver;
 
 import java.lang.annotation.Annotation;
+import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.net.URI;
 import java.util.HashMap;
-import java.util.List;
 import java.util.Map;
 
 import com.sapereapi.log.SapereLogger;
+import com.sapereapi.model.ServerConfig;
 
 import eu.sapere.middleware.log.AbstractLogger;
-import eu.sapere.middleware.node.NodeConfig;
 
 public abstract class AbstractHandler {
 	protected AbstractLogger logger = SapereLogger.getInstance();
 	protected String uri = null;
-	protected NodeConfig nodeConfig = null;
-	protected List<NodeConfig> defaultNeighbours = null;
+	protected ServerConfig serverConfig = null;
 	protected URI requestedUri = null;
 	protected String httpMethod = null;
 	protected Map<String, Object> httpInput = new HashMap<>();
@@ -71,6 +70,12 @@ public abstract class AbstractHandler {
 					}
 				}*/
 			} catch (Throwable e) {
+				if(e instanceof InvocationTargetException) {
+					InvocationTargetException ite = (InvocationTargetException) e;
+					Throwable e2 = ite.getTargetException();
+					logger.error(e2);
+					return e2;
+				}
 				logger.error(e);
 			}
 		} else {

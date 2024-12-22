@@ -1,5 +1,6 @@
 package com.sapereapi.model.energy;
 
+import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.Date;
 import java.util.List;
@@ -7,14 +8,15 @@ import java.util.List;
 import com.sapereapi.model.referential.WarningType;
 import com.sapereapi.util.UtilDates;
 
-public class RegulationWarning implements Cloneable {
+public class RegulationWarning implements Cloneable, Serializable {
+	private static final long serialVersionUID = 1L;
 	private WarningType type;
 	private List<String> destinationAgents;
 	private Date date;
 	private Long timeShiftMS;
 	private Date waitingDeadline;
 	private Date receptionDeadline;
-	private EnergySupply changeRequest;
+	private ChangeRequest changeRequest;
 
 	public WarningType getType() {
 		return type;
@@ -69,11 +71,11 @@ public class RegulationWarning implements Cloneable {
 		this.receptionDeadline = validityDeadline;
 	}
 
-	public EnergySupply getChangeRequest() {
+	public ChangeRequest getChangeRequest() {
 		return changeRequest;
 	}
 
-	public void setChangeRequest(EnergySupply changeRequest) {
+	public void setChangeRequest(ChangeRequest changeRequest) {
 		this.changeRequest = changeRequest;
 	}
 
@@ -129,6 +131,6 @@ public class RegulationWarning implements Cloneable {
 	}
 
 	public Date getCurrentDate() {
-		return UtilDates.getNewDate(timeShiftMS);
+		return UtilDates.getNewDateNoMilliSec(timeShiftMS);
 	}
 }

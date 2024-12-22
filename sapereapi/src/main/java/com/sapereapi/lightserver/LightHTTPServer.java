@@ -1,6 +1,9 @@
 package com.sapereapi.lightserver;
 
+import java.io.BufferedInputStream;
 import java.io.BufferedReader;
+import java.io.File;
+import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.io.OutputStream;
@@ -14,6 +17,7 @@ import org.json.JSONArray;
 import org.json.JSONObject;
 
 import com.sapereapi.model.DataRetriever;
+import com.sapereapi.model.HandlingException;
 import com.sapereapi.model.ServerConfig;
 import com.sapereapi.util.UtilHttp;
 import com.sapereapi.util.UtilJsonParser;
@@ -22,7 +26,6 @@ import com.sun.net.httpserver.HttpHandler;
 import com.sun.net.httpserver.HttpServer;
 
 import eu.sapere.middleware.log.AbstractLogger;
-import eu.sapere.middleware.node.NodeConfig;
 
 public class LightHTTPServer extends Thread implements HttpHandler {
 	private static AbstractLogger logger = null;
@@ -38,10 +41,13 @@ public class LightHTTPServer extends Thread implements HttpHandler {
 	protected Map<String, AbstractHandler> handlersTable = new HashMap<>();
 	protected int debugLevel = 1;
 	protected static StringBuffer response = new StringBuffer();
+	protected static boolean isOutputStremClosed = false;
 	protected static StringBuffer fooResponse = new StringBuffer();
 	protected static byte[] responseBytes = null;
 	private int fooTestCounter = 0;
 	private ServerConfig serverConfig = null;
+	public final static int RETURN_CODE_OK = 200;
+	public final static int RETURN_CODE_SERVER_ERROR = 500;
 
 	private boolean isRunning() {
 		return isRunning;
@@ -55,21 +61,19 @@ public class LightHTTPServer extends Thread implements HttpHandler {
 		try {
 			serverConfig = _serverConfig;
 			logger = aLogger;
-			//hostname = serverConfig.getNodeConfig().getHost();
-			int port = serverConfig.getNodeConfig().getRestPort();
+			//hostname = serverConfig.getNodeLocation().getHost();
+			int port = serverConfig.getNodeLocation().getRestPort();
 			InetSocketAddress address = new InetSocketAddress(port);
 			server = HttpServer.create(address, 10);
 			// server.createContex
 			logger.info("starting http server(" + address + ")");
 			server.createContext("/", this);
 			// Init handlers
-			List<NodeConfig> defaultNeighbours = serverConfig.getDefaultNeighbours();
-			NodeConfig nodeConfig = serverConfig.getNodeConfig();
-			handlersTable.put("energy", new EnergyHandler("/energy", nodeConfig, defaultNeighbours));
-			handlersTable.put("sapere", new SapereHandler("/sapere", nodeConfig, defaultNeighbours));
-			handlersTable.put("config", new ConfigHandler("/config", nodeConfig, defaultNeighbours));
-			handlersTable.put("query", new QueryHandler("/query", nodeConfig, defaultNeighbours));
-			handlersTable.put("service", new ServiceHandler("/service", nodeConfig, defaultNeighbours));
+			handlersTable.put("energy", new EnergyHandler("/energy", serverConfig));
+			handlersTable.put("sapere", new SapereHandler("/sapere", serverConfig));
+			handlersTable.put("config", new ConfigHandler("/config", serverConfig));
+			handlersTable.put("query", new QueryHandler("/query", serverConfig));
+			handlersTable.put("service", new ServiceHandler("/service", serverConfig));
 			// server.setExecutor(Executors.newCachedThreadPool());
 			server.start();
 			if(serverConfig.isModeAuto()) {
@@ -78,7 +82,6 @@ public class LightHTTPServer extends Thread implements HttpHandler {
 			}
 			this.performAction();
 		} catch (Exception e) {
-			e.printStackTrace();
 			logger.warning(e.toString());
 		}
 	}
@@ -99,8 +102,26 @@ public class LightHTTPServer extends Thread implements HttpHandler {
 		// TODO unpublishAllEndpoints();
 	}
 
+	public void handleFileRequest(HttpExchange he, String fileName) throws IOException {
+		// Headers headers = he.getResponseHeaders();
+		he.getResponseHeaders().add("Content-Type", "image/png");
+		// Retrieve requested file
+		File file = new File(fileName);
+		byte[] bytes = new byte[(int) file.length()];
+		logger.info("handleFileRequest requeted file = " + file.getAbsolutePath());
+		logger.info("handleFileRequest length:" + file.length());
+		FileInputStream fileInputStream = new FileInputStream(file);
+		BufferedInputStream bufferedInputStream = new BufferedInputStream(fileInputStream);
+		bufferedInputStream.read(bytes, 0, bytes.length);
+		he.sendResponseHeaders(RETURN_CODE_OK, file.length());
+		OutputStream outputStream = he.getResponseBody();
+		outputStream.write(bytes, 0, bytes.length);
+		outputStream.close();
+	}// end of handleFileReques
+
 	@Override
 	public void handle(HttpExchange he) throws IOException {
+		isOutputStremClosed = false;
 		if(serverCounter % 10 ==0) {
 			System.gc();
 		}
@@ -145,13 +166,15 @@ public class LightHTTPServer extends Thread implements HttpHandler {
 			response = FooHandler.generateResponse(fooTestCounter);
 			fooTestCounter++;
 			sendTextResponse(he, response);
+		} else if (handlerUri.endsWith(".ico")){
+			handleFileRequest(he, handlerUri);
 		} else {
 			if(handlersTable.containsKey(handlerUri)) {
 				requestedHandler = handlersTable.get(handlerUri);
 			}
 			if(requestedHandler == null) {
 				// handler by default
-				requestedHandler = handlersTable.get("energy");
+				logger.error("Handler not found for the URI " + handlerUri);
 			}
 
 			// TODO : set a default service in each handler
@@ -161,7 +184,7 @@ public class LightHTTPServer extends Thread implements HttpHandler {
 			if (isMthodOptions) {
 				// DO NOTHING
 				logger.info("option method received : do nothing");
-			} else  {
+			} else if(requestedHandler != null)  {
 				boolean useStressTest2 = true && serverConfig.isUseStressTest() &&
 						(requestedServcice.contains("retrieveNodeContent") || requestedServcice.contains("nodeTotalHistory"));
 				result = requestedHandler.callService(requestedServcice, httpMethod, httpInput, useStressTest2);
@@ -194,75 +217,93 @@ public class LightHTTPServer extends Thread implements HttpHandler {
 		}
 	}
 
+	protected StringBuffer generateJsonResponse(Object result, boolean useHomeMadeJsonConverter) {
+		StringBuffer responseBuff = new StringBuffer();
+		if (useHomeMadeJsonConverter) {
+			try {
+				responseBuff = UtilJsonParser.toJsonStr(result, logger, 0);
+				if (requestedUri.getPath().contains("PredictionContext")) {
+					logger.info("generateJsonResponse for debug");
+					fooResponse =  UtilJsonParser.toJsonStr(result, logger, 0);
+				}
+				/*
+				 * if(useStressTest) { for (int i = 0; i<100; i++) { response =
+				 * UtilJsonParser.toJsonStr(result, logger,0); } }
+				 */
+				/*
+				 * if(response.contains("\r\n")) { response = response.replace("\r\n",""); }
+				 * response = response.replace("0.0,", "0,"); response =
+				 * response.replace("0.0,", "0,");
+				 */
+			} catch (Throwable e) {
+				logger.error(e);
+			}
+		} else {
+			Object jsonResult = null;
+			if (result instanceof List<?>) {
+				JSONArray jsonArray = new JSONArray();
+				List<Object> resultList = (List) result;
+				for (Object nextItem : resultList) {
+					jsonArray.put(new JSONObject(nextItem));
+				}
+				jsonResult = jsonArray;
+			} else {
+				jsonResult = new JSONObject(result);
+				Object[] resultCorrection = UtilJsonParser.correctJsonDates(jsonResult, logger);
+				Boolean isChanged = (Boolean) resultCorrection[0];
+				if (isChanged) {
+					jsonResult = (JSONObject) resultCorrection[1];
+				}
+			}
+			logger.info("jsonResult = " + jsonResult);
+			responseBuff.append(jsonResult.toString());
+		}
+		return responseBuff;
+	}
+
 	protected boolean sendHttpResponse(HttpExchange he, Object result) {
 		response = new StringBuffer();
-		Object jsonResult = null;
+		boolean bresult = false;
 		boolean useHomeMadeJsonConverter = true;
 		if (result == null && httpMethod.equals("OPTIONS")) {
 			try {
-				sendJsonResponse(he, response);
+				sendJsonResponse(he, response, RETURN_CODE_OK);
 			} catch (IOException e) {
-				// TODO Auto-generated catch block
-				e.printStackTrace();
+				logger.error(e);
 			}
-		}
-		if (result != null) {
-			if (useHomeMadeJsonConverter) {
-				try {
-					response = UtilJsonParser.toJsonStr(result, logger, 0);
-					sendJsonResponse(he, response);
-					if (requestedUri.getPath().contains("retrieveAllNodesContent")) {
-						logger.info("for debug");
-						//fooResponse = new StringBuffer(response.toString());
-					}
-					/*
-					 * if(useStressTest) { for (int i = 0; i<100; i++) { response =
-					 * UtilJsonParser.toJsonStr(result, logger,0); } }
-					 */
-					/*
-					 * if(response.contains("\r\n")) { response = response.replace("\r\n",""); }
-					 * response = response.replace("0.0,", "0,"); response =
-					 * response.replace("0.0,", "0,");
-					 */
-				} catch (Throwable e) {
-					logger.error(e);
-				}
-			} else {
-				/* */
-				if (result instanceof List<?>) {
-					JSONArray jsonArray = new JSONArray();
-					List<Object> resultList = (List) result;
-					for (Object nextItem : resultList) {
-						jsonArray.put(new JSONObject(nextItem));
-					}
-					jsonResult = jsonArray;
-				} else {
-					jsonResult = new JSONObject(result);
-					Object[] resultCorrection = UtilJsonParser.correctJsonDates(jsonResult, logger);
-					Boolean isChanged = (Boolean) resultCorrection[0];
-					if (isChanged) {
-						jsonResult = (JSONObject) resultCorrection[1];
-					}
-				}
-				logger.info("jsonResult = " + jsonResult);
-				response.append(jsonResult.toString());
+		} else if(result == null) {
+			try {
+				sendNotFoundResponse(he);
+			} catch (IOException e) {
+				logger.error(e);
+			}
+		} else if(result instanceof HandlingException) {
+			try {
+				Exception ex = (Exception) result;
+				String message = ""+ ex;
+				response =  generateJsonResponse(message, useHomeMadeJsonConverter);
+				sendJsonResponse(he, response, RETURN_CODE_SERVER_ERROR);
+			} catch (IOException e) {
+				logger.error(e);
+			}
+		} else {
+			response = generateJsonResponse(result, useHomeMadeJsonConverter);
+			try {
+				sendJsonResponse(he, response, RETURN_CODE_OK);
+				bresult = true;
+			} catch (Throwable t) {
+				logger.error("Exception returned by sendJsonResponse : response = " + response);
+				logger.error(t);
+			} finally {
+				int len = response.length();
+				response.delete(0, len);
+				responseBytes = null;
+				//System.gc();
 			}
 		}
 		// send response
-		boolean bresult = false;
 		try {
-			bresult = true;
-		} catch (Throwable t) {
-			logger.error("response = " + response);
-			logger.error(t);
-		} finally {
-			int len = response.length();
-			response.delete(0, len);
-			responseBytes = null;
-			//System.gc();
-		}
-		try {
-			if(!bresult) {
+			if(!isOutputStremClosed && (he.getResponseBody() != null)) {
 				he.getResponseBody().close();
 			}
 		} catch (IOException e) {
@@ -271,16 +312,24 @@ public class LightHTTPServer extends Thread implements HttpHandler {
 		return bresult;
 	}
 
-	public void sendJsonResponse(HttpExchange he, StringBuffer response) throws IOException {
-		responseBytes = response.toString().getBytes("UTF-8");
-		he.getResponseHeaders().set("Content-Type", "application/json");
+	public void generateHeader(HttpExchange he, String contentType) {
+		he.getResponseHeaders().set("Content-Type", contentType);
 		he.getResponseHeaders().set("Access-Control-Allow-Origin", "*");
 		he.getResponseHeaders().set("Access-Control-Allow-Methods", "GET, OPTIONS, HEAD, PUT, POST");
 		he.getResponseHeaders().add("Access-Control-Allow-Credentials", "true");
 		he.getResponseHeaders().add("Access-Control-Allow-Credentials-Header", "*");
 		he.getResponseHeaders().add("Access-Control-Allow-Headers",
 				"Access-Control-Allow-Headers, Origin,Accept, X-Requested-With, Content-Type, Access-Control-Request-Method, Access-Control-Request-Headers");
+		if (httpMethod.equals("OPTIONS")) {
+			logger.info("he.getResponseHeaders() = " + he.getResponseHeaders());
+			// he.getResponseHeaders()..ge(HttpServletResponse.SC_ACCEPTED);
+			// he.getRequestHeaders().setStatus(HttpServletResponse.SC_ACCEPTED);
+		}
+	}
 
+	public void sendNotFoundResponse(HttpExchange he) throws IOException {
+		//responseBytes = response.toString().getBytes("UTF-8");
+		generateHeader(he, "application/json");
 		// For HTTP OPTIONS verb/method reply with ACCEPTED status code -- per CORS
 		// handshake
 		if (httpMethod.equals("OPTIONS")) {
@@ -289,24 +338,35 @@ public class LightHTTPServer extends Thread implements HttpHandler {
 			// he.getRequestHeaders().setStatus(HttpServletResponse.SC_ACCEPTED);
 		}
 		// he.sendResponseHeaders(200, response.length());
-		he.sendResponseHeaders(200, responseBytes.length);
+		he.sendResponseHeaders(404, -1);
+		OutputStream os = he.getResponseBody();
+		//os.write(responseBytes);
+		os.flush();
+		os.close();
+		isOutputStremClosed = true;
+	}
+
+	public void sendJsonResponse(HttpExchange he, StringBuffer response, int returnCode) throws IOException {
+		responseBytes = response.toString().getBytes("UTF-8");
+		generateHeader(he, "application/json");
+		// For HTTP OPTIONS verb/method reply with ACCEPTED status code -- per CORS
+		// handshake
+		he.sendResponseHeaders(returnCode, responseBytes.length);
 		OutputStream os = he.getResponseBody();
 		os.write(responseBytes);
 		os.flush();
 		os.close();
+		isOutputStremClosed = true;
 	}
 
 	public void sendTextResponse(HttpExchange he, StringBuffer response) throws IOException {
 		byte[] responseBytes = response.toString().getBytes("UTF-8");
-		he.getResponseHeaders().set("Content-Type", "text/html");
-		he.getResponseHeaders().set("Access-Control-Allow-Origin", "*");
-		he.getResponseHeaders().set("Access-Control-Allow-Methods","GET, OPTIONS, HEAD, PUT, POST");
-		he.getResponseHeaders().add("Access-Control-Allow-Credentials", "true");
-		he.getResponseHeaders().add("Access-Control-Allow-Credentials-Header", "*");
-		he.getResponseHeaders().add("Access-Control-Allow-Headers", "Access-Control-Allow-Headers, Origin,Accept, X-Requested-With, Content-Type, Access-Control-Request-Method, Access-Control-Request-Headers");
-		he.sendResponseHeaders(200, responseBytes.length);
+		generateHeader(he, "text/html");
+		he.sendResponseHeaders(RETURN_CODE_OK, responseBytes.length);
 		OutputStream os = he.getResponseBody();
 		os.write(response.toString().getBytes());
+		os.flush();
 		os.close();
+		isOutputStremClosed = true;
 	}
 }

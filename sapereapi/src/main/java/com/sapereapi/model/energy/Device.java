@@ -2,10 +2,10 @@ package com.sapereapi.model.energy;
 
 import java.util.Set;
 
-import com.sapereapi.model.Sapere;
 import com.sapereapi.model.referential.DeviceCategory;
 import com.sapereapi.model.referential.EnvironmentalImpact;
 import com.sapereapi.model.referential.PhaseNumber;
+import com.sapereapi.model.referential.PriorityLevel;
 import com.sapereapi.util.SapereUtil;
 import com.sapereapi.util.UtilDates;
 
@@ -66,7 +66,7 @@ public class Device {
 		this.properties = properties;
 	}
 
-	public int getPriorityLevel() {
+	public PriorityLevel getPriorityLevel() {
 		return properties.getPriorityLevel();
 	}
 
@@ -141,7 +141,7 @@ public class Device {
 		result.append("(").append(properties.getCategory()).append(")");
 		result.append(" W: ").append(UtilDates.df3.format(powerMin)).append("-").append(UtilDates.df3.format(powerMax));
 		if (currentPower > 0) {
-			result.append(" current : ").append(SapereUtil.round(currentPower, Sapere.NB_DEC_POWER));
+			result.append(" current : ").append(SapereUtil.roundPower(currentPower));
 		}
 		return result.toString();
 	}
@@ -182,4 +182,13 @@ public class Device {
 		return result;
 	}
 
+	public double getCorrectedTargePower(double targetPower) {
+		if (targetPower >= powerMin && targetPower <= powerMax) {
+			return targetPower;
+		} else {
+			double powerRandom = Math.random();
+			double powerMagnitude = powerMax - powerMin;
+			return powerMin + powerRandom * powerMagnitude;
+		}
+	}
 }

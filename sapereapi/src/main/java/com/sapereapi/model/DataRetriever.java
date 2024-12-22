@@ -12,7 +12,6 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Random;
-import java.util.TimeZone;
 import java.util.TreeMap;
 
 import com.sapereapi.db.EnergyDbHelper;
@@ -20,23 +19,22 @@ import com.sapereapi.model.energy.AgentForm;
 import com.sapereapi.model.energy.Device;
 import com.sapereapi.model.energy.DeviceMeasure;
 import com.sapereapi.model.energy.DeviceProperties;
-import com.sapereapi.model.energy.PricingTable;
-import com.sapereapi.model.energy.TimestampedValue;
 import com.sapereapi.model.energy.input.AgentInputForm;
+import com.sapereapi.model.energy.policy.IConsumerPolicy;
 import com.sapereapi.model.energy.policy.IProducerPolicy;
+import com.sapereapi.model.energy.pricing.PricingTable;
 import com.sapereapi.model.input.InitializationForm;
-import com.sapereapi.model.markov.NodeMarkovStates;
-import com.sapereapi.model.referential.AgentType;
+import com.sapereapi.model.learning.NodeStates;
 import com.sapereapi.model.referential.DeviceCategory;
 import com.sapereapi.model.referential.EnvironmentalImpact;
 import com.sapereapi.model.referential.PhaseNumber;
 import com.sapereapi.model.referential.PriorityLevel;
+import com.sapereapi.model.referential.ProsumerRole;
 import com.sapereapi.util.SapereUtil;
 import com.sapereapi.util.UtilDates;
 
 import eu.sapere.middleware.agent.SapereAgent;
 import eu.sapere.middleware.log.AbstractLogger;
-import eu.sapere.middleware.node.NodeConfig;
 
 public class DataRetriever extends Thread {
 	protected ServerConfig serverConfig = null;
@@ -56,17 +54,14 @@ public class DataRetriever extends Thread {
 
 	private void aux_addMeasure(Map<String, Object> row, Date measureDate, Map<String, DeviceMeasure> mapMeasures,
 			boolean replaceAll) {
-		PhaseNumber phaseNumber = PhaseNumber.getByLabel("" + row.get("phase"));
-		Double power_p = SapereUtil.round(Math.abs(SapereUtil.getDoubleValue(row, "active_power")),
-				Sapere.NB_DEC_POWER); // active power
+		PhaseNumber phaseNumber = PhaseNumber.valueOf("" + row.get("phase"));
+		Double power_p = SapereUtil.roundPower(Math.abs(SapereUtil.getDoubleValue(row, "active_power", logger))); // active power
 		// (power_p)
-		Double power_q = SapereUtil.round(Math.abs(SapereUtil.getDoubleValue(row, "reactive_power")),
-				Sapere.NB_DEC_POWER); // reactive
+		Double power_q = SapereUtil.roundPower(Math.abs(SapereUtil.getDoubleValue(row, "reactive_power", logger))); // reactive
 		// power
 		// (power_q)
 		// apparent power (power_s) : power_s^2 = power_p^2 + power_q^2
-		Double power_s = SapereUtil.round(Math.abs(SapereUtil.getDoubleValue(row, "apparent_power")),
-				Sapere.NB_DEC_POWER);
+		Double power_s = SapereUtil.roundPower(Math.abs(SapereUtil.getDoubleValue(row, "apparent_power", logger)));
 		String deviceName = "" + row.get("description");
 		if (replaceAll && mapMeasures.containsKey(deviceName)) {
 			DeviceMeasure existingMeasure = mapMeasures.get(deviceName);
@@ -126,7 +121,7 @@ public class DataRetriever extends Thread {
 						device.setId(deviceId);
 						deviceId++;
 						DeviceProperties deviceProp = new DeviceProperties(deviceName, category,
-								EnvironmentalImpact.MEDIUM, category.isProducer());
+								EnvironmentalImpact.MEDIUM);
 						if (category == DeviceCategory.BIOMASS_ENG || category == DeviceCategory.WIND_ENG
 								|| category == DeviceCategory.SOLOR_ENG) {
 							deviceProp.setEnvironmentalImpact(EnvironmentalImpact.LOW);
@@ -159,7 +154,7 @@ public class DataRetriever extends Thread {
 		}
 		// Complete Prod Measures
 		DeviceProperties sigProperties = new DeviceProperties("SIG", DeviceCategory.EXTERNAL_ENG,
-				EnvironmentalImpact.MEDIUM, true);
+				EnvironmentalImpact.MEDIUM);
 		sigProperties.setThreePhases();
 		Device prodSig = new Device(deviceId, sigProperties, 0, 1500, 0);
 		deviceId++;
@@ -179,8 +174,8 @@ public class DataRetriever extends Thread {
 					mapMeasures.put(deviceName, copy);
 				}
 				// add SIG Measure
-				double power_p = SapereUtil.round(100 * 78 * (1 + 0 * 0.05 * random.nextGaussian()), 2);
-				DeviceMeasure sigMeasure = new DeviceMeasure(measureDate, prodSig.getName(), PhaseNumber.L1, power_p,
+				double power_p = SapereUtil.roundPower(100 * 78 * (1 + 0 * 0.05 * random.nextGaussian()));
+				DeviceMeasure sigMeasure = new DeviceMeasure(measureDate, prodSig.getName(), PhaseNumber.l1, power_p,
 						0., 0.);
 				mapMeasures.put(prodSig.getName(), sigMeasure);
 			}
@@ -193,21 +188,21 @@ public class DataRetriever extends Thread {
 		mapDevices.clear();
 		// Create a consumer device
 		DeviceProperties deviceProp1 = new DeviceProperties(consumerDeviceName, DeviceCategory.LIGHTING,
-				EnvironmentalImpact.MEDIUM, DeviceCategory.LIGHTING.isProducer());
+				EnvironmentalImpact.MEDIUM);
 		long deviceId = 1;
 		Device deviceConsumer = new Device(deviceId, deviceProp1, 0., 1000., 60.0);
 		deviceId++;
 		mapDevices.put(deviceConsumer.getName(), deviceConsumer);
 		// Create a producer device
 		DeviceProperties deviceProp2 = new DeviceProperties(producerDeviceName, DeviceCategory.SOLOR_ENG,
-				EnvironmentalImpact.LOW, DeviceCategory.SOLOR_ENG.isProducer());
+				EnvironmentalImpact.LOW);
 		Device deviceProducer = new Device(deviceId, deviceProp2, 0., 1000., 60.0);
 		deviceId++;
 		mapDevices.put(deviceProducer.getName(), deviceProducer);
 	}
 
 	public TreeMap<Date, Map<String, DeviceMeasure>> aux_retrieveDataHackDay(Date dateBegin, Date dateEnd,
-			String csvfilepath, String separator) {
+			String csvfilepath, String separator) throws HandlingException {
 		int lineIndx = 1;
 		logger.info("aux_retrieveDataHackDay : begin");
 		Date begin = new Date();
@@ -233,7 +228,7 @@ public class DataRetriever extends Thread {
 				Date measureDate1 = UtilDates.format_sql.parse(sDate);
 				int tzOffset = 0;// tz.getOffset(measureDate1.getDate());
 				Date measureDate = new Date(measureDate1.getTime() + tzOffset);
-				double power_p_balance = SapereUtil.round(SapereUtil.getDoubleValue(row, sHeaderValues), 3);
+				double power_p_balance = SapereUtil.roundPower(SapereUtil.getDoubleValue(row, sHeaderValues, logger));
 				double power_p_consumer = 0.;
 				double power_p_producer = 0.;
 				if (power_p_balance > 0) {
@@ -252,10 +247,10 @@ public class DataRetriever extends Thread {
 
 				Map<String, DeviceMeasure> mapMeasures = new HashMap<>();
 				if (!measureDate.before(dateBegin) && measureDate.before(dateEnd)) {
-					DeviceMeasure consumerMeasure = new DeviceMeasure(measureDate, consumerDeviceName, PhaseNumber.L1,
+					DeviceMeasure consumerMeasure = new DeviceMeasure(measureDate, consumerDeviceName, PhaseNumber.l1,
 							power_p_consumer, 0., 0.);
 					mapMeasures.put(consumerDeviceName, consumerMeasure);
-					DeviceMeasure producerMeasure = new DeviceMeasure(measureDate, producerDeviceName, PhaseNumber.L1,
+					DeviceMeasure producerMeasure = new DeviceMeasure(measureDate, producerDeviceName, PhaseNumber.l1,
 							power_p_producer, 0., 0.);
 					mapMeasures.put(producerDeviceName, producerMeasure);
 					result.put(measureDate, mapMeasures);
@@ -292,32 +287,36 @@ public class DataRetriever extends Thread {
 			}
 		}
 		logger.info("DataRetriever.start : csvFilePath = "+ csvFilePath + " fileFormat = " + CSV_FORMAT_HACKDAY);
-		initService();
-		Date dateCurrent = Sapere.getInstance().getCurrentDate();
-		if (csvFilePath != null) {
-			Date dateMin = UtilDates.shiftDateMinutes(dateCurrent, -15);
-			Date dateMax = UtilDates.shiftDateMinutes(dateCurrent, 60);
-			TreeMap<Date, Map<String, DeviceMeasure>> measurementData = new TreeMap<>();
-			if (fileFormat == CSV_FORMAT_LESVERGERS) {
-				dateMin = UtilDates.shiftDateMinutes(dateCurrent, -1);
-				measurementData = aux_retrieveDataLesVergers(dateMin, dateMax, csvFilePath, ";");
+		try {
+			initService();
+			Date dateCurrent = Sapere.getInstance().getCurrentDate();
+			if (csvFilePath != null) {
+				Date dateMin = UtilDates.shiftDateMinutes(dateCurrent, -15);
+				Date dateMax = UtilDates.shiftDateMinutes(dateCurrent, 60);
+				TreeMap<Date, Map<String, DeviceMeasure>> measurementData = new TreeMap<>();
+				if (fileFormat == CSV_FORMAT_LESVERGERS) {
+					dateMin = UtilDates.shiftDateMinutes(dateCurrent, -1);
+					measurementData = aux_retrieveDataLesVergers(dateMin, dateMax, csvFilePath, ";");
+				}
+				if (fileFormat == CSV_FORMAT_HACKDAY) {
+					dateMin = UtilDates.shiftDateMinutes(dateCurrent, -15);
+					dateMax = UtilDates.shiftDateMinutes(dateCurrent, 200);
+					measurementData = aux_retrieveDataHackDay(dateMin, dateMax, csvFilePath, ",");
+				}
+				for (Date nextMeasureDate : measurementData.keySet()) {
+					executeLoop(nextMeasureDate, measurementData.get(nextMeasureDate));
+				}
+			} else {
+				logger.error("csvFilePath not given");
 			}
-			if (fileFormat == CSV_FORMAT_HACKDAY) {
-				dateMin = UtilDates.shiftDateMinutes(dateCurrent, -15);
-				dateMax = UtilDates.shiftDateMinutes(dateCurrent, 200);
-				measurementData = aux_retrieveDataHackDay(dateMin, dateMax, csvFilePath, ",");
-			}
-			for (Date nextMeasureDate : measurementData.keySet()) {
-				executeLoop(nextMeasureDate, measurementData.get(nextMeasureDate));
-			}
-		} else {
-			logger.error("csvFilePath not given");
+		} catch (Exception e) {
+			logger.error(e);
 		}
 	}
 
-	private void initService() {
-		boolean activatePredictions = true;
-		boolean activateAggregation = true;
+	private void initService() throws HandlingException {
+		PredictionSetting nodePredictionSetting = new PredictionSetting(false, null, null);
+		PredictionSetting clusterPredictionSetting = new PredictionSetting(false, null, null);
 		String scenario = "auto";
 		Date current = new Date();
 		// long currentMS = current.getTime();
@@ -343,19 +342,20 @@ public class DataRetriever extends Thread {
 		datetimeShifts.put(Calendar.HOUR, (int) (1 * timeShiftHour));
 		// long testDateLong = UtilDates.computeTimeShiftMS(datetimeShifts);
 		// Date testDate = new Date(testDateLong + currentMS);
-		InitializationForm initForm = new InitializationForm(scenario,
-				100 * NodeMarkovStates.DEFAULT_NODE_MAX_TOTAL_POWER, new HashMap<Integer, Integer>(),
-				activatePredictions, activateAggregation);
+		InitializationForm initForm = new InitializationForm(scenario
+				,100 * NodeStates.DEFAULT_NODE_MAX_TOTAL_POWER
+				,new HashMap<Integer, Integer>()
+				,nodePredictionSetting, clusterPredictionSetting
+				);
 		initForm.setShiftDayOfMonth(datetimeShifts.get(Calendar.DAY_OF_YEAR));
 		initForm.setShiftHourOfDay(datetimeShifts.get(Calendar.HOUR));
 		initForm.setDisableSupervision(false);
-		initForm.setActivatePredictions(false);
 		initForm.setTimeZoneId("GMT");
 		initForm.setUrlForcasting(serverConfig.getUrlForcasting());
-		Sapere.getInstance().initEnergyService(serverConfig.getNodeConfig(), initForm, new ArrayList<NodeConfig>());
+		Sapere.getInstance().initEnergyService(serverConfig, initForm);
 	}
 
-	private void executeLoop(Date measureDate, Map<String, DeviceMeasure> mapMeasures) {
+	private void executeLoop(Date measureDate, Map<String, DeviceMeasure> mapMeasures) throws HandlingException {
 		Date current = Sapere.getInstance().getCurrentDate();
 		int cpt = 0;
 		while (current.before(measureDate)) {
@@ -372,15 +372,13 @@ public class DataRetriever extends Thread {
 				logger.error(e);
 			}
 		}
-		PricingTable pricingTable = new PricingTable(current, UtilDates.shiftDateDays(current, 365), 0,
-				Sapere.getInstance().getTimeShiftMS());
-		IProducerPolicy producerPolicy = Sapere.getInstance().initDefaultProducerPolicy();
+		PricingTable pricingTable = new PricingTable(current, 0, Sapere.getInstance().getTimeShiftMS());
 		double balanceValue = 0;
 		for (String deviceName : mapMeasures.keySet()) {
 			DeviceMeasure measure = mapMeasures.get(deviceName);
 			Device device = mapDevices.get(deviceName);
 			Date endDate = UtilDates.shiftDateMinutes(measureDate, 60);
-			AgentType agentType = device.isProducer() ? AgentType.PRODUCER : AgentType.CONSUMER;
+			ProsumerRole prosumerRole = device.isProducer() ? ProsumerRole.PRODUCER : ProsumerRole.CONSUMER;
 			EnvironmentalImpact envImpact = device.getEnvironmentalImpact();
 			double power_p = measure.computeTotalPower_p();
 			boolean isRunning = Device.STATUS_RUNNING.equals(device.getStatus());
@@ -389,7 +387,7 @@ public class DataRetriever extends Thread {
 			AgentForm result = null;
 			if (isRunning) {
 				long timeShiftMS = Sapere.getNodeContext().getTimeShiftMS();
-				AgentInputForm agentInputForm = new AgentInputForm(agentType.getOptionItem(),
+				AgentInputForm agentInputForm = new AgentInputForm(prosumerRole,
 						device.getRunningAgentName(), device.getName(), device.getCategory(), envImpact,
 						pricingTable.getMapPrices(), power_p, measureDate, endDate, PriorityLevel.LOW, duration,
 						timeShiftMS);
@@ -397,16 +395,19 @@ public class DataRetriever extends Thread {
 				result = Sapere.getInstance().modifyEnergyAgent(agentInputForm);
 			} else {
 				SapereAgent agent = null;
+				IProducerPolicy producerPolicy = Sapere.getPolicyFactory().initDefaultProducerPolicy();
+				IConsumerPolicy consumerPolicy = Sapere.getPolicyFactory().initDefaultConsumerPolicy();
 				if (device.isProducer()) {
 					agent = Sapere.getInstance()
 							.addServiceProducer(
 									power_p, current, endDate, new DeviceProperties(device.getName(),
-											device.getCategory(), device.getEnvironmentalImpact(), true),
-									pricingTable, producerPolicy);
+											device.getCategory(), device.getEnvironmentalImpact()),
+									pricingTable, producerPolicy, consumerPolicy);
 
 				} else {
 					agent = Sapere.getInstance().addServiceConsumer(power_p, current, endDate, duration,
-							PriorityLevel.LOW, device.getProperties(), pricingTable, null);
+							PriorityLevel.LOW, device.getProperties(), pricingTable,
+							Sapere.getPolicyFactory().initDefaultProducerPolicy(), consumerPolicy);
 				}
 				result = Sapere.getInstance().generateAgentForm(agent);
 			}

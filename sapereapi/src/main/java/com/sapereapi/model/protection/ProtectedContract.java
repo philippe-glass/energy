@@ -1,6 +1,5 @@
 package com.sapereapi.model.protection;
 
-import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.Date;
 import java.util.HashSet;
@@ -11,7 +10,6 @@ import java.util.Set;
 import com.sapereapi.agent.energy.EnergyAgent;
 import com.sapereapi.agent.energy.LearningAgent;
 import com.sapereapi.exception.PermissionException;
-import com.sapereapi.log.SapereLogger;
 import com.sapereapi.model.energy.Contract;
 import com.sapereapi.model.energy.EnergyRequest;
 import com.sapereapi.model.energy.EnergySupply;
@@ -21,11 +19,11 @@ import com.sapereapi.model.referential.AgentType;
 
 import eu.sapere.middleware.agent.AgentAuthentication;
 import eu.sapere.middleware.agent.SapereAgent;
+import eu.sapere.middleware.log.AbstractLogger;
 import eu.sapere.middleware.lsa.Lsa;
-import eu.sapere.middleware.lsa.values.IAggregateable;
-import eu.sapere.middleware.node.NodeConfig;
+import eu.sapere.middleware.node.NodeLocation;
 
-public class ProtectedContract extends ProtectedObject implements Serializable, IAggregateable {
+public class ProtectedContract extends ProtectedObject {
 	private static final long serialVersionUID = 5L;
 	private Contract contract;
 	public ProtectedContract(Contract contract) {
@@ -34,32 +32,35 @@ public class ProtectedContract extends ProtectedObject implements Serializable, 
 	}
 
 	public boolean checkAccessAsProducer(AgentAuthentication authentication) {
-		if (AgentType.PRODUCER.getLabel().equals(authentication.getAgentType())
-				&& contract.hasProducer(authentication.getAgentName())) {
+		boolean hasTypeProducer = AgentType.PROSUMER.name().equals(authentication.getAgentType());
+		if (hasTypeProducer && contract.hasProducer(authentication.getAgentName())) {
 			return checkAuthentication(authentication);
 		}
 		return false;
 	}
 
 	protected boolean checkAccessAsConsumer(AgentAuthentication authentication) {
-		if (AgentType.CONSUMER.getLabel().equals(authentication.getAgentType())
-				&& contract.getConsumerAgent().equals(authentication.getAgentName())) {
+		boolean hasTypeConsumer = AgentType.PROSUMER.name().equals(authentication.getAgentType());
+		if (hasTypeConsumer	&& contract.getConsumerAgent().equals(authentication.getAgentName())) {
 			return checkAuthentication(authentication);
 		}
 		return false;
 	}
 
 	protected boolean checkAccessAsStakeholder(AgentAuthentication authentication) {
+		return checkAccessAsConsumer(authentication) || checkAccessAsProducer(authentication);
+		/*
 		if (AgentType.CONSUMER.getLabel().equals(authentication.getAgentType())) {
 			return checkAccessAsConsumer(authentication);
 		} else if (AgentType.PRODUCER.getLabel().equals(authentication.getAgentType())) {
 			return checkAccessAsProducer(authentication);
 		}
 		return false;
+		*/
 	}
 
 	protected boolean checkAccessAsLearningAgent(AgentAuthentication authentication) {
-		if (AgentType.LEARNING_AGENT.getLabel().equals(authentication.getAgentType())) {
+		if (AgentType.LEARNING_AGENT.name().equals(authentication.getAgentType())) {
 			return checkAuthentication(authentication);
 		}
 		return false;
@@ -102,7 +103,7 @@ public class ProtectedContract extends ProtectedObject implements Serializable, 
 		return contract.getConsumerAgent();
 	}
 
-	public NodeConfig getConsumerLocation() {
+	public NodeLocation getConsumerLocation() {
 		return contract.getConsumerLocation();
 	}
 
@@ -187,8 +188,8 @@ public class ProtectedContract extends ProtectedObject implements Serializable, 
 		return new ProtectedContract(contractClone);
 	}
 
-	public ProtectedContract copyForLSA() {
-		Contract contractClone = contract.copyForLSA();
+	public ProtectedContract copyForLSA(AbstractLogger logger) {
+		Contract contractClone = contract.copyForLSA(logger);
 		return new ProtectedContract(contractClone);
 	}
 
@@ -210,7 +211,10 @@ public class ProtectedContract extends ProtectedObject implements Serializable, 
 	}
 
 	public int getIssuerDistance() {
-		return contract.getRequest().getIssuerDistance();
+		if(contract.getRequest().getIssuerProperties() == null) {
+			return 0;
+		}
+		return contract.getRequest().getIssuerProperties() .getDistance();
 	}
 
 	public boolean isMerged() {
@@ -224,11 +228,12 @@ public class ProtectedContract extends ProtectedObject implements Serializable, 
 			throw new PermissionException("Access denied for agent " + agentName);
 		}
 		EnergyAgent producerAgent = (EnergyAgent) agent;
-		EnergySupply supply = producerAgent.getEnergySupply().clone();
+		if(producerAgent.getGlobalProduction() == null) {
+			return null;
+		}
+		EnergySupply supply = producerAgent.getGlobalProduction().clone();
 		PowerSlot producerPowerSlot = contract.getPowerSlotFromAgent(agentName);
-		supply.setPower(producerPowerSlot.getCurrent());
-		supply.setPowerMin(producerPowerSlot.getMin());
-		supply.setPowerMax(producerPowerSlot.getMax());
+		supply.setPowerSlot(producerPowerSlot.clone());
 		supply.setBeginDate(contract.getBeginDate());
 		supply.setEndDate(contract.getEndDate());
 		ReducedContract result = new ReducedContract(contract.getRequest(), supply, contract.getValidationDeadline());
@@ -267,50 +272,19 @@ public class ProtectedContract extends ProtectedObject implements Serializable, 
 		return result;
 	}
 
-	public List<IAggregateable> auxRetriveListContracts(List<IAggregateable> listObjects, AgentAuthentication authentication)  {
-		List<IAggregateable> listContracts = new ArrayList<IAggregateable>();
-		try {
-			for(IAggregateable nextObj : listObjects) {
-				if(nextObj instanceof ProtectedContract) {
-					ProtectedContract nextProtectedContract = (ProtectedContract) nextObj;
-					Contract nextContract = nextProtectedContract.getContract(authentication);
-					if(!nextContract.isComplementary() && nextContract.isOnGoing()) {
-						listContracts.add(nextContract);
-					}
-				}
-			}
-		} catch (PermissionException e) {
-			SapereLogger.getInstance().error(e);
-			return new ArrayList<>();
-		}
-		return listContracts;
-	}
-
-	public ProtectedContract aggregate(String operator, List<IAggregateable> listObjects, AgentAuthentication agentAuthentication) {
-		List<IAggregateable> listContracts = auxRetriveListContracts(listObjects, agentAuthentication);
-		if(listContracts.size() == 0) {
-			return null;
-		}
-		Contract firstContract = (Contract) listContracts.get(0);
-		Contract resultContract = firstContract.aggregate(operator, listContracts, agentAuthentication);
-		if(resultContract != null) {
-			return new ProtectedContract(resultContract);
-		}
-		return null;
-	}
-
 	@Override
-	public void completeContent(Lsa bondedLsa, Map<String, NodeConfig> mapNodeLocation) {
+	public void completeInvolvedLocations(Lsa bondedLsa, Map<String, NodeLocation> mapNodeLocation, AbstractLogger logger) {
 		if(contract != null) {
-			contract.completeContent(bondedLsa, mapNodeLocation);
+			contract.completeInvolvedLocations(bondedLsa, mapNodeLocation, logger);
 		}
 	}
 
 	@Override
-	public List<NodeConfig> retrieveInvolvedLocations() {
+	public List<NodeLocation> retrieveInvolvedLocations() {
 		if(contract != null) {
 			return contract.retrieveInvolvedLocations();
 		}
-		return new ArrayList<NodeConfig>();
+		return new ArrayList<NodeLocation>();
 	}
+
 }

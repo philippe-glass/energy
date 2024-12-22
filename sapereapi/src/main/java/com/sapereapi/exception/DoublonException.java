@@ -1,6 +1,8 @@
 package com.sapereapi.exception;
 
-public class DoublonException extends Exception {
+import com.sapereapi.model.HandlingException;
+
+public class DoublonException extends HandlingException {
 	private static final long serialVersionUID = 1779L;
 
 	public DoublonException(String message) {

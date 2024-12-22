@@ -3,7 +3,8 @@ package com.sapereapi.model.input;
 import java.util.Calendar;
 import java.util.HashMap;
 import java.util.Map;
-import java.util.TimeZone;
+
+import com.sapereapi.model.PredictionSetting;
 
 public class InitializationForm {
 	private String scenario;
@@ -13,27 +14,32 @@ public class InitializationForm {
 	private Integer shiftDayOfMonth;
 	private Integer shiftMonth;
 	private Double maxTotalPower;
-	private boolean disableSupervision = false;
-	private boolean activatePredictions = false;
-	private boolean activateAggregations = false;
+	private Boolean disableSupervision = Boolean.FALSE;
+	private Boolean activateAwards = Boolean.FALSE;
+	private Boolean activateEnergyStorage = Boolean.FALSE;
+	private PredictionSetting nodePredicitonSetting = new PredictionSetting();
+	private PredictionSetting clusterPredictionSetting = new PredictionSetting();
+
+
 	private String timeZoneId = "Europe/Zurich";
-	//private TimeZone timeZone = TimeZone.getTimeZone("Europe/Zurich");
+	// private TimeZone timeZone = TimeZone.getTimeZone("Europe/Zurich");
 	private String urlForcasting = null;
 
 	public InitializationForm() {
 		super();
 	}
 
-	public InitializationForm(String scenario, Double maxTotalPower,
-			Map<Integer, Integer> datetimeConstraints
-			,boolean _activatePredictions
-			,boolean _activateAggregations) {
+	public InitializationForm(String scenario, Double maxTotalPower, Map<Integer, Integer> datetimeConstraints
+			,PredictionSetting _nodePredicitonSetting, PredictionSetting _clusterPredictionSetting
+			) {
 		super();
 		this.scenario = scenario;
 		this.maxTotalPower = maxTotalPower;
 		this.disableSupervision = false;
-		this.activatePredictions = _activatePredictions;
-		this.activateAggregations = _activateAggregations;
+		this.nodePredicitonSetting = _nodePredicitonSetting;
+		this.clusterPredictionSetting = _clusterPredictionSetting;
+		this.activateAwards = false;
+		this.activateEnergyStorage = false;
 		setTimeConstraints(datetimeConstraints);
 	}
 
@@ -98,24 +104,12 @@ public class InitializationForm {
 		this.disableSupervision = disableSupervision;
 	}
 
-	public boolean isActivatePredictions() {
-		return activatePredictions;
+	public Boolean getActivateEnergyStorage() {
+		return activateEnergyStorage;
 	}
 
-	public void setActivatePredictions(boolean activatePredictions) {
-		this.activatePredictions = activatePredictions;
-	}
-
-	public boolean isActivateAggregations() {
-		return activateAggregations;
-	}
-
-	public void setActivateAggregations(boolean activateAggregations) {
-		this.activateAggregations = activateAggregations;
-	}
-
-	public void setDisableSupervision(boolean disableSupervision) {
-		this.disableSupervision = disableSupervision;
+	public void setActivateEnergyStorage(Boolean activateEnergyStorage) {
+		this.activateEnergyStorage = activateEnergyStorage;
 	}
 
 	public void setInitialState(String _initialStateVariable, Integer _initialStateId) {
@@ -170,6 +164,30 @@ public class InitializationForm {
 
 	public void setUrlForcasting(String urlForcasting) {
 		this.urlForcasting = urlForcasting;
+	}
+
+	public PredictionSetting getNodePredicitonSetting() {
+		return nodePredicitonSetting;
+	}
+
+	public void setNodePredicitonSetting(PredictionSetting nodePredicitonSetting) {
+		this.nodePredicitonSetting = nodePredicitonSetting;
+	}
+
+	public PredictionSetting getClusterPredictionSetting() {
+		return clusterPredictionSetting;
+	}
+
+	public void setClusterPredictionSetting(PredictionSetting clusterPredictionSetting) {
+		this.clusterPredictionSetting = clusterPredictionSetting;
+	}
+
+	public Boolean getActivateAwards() {
+		return activateAwards;
+	}
+
+	public void setActivateAwards(Boolean activateAwards) {
+		this.activateAwards = activateAwards;
 	}
 
 }

@@ -7,25 +7,28 @@ import com.sapereapi.model.referential.EventMainCategory;
 import com.sapereapi.model.referential.EventObjectType;
 import com.sapereapi.model.referential.EventType;
 import com.sapereapi.model.referential.WarningType;
+import com.sapereapi.util.UtilDates;
 
-import eu.sapere.middleware.node.NodeConfig;
+import eu.sapere.middleware.log.AbstractLogger;
 
-public class EnergyEvent extends EnergySupply implements Cloneable, Serializable {
+public class EnergyEvent extends EnergyFlow implements Cloneable, Serializable {
 	private static final long serialVersionUID = 14408L;
 	protected Long id;
 	protected Long histoId;
 	protected EventType type;
 	protected EnergyEvent originEvent = null;
 	protected WarningType warningType = null;
-	protected PowerSlot powerUpateSlot = null;
-	protected PricingTable pricingTable = null;
+	protected PowerSlot powerUpdateSlot = null;
 	protected String comment = null;
+	protected Double firstRate = null;
+	protected Double additionalPower = 0.0;
 
 	public final static String CLASS_OK = "warning_ok";
 	public final static String CLASS_OK_LIGHT = "warning_ok_light";
 	public final static String CLASS_WARNING_LIGHT = "warning_light";
 	public final static String CLASS_WARNING_MEDIUM = "warning_medium";
 	public final static String CLASS_WARNING_HIGH = "warning_high";
+
 
 	public Long getId() {
 		return id;
@@ -65,6 +68,7 @@ public class EnergyEvent extends EnergySupply implements Cloneable, Serializable
 		this.originEvent = originEvent;
 	}
 
+
 	public WarningType getWarningType() {
 		return warningType;
 	}
@@ -89,32 +93,40 @@ public class EnergyEvent extends EnergySupply implements Cloneable, Serializable
 		this.comment = comment;
 	}
 
-	public PricingTable getPricingTable() {
-		return pricingTable;
+	public Double getFirstRate() {
+		return firstRate;
 	}
 
-	public void setPricingTable(PricingTable pricingTable) {
-		this.pricingTable = pricingTable;
+	public void setFirstRate(Double firstRate) {
+		this.firstRate = firstRate;
 	}
 
-	public EnergyEvent(EventType type, String _agent, NodeConfig _location, Integer _issuerDistance, Boolean _isComplementary, Double _power, Double _powerMin, Double _powerMax, Date beginDate, Date endDate, DeviceProperties deviceProperties, PricingTable pricingTable, String _comment, long timeShiftMS) {
-		super(_agent, _location, _issuerDistance, _isComplementary, _power, _powerMin, _powerMax, beginDate, endDate, deviceProperties, pricingTable, timeShiftMS);
+	public Double getAdditionalPower() {
+		return additionalPower;
+	}
+
+	public void setAdditionalPower(Double additionalPower) {
+		this.additionalPower = additionalPower;
+	}
+
+	public EnergyEvent(EventType type
+			, ProsumerProperties prosumerProperties
+			, Boolean isComplementary
+			, PowerSlot powerSlot
+			, Date beginDate, Date endDate
+			, String comment, Double firstRate) {
+		super(prosumerProperties, isComplementary, powerSlot, beginDate, endDate);
 		this.type = type;
-		this.comment = _comment;
-	}
-
-	public EnergyEvent(EventType type, EnergySupply energySupply, String _comment) {
-		super(energySupply.getIssuer(), energySupply.getIssuerLocation(), energySupply.getIssuerDistance()
-				, energySupply.getIsComplementary(), energySupply.getPower(), energySupply.getPowerMin(), energySupply.getPowerMax() ,energySupply.getBeginDate(), energySupply.getEndDate(), energySupply.getDeviceProperties(), energySupply.getPricingTable(), energySupply.getTimeShiftMS());
-		this.type = type;
-		this.comment = _comment;
+		this.comment = comment;
+		this.firstRate = firstRate;
 	}
 
 	public String getKey() {
 		StringBuffer result = new StringBuffer();
-		result.append(this.issuer).append("#");
+		String issuer = getIssuer();
+		result.append(issuer).append("#");
 		if(type!=null) {
-			result.append(type.getLabel());
+			result.append(type.name());
 		}
 		result.append("#");
 		if(beginDate!=null) {
@@ -127,7 +139,8 @@ public class EnergyEvent extends EnergySupply implements Cloneable, Serializable
 	}
 
 	public void setSupplyFields(EnergySupply energySupply) {
-		this.power = energySupply.getPower();
+		//this.power = energySupply.getPower();
+		this.powerSlot = energySupply.getPowerSlot();
 		this.beginDate = energySupply.getBeginDate();
 		this.endDate = energySupply.getEndDate();
 	}
@@ -144,74 +157,104 @@ public class EnergyEvent extends EnergySupply implements Cloneable, Serializable
 
 	public String toString() {
 		StringBuffer result = new StringBuffer();
-		result.append(this.type.getLabel()).append(" ")
-		.append(this.issuer).append(" ")
-		.append(this.isComplementary() ? " [COMPLEMENTARY] " : "")
-		.append((super.toString()));
+		result.append("[id:").append(id).append("]");
+		String issuer = getIssuer();
+		result.append(this.type.name()).append(" ")
+			.append(issuer).append(" ")
+			.append(this.isComplementary() ? " [COMPLEMENTARY] " : "");
+		result.append(":");
+		result.append(UtilDates.df3.format(getPower())).append(" W from ");
+		result.append(UtilDates.formatTimeOrDate(beginDate, getTimeShiftMS()));
+		result.append(" to ");
+		result.append(UtilDates.formatTimeOrDate(endDate, getTimeShiftMS()));
+		if(this.disabled) {
+			result.append("# DISABLED #");
+		}
 		if(warningType!=null) {
 			result.append(" ").append(warningType.getLabel());
 		}
 		return result.toString();
 	}
 
-	public EnergyEvent clone() {
-		EnergySupply supply = super.clone();
-		EventType type2 = EventType.getByLabel(this.type.getLabel());
-		EnergyEvent copy = new EnergyEvent(type2, supply, comment);
-		copy.setId(id);
-		if(powerUpateSlot!=null) {
-			copy.setPowerUpateSlot(powerUpateSlot);
+	@Override
+	public boolean equals(Object obj) {
+		if (obj == null || !(obj instanceof EnergyEvent)) {
+			return false;
 		}
-		return copy;
+		EnergyEvent other = (EnergyEvent) obj;
+		if (beginDate != null && !this.beginDate.equals(other.getBeginDate())) {
+			return false;
+		}
+		if (endDate != null && !this.endDate.equals(other.getEndDate())) {
+			return false;
+		}
+		if (type != null && !this.type.equals(other.getType())) {
+			return false;
+		}
+		if (issuerProperties != null && !this.issuerProperties.equals(other.getIssuerProperties())) {
+			return false;
+		}
+		if (id != null && !this.id.equals(other.getId())) {
+			return false;
+		}
+		if (histoId != null && !this.histoId.equals(other.getHistoId())) {
+			return false;
+		}
+		if (getPower() != null && !this.getPower().equals(other.getPower())) {
+			return false;
+		}
+		return true;
+	}
+
+	public EnergyEvent clone() {
+		return copy(true);
 	}
 
 	@Override
-	public EnergyEvent copyForLSA() {
+	public EnergyEvent copyForLSA(AbstractLogger logger) {
 		return copy(false);
 	}
 
 	public EnergyEvent copy(boolean copyIds) {
-		EnergySupply supply = super.copy(copyIds);
-		EventType type2 = EventType.getByLabel(this.type.getLabel());
-		EnergyEvent copy = new EnergyEvent(type2, supply, comment);
+		//PricingTable copyPricingTable = pricingTable==null ? null : pricingTable.copy(copyIds);
+		ProsumerProperties cloneIssuerProperties = issuerProperties.copy(copyIds);
+		EnergyEvent copy = new EnergyEvent(type, cloneIssuerProperties, isComplementary, getPowerSlot(), beginDate, endDate, comment, firstRate);
 		if(copyIds) {
 			copy.setId(id);
-		}
-		if(powerUpateSlot!=null) {
-			copy.setPowerUpateSlot(powerUpateSlot);
+			copy.setHistoId(histoId);
 		}
 		return copy;
 	}
 
-	public PowerSlot getPowerUpateSlot() {
-		return powerUpateSlot;
+	public PowerSlot getPowerUpdateSlot() {
+		return powerUpdateSlot;
 	}
 
-	public void setPowerUpateSlot(PowerSlot _powerUpateSlot) {
-		this.powerUpateSlot = _powerUpateSlot;
+	public void setPowerUpdateSlot(PowerSlot _powerUpdateSlot) {
+		this.powerUpdateSlot = _powerUpdateSlot;
 	}
 
 	public void setPowerUpates(double powerUpdate, double powerMinUpdate, double powerMaxUpdate) {
-		this.powerUpateSlot = new PowerSlot(powerUpdate, powerMinUpdate, powerMaxUpdate);
+		this.powerUpdateSlot = new PowerSlot(powerUpdate, powerMinUpdate, powerMaxUpdate);
 	}
 
 	public double getPowerUpdate() {
-		if(powerUpateSlot != null) {
-			return powerUpateSlot.getCurrent();
+		if(powerUpdateSlot != null) {
+			return powerUpdateSlot.getCurrent();
 		}
 		return 0.0;
 	}
 
 	public double getPowerMinUpdate() {
-		if(powerUpateSlot != null) {
-			return powerUpateSlot.getMin();
+		if(powerUpdateSlot != null) {
+			return powerUpdateSlot.getMin();
 		}
 		return 0.0;
 	}
 
 	public double getPowerMaxUpdate() {
-		if(powerUpateSlot != null) {
-			return powerUpateSlot.getMax();
+		if(powerUpdateSlot != null) {
+			return powerUpdateSlot.getMax();
 		}
 		return 0.0;
 	}
@@ -277,6 +320,9 @@ public class EnergyEvent extends EnergySupply implements Cloneable, Serializable
 		        result = CLASS_WARNING_MEDIUM;
 		      }
 		    }
+			if(type.isSwitch()) {
+				result = CLASS_WARNING_MEDIUM;
+			}
 			if(type.getIsEnding()) {
 				result = CLASS_OK_LIGHT;
 			}
@@ -296,6 +342,9 @@ public class EnergyEvent extends EnergySupply implements Cloneable, Serializable
 		    }
 			if(type.getIsEnding()) {
 				result = CLASS_WARNING_HIGH;
+			}
+			if(type.isSwitch()) {
+				result = CLASS_OK_LIGHT;
 			}
 		}
 		return result;

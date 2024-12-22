@@ -5,21 +5,19 @@ import java.util.Date;
 import com.sapereapi.model.TimeSlot;
 
 import eu.sapere.middleware.lsa.IPropertyObject;
-import eu.sapere.middleware.lsa.values.IAggregateable;
-import eu.sapere.middleware.node.NodeConfig;
 
-public interface IEnergyObject extends IAggregateable , IPropertyObject {
+public interface IEnergyObject extends IPropertyObject {
+	public ProsumerProperties getIssuerProperties();
+
 	public String getIssuer();
-
-	public NodeConfig getIssuerLocation();
-
-	public int getIssuerDistance();
-
-	public boolean isIssuerLocal();
 
 	public Date getBeginDate();
 
+	public void setBeginDate(Date aDate);
+
 	public Date getEndDate();
+
+	public void setEndDate(Date aDate);
 
 	public Double getPower();
 
@@ -43,7 +41,7 @@ public interface IEnergyObject extends IAggregateable , IPropertyObject {
 
 	public IEnergyObject clone();
 
-	public Long getTimeShiftMS();
+	public long getTimeShiftMS();
 
 	public Date getCurrentDate();
 

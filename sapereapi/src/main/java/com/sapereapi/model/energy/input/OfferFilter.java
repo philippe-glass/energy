@@ -7,7 +7,7 @@ public class OfferFilter {
 	private Date dateMax;
 	private String consumerFilter;
 	private String producerFilter;
-	private String AdditionalFilter;
+	private String additionalFilter;
 
 	public Date getDateMin() {
 		return dateMin;
@@ -42,11 +42,11 @@ public class OfferFilter {
 	}
 
 	public String getAdditionalFilter() {
-		return AdditionalFilter;
+		return additionalFilter;
 	}
 
 	public void setAdditionalFilter(String additionalFilter) {
-		AdditionalFilter = additionalFilter;
+		this.additionalFilter = additionalFilter;
 	}
 
 }

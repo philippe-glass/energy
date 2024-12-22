@@ -32,24 +32,4 @@ public enum EnvironmentalImpact {
 		}
 		return null;
 	}
-
-	public static EnvironmentalImpact getByLabel(String label) {
-		String label2 = (label == null) ? "" : label;
-		for (EnvironmentalImpact envImpact : EnvironmentalImpact.values()) {
-			if (envImpact.getLabel().equals(label2)) {
-				return envImpact;
-			}
-		}
-		return null;
-	}
-
-	public static EnvironmentalImpact getByName(String name) {
-		String name2 = (name == null) ? "" : name;
-		for (EnvironmentalImpact envImpact : EnvironmentalImpact.values()) {
-			if (envImpact.name().equals(name2)) {
-				return envImpact;
-			}
-		}
-		return EnvironmentalImpact.VERY_HIGH;
-	}
 }

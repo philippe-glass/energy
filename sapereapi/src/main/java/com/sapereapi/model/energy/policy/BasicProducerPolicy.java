@@ -12,12 +12,16 @@ import com.sapereapi.agent.energy.manager.RequestSelectionStrategy;
 import com.sapereapi.log.SapereLogger;
 import com.sapereapi.model.NodeContext;
 import com.sapereapi.model.energy.EnergyRequest;
-import com.sapereapi.model.energy.PricingTable;
+import com.sapereapi.model.energy.SingleOffer;
+import com.sapereapi.model.energy.pricing.PricingTable;
+import com.sapereapi.util.SapereUtil;
 import com.sapereapi.util.UtilDates;
 
 public class BasicProducerPolicy implements IProducerPolicy {
 	protected PricingTable defaultPricingTable;
 	protected int requestSelectionPolicy;
+	protected NodeContext nodeContext;
+	protected boolean useAwardCredits = false;
 	protected static SapereLogger logger = SapereLogger.getInstance();
 
 	public final static RequestSelectionStrategy SORTBY_DISTANCE_PRIORITY_WARNING_POWER = new RequestSelectionStrategy(
@@ -44,7 +48,9 @@ public class BasicProducerPolicy implements IProducerPolicy {
 			}, new Comparator<EnergyRequest>() {
 				// If all the above criteria are equal, compare the consumer name
 				public int compare(EnergyRequest req1, EnergyRequest req2) {
-					return req1.getIssuer().compareTo(req2.getIssuer());
+					String issuer1 =  req1.getIssuer();
+					String issuer2 = req2.getIssuer();
+					return issuer1.compareTo(issuer2);
 				}
 			});
 
@@ -72,7 +78,7 @@ public class BasicProducerPolicy implements IProducerPolicy {
 			// Sort only by request priority
 			// Collections.sort(requestList, requestComparatorPriority);
 			requestList = DISTANCE_PRIORITY.sortList(requestList);
-		} else if (requestSelectionPolicy == POLICY_PRIORIZATION) {
+		} else if (requestSelectionPolicy == POLICY_PRIORITIZATION) {
 			// Sort by request priority, warning level desc, power asc
 			// Collections.sort(requestList,
 			// requestComparatorDistancePriorityAndWarningAndPower);
@@ -121,23 +127,35 @@ public class BasicProducerPolicy implements IProducerPolicy {
 
 	private PricingTable initSimplePricingTable(NodeContext nodeContext, Double rate) {
 		Date current = nodeContext.getCurrentDate();
-		Date end = UtilDates.shiftDateDays(current, 366 * 1000);
+		//Date end = UtilDates.shiftDateDays(current, 366 * 1000);
 		// Map<Integer, Double> simplePicingTable = new HashMap<Integer, Double>();
 		PricingTable pricingTable = new PricingTable(nodeContext.getTimeShiftMS());
-		pricingTable.addPrice(current, end, rate);
+		pricingTable.putRate(current, rate, null);
 		return pricingTable;
 	}
 
-	public BasicProducerPolicy(PricingTable defaultPricingTable, int _requestSelectionPolicy) {
+	public BasicProducerPolicy(NodeContext nodeContext, PricingTable defaultPricingTable, int _requestSelectionPolicy, boolean useAwardCredits) {
 		super();
+		this.nodeContext = nodeContext;
 		this.defaultPricingTable = defaultPricingTable;
 		this.requestSelectionPolicy = _requestSelectionPolicy;
+		this.useAwardCredits = useAwardCredits;
 	}
 
-	public BasicProducerPolicy(NodeContext nodeContext, Double rate, int _requestSelectionPolicy) {
+	public BasicProducerPolicy(NodeContext nodeContext, Double rate, int _requestSelectionPolicy, boolean useAwardCredits) {
 		super();
+		this.nodeContext = nodeContext;
 		this.defaultPricingTable = initSimplePricingTable(nodeContext, rate);
 		this.requestSelectionPolicy = _requestSelectionPolicy;
+		this.useAwardCredits = useAwardCredits;
+	}
+
+	public PricingTable getDefaultPricingTable() {
+		return defaultPricingTable;
+	}
+
+	public void setDefaultPricingTable(PricingTable defaultPricingTable) {
+		this.defaultPricingTable = defaultPricingTable;
 	}
 
 	@Override
@@ -150,4 +168,36 @@ public class BasicProducerPolicy implements IProducerPolicy {
 		return defaultPricingTable.hasNotNullValue();
 	}
 
+	protected Date getCurrentDate() {
+		long timeShiftMS = nodeContext.getTimeShiftMS();
+		return UtilDates.getNewDate(timeShiftMS);
+	}
+
+	protected PricingTable getRefreshDefaultPricingTable(Date beginDate) {
+		return defaultPricingTable.getRefreshedTable(beginDate);
+	}
+
+	@Override
+	public boolean confirmSupply(EnergyAgent producerAgent, EnergyRequest request) {
+		if (request.getAwardsCredit() < 0) {
+			return false;
+		}
+		return true;
+	}
+
+
+	@Override
+	public SingleOffer priceOffer(EnergyAgent producerAgent, SingleOffer offer) {
+		PricingTable pricingTable =  defaultPricingTable.applyAwardsOnPricingTable(offer, useAwardCredits, logger);
+		EnergyRequest request = offer.getRequest();
+		double awardCredit = request.getAwardsCredit();
+		if (Math.abs(awardCredit) > 0) {
+			double demandedWH = request.getWH();
+			logger.info("confirmSupply " + producerAgent.getAgentName() + " : awardCredit = "
+					+ SapereUtil.roundPower(awardCredit) + ", demandedWH = " + SapereUtil.roundPower(demandedWH)
+					+ ", pricingTable = " + pricingTable);
+		}
+		offer.setPricingTable(pricingTable);
+		return offer;
+	}
 }

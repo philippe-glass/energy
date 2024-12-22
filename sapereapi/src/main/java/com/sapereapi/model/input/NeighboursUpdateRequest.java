@@ -1,14 +1,14 @@
 package com.sapereapi.model.input;
 
 public class NeighboursUpdateRequest {
-	Long[] neighboursConfigId;
+	String[] neighbourNodes;
 
-	public Long[] getNeighboursConfigId() {
-		return neighboursConfigId;
+	public String[] getNeighbourNodes() {
+		return neighbourNodes;
 	}
 
-	public void setNeighboursConfigId(Long[] neighboursConfigId) {
-		this.neighboursConfigId = neighboursConfigId;
+	public void setNeighbourNodes(String[] neighbourNodes) {
+		this.neighbourNodes = neighbourNodes;
 	}
 
 }

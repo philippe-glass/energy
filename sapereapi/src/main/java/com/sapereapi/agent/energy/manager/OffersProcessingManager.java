@@ -12,6 +12,7 @@ import com.sapereapi.log.SapereLogger;
 import com.sapereapi.model.Sapere;
 import com.sapereapi.model.energy.CompositeOffer;
 import com.sapereapi.model.energy.EnergyRequest;
+import com.sapereapi.model.energy.ProsumerProperties;
 import com.sapereapi.model.energy.SingleOffer;
 import com.sapereapi.model.referential.PriorityLevel;
 import com.sapereapi.util.SapereUtil;
@@ -77,7 +78,10 @@ public class OffersProcessingManager {
 	public OffersProcessingManager(EnergyAgent consumerAgent, int _debugLevel) {
 		super();
 		this.tableSingleOffers = new HashMap<String, SingleOffer>();
-		this.globalOffer = new CompositeOffer(consumerAgent.getEnergyRequest());
+		EnergyRequest request = consumerAgent.getGlobalNeed();
+		if(request != null) {
+			this.globalOffer = new CompositeOffer(request);
+		}
 		debugLevel = _debugLevel;
 	}
 
@@ -112,17 +116,21 @@ public class OffersProcessingManager {
 				logger.info("tableSingleOffers.size() = " + tableSingleOffers.size());
 				int offerIdx = 1;
 				for(SingleOffer nextOffer : offerList) {
-					logger.info("generateGlobalOffer offer " + offerIdx + " : envImpact " + nextOffer.getDeviceProperties().getEnvironmentalImpactLevel() + ", dist : " + nextOffer.getIssuerDistance() + " " + nextOffer);
+					ProsumerProperties offerIssuer = nextOffer.getIssuerProperties();
+					logger.info("generateGlobalOffer offer " + offerIdx + " : envImpact " + offerIssuer.getDeviceProperties().getEnvironmentalImpactLevel()
+							+ ", dist : " + offerIssuer.getDistance() + " " + nextOffer);
 					offerIdx++;
 				}
 			}
 		}
 
 		globalOffer = new CompositeOffer(missing);
+		globalOffer.checkBeginNotPassed();
+		globalOffer.checkDates(logger, "generateGlobalOffer");
 		for (SingleOffer nextOffer : offerList) {
 			this.globalOffer.addSingleOffer(nextOffer);
-			if(!this.globalOffer.checkLocationId()) {
-				logger.error("generateGlobalOffer : for debug locationid is null");
+			if(!this.globalOffer.checkLocation()) {
+				logger.error("generateGlobalOffer : for debug location is null");
 			}
 		}
 		return globalOffer;
@@ -143,6 +151,7 @@ public class OffersProcessingManager {
 				if(!offer.getAcquitted()) {
 					logger.warning("cleanObsoleteData " + consumerAgent.getAgentName() + " this offer is not acquitted " + offer);
 				}
+				logger.info("cleanExpiredOffers " + consumerAgent.getAgentName() + " remove offer " + offer);
 				this.tableSingleOffers.remove(offerKey);
 			}
 		}

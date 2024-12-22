@@ -33,7 +33,22 @@ docker build -t philippeglass1/coordination_platform:1 --build-arg REST_PORT=919
 # docker build -t philippeglass1/coordination_platform_n3:1 --build-arg REST_PORT=9393 --build-arg MAIN_PORT=10003 --build-arg NODE_CONFIG=node3sqlite --build-arg HOST=node3 --build-arg NEIHBOURS=$NB_NODE3 --build-arg MODE_AUTO=1 --network=host .
 # docker build -t philippeglass1/coordination_platform_n4:1 --build-arg REST_PORT=9494 --build-arg MAIN_PORT=10004 --build-arg NODE_CONFIG=node4sqlite --build-arg HOST=node4 --build-arg NEIHBOURS=$NB_NODE4 --build-arg MODE_AUTO=1 --network=host .
 
-docker push philippeglass1/coordination_platform:1
+
+
+
+cat /proc/version
+
+isInFile=$(cat /proc/version | grep -c "Debian")
+echo isInFile=$isInFile
+if [[ $isInFile -eq 1 ]]
+then
+        echo "debian found"
+        docker push philippeglass1/coordination_platform:1
+else
+        echo "debian not found"
+fi
+
+
 # docker push philippeglass1/coordination_platform_n1:1
 # docker push philippeglass1/coordination_platform_n2:1
 # docker push philippeglass1/coordination_platform_n3:1

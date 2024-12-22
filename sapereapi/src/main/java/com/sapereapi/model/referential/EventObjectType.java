@@ -21,14 +21,4 @@ public enum EventObjectType {
 	public Integer getId() {
 		return id;
 	}
-
-	public static EventObjectType getByLabel(String label) {
-		String label2 = (label == null) ? "" : label;
-		for (EventObjectType pLevel : EventObjectType.values()) {
-			if (pLevel.getLabel().equals(label2)) {
-				return pLevel;
-			}
-		}
-		return null;
-	}
 }

@@ -1,8 +1,10 @@
 package com.sapereapi.model.energy.input;
 
+import com.sapereapi.model.referential.DeviceCategory;
+
 public class SimulatorLog {
 	private int loopNumber;
-	private String deviceCategoryCode;
+	private DeviceCategory deviceCategory;
 	private double powerTarget;
 	private double powerTargetMin;
 	private double powerTargetMax;
@@ -16,10 +18,6 @@ public class SimulatorLog {
 
 	public int getLoopNumber() {
 		return loopNumber;
-	}
-
-	public String getDeviceCategoryCode() {
-		return deviceCategoryCode;
 	}
 
 	public double getPowerTarget() {
@@ -54,10 +52,6 @@ public class SimulatorLog {
 		this.loopNumber = loopNumber;
 	}
 
-	public void setDeviceCategoryCode(String deviceCategoryCode) {
-		this.deviceCategoryCode = deviceCategoryCode;
-	}
-
 	public void setPowerTarget(double powerTarget) {
 		this.powerTarget = powerTarget;
 	}
@@ -68,6 +62,14 @@ public class SimulatorLog {
 
 	public void setPowerTargetMax(double powerTargetMax) {
 		this.powerTargetMax = powerTargetMax;
+	}
+
+	public DeviceCategory getDeviceCategory() {
+		return deviceCategory;
+	}
+
+	public void setDeviceCategory(DeviceCategory deviceCategory) {
+		this.deviceCategory = deviceCategory;
 	}
 
 	public void setPower(double power) {
@@ -110,11 +112,11 @@ public class SimulatorLog {
 		this.nbDevices = nbDevices;
 	}
 
-	public SimulatorLog(int loopNumber, String deviceCategoryCode, double powerTarget, double powerTargetMin,
+	public SimulatorLog(int loopNumber, DeviceCategory deviceCategory, double powerTarget, double powerTargetMin,
 			double powerTargetMax, double power, boolean reached, int _nbDevices) {
 		super();
 		this.loopNumber = loopNumber;
-		this.deviceCategoryCode = deviceCategoryCode;
+		this.deviceCategory = deviceCategory;
 		this.powerTarget = powerTarget;
 		this.powerTargetMin = powerTargetMin;
 		this.powerTargetMax = powerTargetMax;
@@ -125,7 +127,7 @@ public class SimulatorLog {
 
 	@Override
 	public String toString() {
-		return "SimulatorLog [loopNumber=" + loopNumber + ", deviceCategoryCode=" + deviceCategoryCode
+		return "SimulatorLog [loopNumber=" + loopNumber + ", deviceCategory=" + deviceCategory
 				+ ", powerTarget=" + powerTarget + ", powerTargetMin=" + powerTargetMin + ", powerTargetMax="
 				+ powerTargetMax + ", power=" + power + ", reached=" + reached + ", nbStarted=" + nbStarted
 				+ ", nbModified=" + nbModified + ", nbStopped=" + nbStopped + ", nbDevices=" + nbDevices

@@ -5,6 +5,7 @@ public enum EventMainCategory {
 	STOP("STOP", 2, true, true),
 	EXPIRY("EXPIRY", 3, false, true),
 	UPDATE("UPDATE", 4, true, false),
+	SWITCH("SWITCH", 5, true, false),
 	;
 
 	private String label;
@@ -33,15 +34,5 @@ public enum EventMainCategory {
 
 	public Boolean getIsEnding() {
 		return isEnding;
-	}
-
-	public static EventMainCategory getByLabel(String label) {
-		String label2 = (label == null) ? "" : label;
-		for (EventMainCategory pLevel : EventMainCategory.values()) {
-			if (pLevel.getLabel().equals(label2)) {
-				return pLevel;
-			}
-		}
-		return null;
 	}
 }

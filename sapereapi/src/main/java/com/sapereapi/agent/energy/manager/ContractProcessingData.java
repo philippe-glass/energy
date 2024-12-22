@@ -1,21 +1,26 @@
 package com.sapereapi.agent.energy.manager;
 
+import java.util.Collections;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.Iterator;
 import java.util.Map;
 import java.util.Set;
+import java.util.TreeMap;
 
 import com.sapereapi.agent.energy.EnergyAgent;
 import com.sapereapi.db.EnergyDbHelper;
 import com.sapereapi.log.SapereLogger;
+import com.sapereapi.model.HandlingException;
+import com.sapereapi.model.NodeContext;
 import com.sapereapi.model.Sapere;
-import com.sapereapi.model.TimeSlot;
 import com.sapereapi.model.energy.ConfirmationItem;
 import com.sapereapi.model.energy.Contract;
 import com.sapereapi.model.energy.EnergyEvent;
 import com.sapereapi.model.energy.PowerSlot;
 import com.sapereapi.model.energy.RegulationWarning;
+import com.sapereapi.model.referential.EventMainCategory;
 import com.sapereapi.model.referential.EventType;
 import com.sapereapi.model.referential.WarningType;
 import com.sapereapi.util.SapereUtil;
@@ -24,18 +29,22 @@ import com.sapereapi.util.UtilDates;
 public class ContractProcessingData {
 	private Boolean isComplementary = null;
 	private long timeShiftMS = 0;
-	private EnergyEvent startEvent = null;
-	private EnergyEvent stopEvent = null;
-	private EnergyEvent expiryEvent = null;
+	private Map<Date, EnergyEvent> mapLastEvents = new TreeMap<Date, EnergyEvent>(Collections.reverseOrder());
 	private Contract currentContract = null;
 	private Map<String, ConfirmationItem> receivedConfirmations = null;
+	protected boolean isAwardsActivated = false;
+	private Map<Date, Double> awardCreaditUsage = new HashMap<Date, Double>();
+	private Date eventDateLastRefresh = null;
+	private Date lastRefreshAwardCreditUsage = null;
 	private static SapereLogger logger = SapereLogger.getInstance();
 
-	public ContractProcessingData(Boolean isComplementary, long _timeShiftMS) {
+	public ContractProcessingData(Boolean isComplementary, NodeContext nodeContext) {
 		super();
 		this.isComplementary = isComplementary;
-		this.timeShiftMS = _timeShiftMS;
+		this.timeShiftMS = nodeContext.getTimeShiftMS();
+		this.isAwardsActivated = nodeContext.isAwardsActivated();
 		this.receivedConfirmations = new HashMap<String, ConfirmationItem>();
+		this.awardCreaditUsage.clear();
 	}
 
 	public Boolean isComplementary() {
@@ -55,16 +64,49 @@ public class ContractProcessingData {
 			currentContract.setMerged(isMerged);
 		}
 	}
+
+	public EnergyEvent getLastEvent() {
+		if(mapLastEvents.size() > 0) {
+			return mapLastEvents.values().iterator().next();
+		}
+		return null;
+	}
+
+	public EnergyEvent getLastEvent(EventMainCategory evtCategory) {
+		EnergyEvent lastEvent = getLastEvent();
+		if (lastEvent != null && evtCategory != null) {
+			boolean categoryMatches = evtCategory.equals(lastEvent.getType().getMainCategory());
+			if (categoryMatches) {
+				return lastEvent;
+			}
+		}
+		return null;
+	}
+
+	public EnergyEvent getLastEvent(EventMainCategory[] evtCategories) {
+		EnergyEvent lastEvent = getLastEvent();
+		if (lastEvent != null && evtCategories.length > 0) {
+			for (EventMainCategory evtCategory : evtCategories) {
+				boolean categoryMatches = evtCategory.equals(lastEvent.getType().getMainCategory());
+				if (categoryMatches) {
+					return lastEvent;
+				}
+			}
+		}
+		return null;
+	}
+
 	public EnergyEvent getStartEvent() {
-		return startEvent;
+		EventMainCategory[] evtCategories = { EventMainCategory.START, EventMainCategory.UPDATE , EventMainCategory.SWITCH };
+		return getLastEvent(evtCategories);
 	}
 
 	public EnergyEvent getStopEvent() {
-		return stopEvent;
+		return getLastEvent(EventMainCategory.STOP);
 	}
 
 	public EnergyEvent getExpiryEvent() {
-		return expiryEvent;
+		return getLastEvent(EventMainCategory.EXPIRY);
 	}
 
 	public boolean isContractOnGoing() {
@@ -82,10 +124,14 @@ public class ContractProcessingData {
 		return currentContract.hasExpired() || currentContract.hasDisagreement();
 	}
 
-	public void resetCurrentContractIfInvalid() {
+	public void resetCurrentContractIfInvalid(EnergyAgent agent, PowerSlot mainContractPower) {
 		// Delete contract if invalid
 		if (currentContract != null) {
-			if (currentContract.hasDisagreement() || currentContract.hasExpired()) {
+			if(currentContract.hasExpired()) {
+				// post expiry event
+				postExpiryEvent(agent, mainContractPower);
+				currentContract = null;
+			} else if (currentContract.hasDisagreement()) {
 				currentContract = null;
 			}
 		}
@@ -102,10 +148,45 @@ public class ContractProcessingData {
 		return currentContract.getProducerAgents();
 	}
 
-	private EnergyEvent auxCreateEvent(EventType type, EnergyAgent consumerAgent, TimeSlot timeSlot, String comment) {
-		EnergyEvent result = new EnergyEvent(type, consumerAgent.getEnergySupply(), comment);
+	/*
+	private EnergyEvent oldAuxCreateEvent(EventType type, EnergyAgent consumerAgent, TimeSlot timeSlot, String comment, PowerSlot mainContractPower) {
+		EnergyEvent result = consumerAgent.generateEvent(type, comment);
 		result.setBeginDate(timeSlot.getBeginDate());
 		result.setEndDate(timeSlot.getEndDate());
+		double firstRate = (currentContract == null) ? 0.0 : currentContract.getFirstRateValue();
+		result.setFirstRate(firstRate);
+		if(currentContract != null) {
+			if(!currentContract.isComplementary()) {
+				double powerToSet = currentContract.getPower();
+				if(Math.abs(powerToSet - result.getPower()) >= 0.001) {
+					double needPower = consumerAgent.getGlobalNeed().getPower();
+					logger.error("auxCreateEvent gap between created contract and consumer need : powerToSet " + powerToSet + ", need = " + needPower
+					+ ", currentContract = " + currentContract + ", evt = " + result);
+				}
+				result.setPower(currentContract.getPower());
+				result.setPowerMin(currentContract.getPowerMin());
+				result.setPowerMax(currentContract.getPowerMax());
+			}
+		}
+		return result;
+	}
+	*/
+
+	private EnergyEvent auxCreateEvent(EventType type, Date eventDate, String comment, PowerSlot mainContractPower) throws HandlingException {
+		if(currentContract == null) {
+			throw new HandlingException("auxCreateEvent : currentContract is null");
+		}
+		PowerSlot powerSlot = currentContract.getPowerSlot();
+		if(currentContract.isComplementary() && mainContractPower != null) {
+			PowerSlot toAdd = mainContractPower;
+			powerSlot.add(toAdd);
+		}
+		EnergyEvent result = new EnergyEvent(type, currentContract.getIssuerProperties(), currentContract.isComplementary(), powerSlot
+				, currentContract.getBeginDate(), currentContract.getEndDate(), comment, currentContract.getFirstRateValue());
+		if(eventDate != null) {
+			result.setBeginDate(eventDate);
+			result.setEndDate(eventDate);
+		}
 		return result;
 	}
 
@@ -168,87 +249,114 @@ public class ContractProcessingData {
 		}
 	}
 
-	public EnergyEvent generateStartEvent(EnergyAgent consumerAgent) {
-		startEvent = auxCreateEvent(EventType.CONTRACT_START, consumerAgent, currentContract.getTimeSlot(), "");
-		startEvent = EnergyDbHelper.registerEvent2(startEvent, currentContract);
-		// Remove other events
-		stopEvent = null;
-		expiryEvent = null;
-		// Post event in LSA
+	private void pushEvent(EnergyEvent newEvent) {
+		Date newDate = newEvent.getBeginDate();
+		if(mapLastEvents.size() > 0) {
+			logger.info("pushEvent : for debug : lastEvents = " + mapLastEvents);
+			Date firstDate = mapLastEvents.keySet().iterator().next();
+			if(newDate.before(firstDate)) {
+				logger.error("pushEvent : new date " + UtilDates.format_time.format(newDate) + " is before last event date " + UtilDates.format_time.format(firstDate));
+				logger.error("newEvent : " + newEvent);
+				logger.error("mapLastEvents : " + mapLastEvents);
+				mapLastEvents.clear();
+			}
+		}
+		mapLastEvents.put(newDate, newEvent);
+		int maxSize = 5;
+		while(mapLastEvents.size() > maxSize) {
+			Iterator<Date> dateIt = mapLastEvents.keySet().iterator();
+			Date idxToRemove = dateIt.next();
+			while(dateIt.hasNext()) {
+				idxToRemove = dateIt.next();
+			}
+			mapLastEvents.remove(idxToRemove);
+		}
+	}
+
+	public EnergyEvent generateStartEvent(EnergyAgent consumerAgent, PowerSlot mainContractPower) throws HandlingException {
+		currentContract.checkDates(logger, "generateStartEvent : begin");
+		EnergyEvent startEvent = auxCreateEvent(EventType.CONTRACT_START, null, "", mainContractPower);
+		startEvent = EnergyDbHelper.registerEvent2(startEvent, currentContract, "generateStartEvent by " + consumerAgent.getAgentName());
+		currentContract.setEventId(startEvent.getId());
 		if(startEvent.isComplementary()) {
 			logger.info("generateStartEvent for debug : complt event");
 		}
+		pushEvent(startEvent);
+		// Post event in LSA
 		consumerAgent.postEvent(startEvent);
 		return startEvent;
 	}
 
-	public EnergyEvent generateUpdateEvent(EnergyAgent consumerAgent, WarningType warningType) {
+	public EnergyEvent generateUpdateEvent(EnergyAgent consumerAgent, WarningType warningType, PowerSlot mainContractPower) throws HandlingException {
+		EnergyEvent startEvent = getStartEvent();
 		if (startEvent != null && currentContract != null) {
-			if(!currentContract.checkLocationId())  {
+			//refreshCreditUsedHWcurrentContract("generateUpdateEvent");
+			if(!currentContract.checkLocation())  {
 				logger.error("generateUpdateEvent contract isseur has no location id");
 			}
-			EnergyEvent originStartEvent = startEvent.clone();
-			startEvent = auxCreateEvent(EventType.CONTRACT_UPDATE, consumerAgent, currentContract.getTimeSlot(), "");
-			startEvent.setOriginEvent(originStartEvent);
-			if(originStartEvent!=null) {
-				PowerSlot powerSlotBefore = originStartEvent.getPowerSlot();
-				PowerSlot powerUpdate = startEvent.getPowerSlot().clone();
+			EnergyEvent originEvent = startEvent.clone();
+			EnergyEvent updateEvent = auxCreateEvent(EventType.CONTRACT_UPDATE,  null, "", mainContractPower);
+			updateEvent.setOriginEvent(originEvent);
+			if(originEvent!=null) {
+				PowerSlot powerSlotBefore = originEvent.getPowerSlot();
+				PowerSlot powerUpdate = updateEvent.getPowerSlot().clone();
 				powerUpdate.substract(powerSlotBefore);
-				startEvent.setPowerUpateSlot(powerUpdate);
+				updateEvent.setPowerUpdateSlot(powerUpdate);
 			}
-			startEvent.setWarningType(warningType);
-			startEvent = EnergyDbHelper.registerEvent2(startEvent, currentContract);
-			// Remove other events
-			stopEvent = null;
-			expiryEvent = null;
+			updateEvent.setWarningType(warningType);
+			updateEvent = EnergyDbHelper.registerEvent2(updateEvent, currentContract, "generateUpdateEvent by " + consumerAgent.getAgentName());
+			currentContract.setEventId(updateEvent.getId());
+			if(updateEvent.getIssuerProperties() != null && updateEvent.getIssuerProperties().getLocation() == null) {
+				logger.error("generateUpdateEvent : updateEvent location is null");
+			}
+			pushEvent(updateEvent);
 			// Post event in LSA
-			consumerAgent.postEvent(startEvent);
-			return startEvent;
+			consumerAgent.postEvent(updateEvent);
+			return updateEvent;
 		}
 		return null;
 	}
 
-	public EnergyEvent generateStopEvent(EnergyAgent consumerAgent, RegulationWarning warning, String log) {
+	public EnergyEvent generateStopEvent(EnergyAgent consumerAgent, RegulationWarning warning, String log, PowerSlot mainContractPower) throws HandlingException {
 		Date timeStop = UtilDates.getCurrentSeconde(timeShiftMS);
-		if (warning != null && warning.getChangeRequest() != null) {
-			timeStop = warning.getChangeRequest().getBeginDate();
+		if (warning != null && warning.getChangeRequest() != null && warning.getChangeRequest().getSupply() != null) {
+			timeStop = warning.getChangeRequest().getSupply().getBeginDate();
 		}
-		stopEvent = auxCreateEvent(EventType.CONTRACT_STOP, consumerAgent, new TimeSlot(timeStop, timeStop), log);
+		EnergyEvent stopEvent = auxCreateEvent(EventType.CONTRACT_STOP, timeStop, log, mainContractPower);
+		EnergyEvent startEvent = getStartEvent();
 		if (startEvent != null) {
 			stopEvent.setOriginEvent(startEvent.clone());
 		}
 		if (warning != null) {
 			stopEvent.setWarningType(warning.getType());
 		}
-		stopEvent = EnergyDbHelper.registerEvent2(stopEvent);
-		// Remove other events
-		startEvent = null;
-		expiryEvent = null;
+		stopEvent = EnergyDbHelper.registerEvent2(stopEvent, "generateStopEvent by " + consumerAgent.getAgentName());
+		pushEvent(stopEvent);
 		// Post event in LSA
 		consumerAgent.postEvent(stopEvent);
 		return stopEvent;
 	}
 
-	public EnergyEvent generateExpiryEvent(EnergyAgent consumerAgent) {
+	public EnergyEvent generateExpiryEvent(EnergyAgent consumerAgent, PowerSlot mainContractPower) throws HandlingException {
 		if (currentContract != null) {
-			Date evtDate = UtilDates.getNewDate(timeShiftMS);
+			refreshCreditUsedHWcurrentContract("generateExpiryEvent");
+			Date evtDate = UtilDates.getNewDateNoMilliSec(timeShiftMS);
 			evtDate = currentContract.getEndDate();
-			expiryEvent = auxCreateEvent(EventType.CONTRACT_EXPIRY, consumerAgent, new TimeSlot(evtDate, evtDate), "");
+			EnergyEvent expiryEvent = auxCreateEvent(EventType.CONTRACT_EXPIRY, evtDate, "", mainContractPower);
+			EnergyEvent startEvent = getStartEvent();
 			if (startEvent != null) {
 				expiryEvent.setOriginEvent(startEvent.clone());
 			}
-			expiryEvent = EnergyDbHelper.registerEvent2(expiryEvent);
+			expiryEvent = EnergyDbHelper.registerEvent2(expiryEvent, "generateExpiryEvent by " + consumerAgent.getAgentName());
+			pushEvent(expiryEvent);
 			// Post event in LSA
 			consumerAgent.postEvent(expiryEvent);
-			// Remove other events
-			startEvent = null;
-			stopEvent = null;
 			return expiryEvent;
 		}
 		return null;
 	}
 
-	public void stopCurrentContract(EnergyAgent consumerAgent, RegulationWarning warning, String logCancel) {
+	public void stopCurrentContract(EnergyAgent consumerAgent, RegulationWarning warning, String logCancel, PowerSlot mainContractPower) throws HandlingException {
 		if (currentContract == null) {
 			return;
 		}
@@ -256,6 +364,8 @@ public class ContractProcessingData {
 			EnergyDbHelper.setSingleOfferCanceled(currentContract, logCancel);
 		}
 		boolean isOldContractOnGoing = currentContract.isOnGoing();
+		refreshCreditUsedHWcurrentContract("stopCurrentContract");
+
 		// Contract oldContract = getCloneOfCurrentContract();
 		receivedConfirmations.clear();
 		currentContract.stop(consumerAgent.getAgentName());
@@ -266,7 +376,7 @@ public class ContractProcessingData {
 				// Generate a stop event is the contract was on going
 				if (isOldContractOnGoing) {
 					if (getStartEvent() != null && getStopEvent() == null) {
-						EnergyEvent stopEvent = generateStopEvent(consumerAgent, warning, logCancel);
+						EnergyEvent stopEvent = generateStopEvent(consumerAgent, warning, logCancel, mainContractPower);
 						logger.info("Contract interuption " + currentContract + " " + stopEvent);
 					}
 				}
@@ -278,11 +388,11 @@ public class ContractProcessingData {
 		currentContract = null;
 	}
 
-	public void postExpiryEvent(EnergyAgent consumerAgent) {
+	public void postExpiryEvent(EnergyAgent consumerAgent, PowerSlot mainContractPower) {
 		if (getExpiryEvent() == null && getStartEvent() != null) {
 			try {
-				generateExpiryEvent(consumerAgent);
-				logger.info("Contract expiration : unset start event " + expiryEvent);
+				generateExpiryEvent(consumerAgent, mainContractPower);
+				logger.info("Contract expiration : unset start event ");
 			} catch (Exception e) {
 				logger.error(e);
 			}
@@ -297,8 +407,8 @@ public class ContractProcessingData {
 		return this.receivedConfirmations.containsKey(producer);
 	}
 
-	public boolean addConfirmationItem(EnergyAgent consumerAgent, String producer, ConfirmationItem confirmation) {
-		// Add received confirmaitons in memory
+	public boolean addConfirmationItem(EnergyAgent consumerAgent, String producer, ConfirmationItem confirmation, PowerSlot mainContractPower) throws HandlingException {
+		// Add received confirmations in memory
 		receivedConfirmations.put(producer, confirmation);
 		String agentName = consumerAgent.getAgentName();
 		String comment = confirmation.getComment();
@@ -309,17 +419,27 @@ public class ContractProcessingData {
 			if (!currentContract.hasAgreement(producer)) {
 				// Contract validation
 				currentContract.addProducerAgreement(consumerAgent, producer, true);
-				if (currentContract.hasAllAgreements() && getStartEvent() == null) {
-					logger.info(" --- validaiton of contract= " + currentContract.getConsumerAgent());
-					currentContract.checkBeginNotPassed();
-					// Add event to indicate that the contract is valided
-					EnergyEvent startEvent = generateStartEvent(consumerAgent);
-					String sOfferIds = currentContract.getSingleOffersIdsStr();
-					// SET contract eventid in single_offer
-					EnergyDbHelper.setSingleOfferLinkedToContract(currentContract, startEvent);
-					logger.info("Step2a : startEvent = " + startEvent + " current instance = " + this + " sOfferIds="
-							+ sOfferIds);
-					// eventToPost = startEvent.clone();
+				if (currentContract.hasAllAgreements()) {
+					boolean createEvent = false;
+					EnergyEvent startEvent = getStartEvent();
+					if(startEvent == null) {
+						createEvent = true;
+					} else {
+						logger.info("addConfirmationItem --- contract validated by startEvent is not null : ");
+						logger.info(", startEvent = " + startEvent);
+						createEvent = startEvent.hasExpired();
+					}
+					if (createEvent) {
+						logger.info("addConfirmationItem --- validaiton of contract= " + currentContract.getConsumerAgent());
+						currentContract.checkBeginNotPassed();
+						// Add a CONTRACT_START event to indicate that the contract has been validated
+						startEvent = generateStartEvent(consumerAgent, mainContractPower);
+						String sOfferIds = currentContract.getSingleOffersIdsStr();
+						// Set the ling to contract eventid in the corresponding offers
+						EnergyDbHelper.setSingleOfferLinkedToContract(currentContract, startEvent);
+						logger.info("addConfirmationItem Step2a : startEvent = " + startEvent + " current instance = " + this + " sOfferIds="
+								+ sOfferIds);
+					}
 				}
 				hasChanged = true;
 			}
@@ -333,7 +453,7 @@ public class ContractProcessingData {
 					logger.warning(agentName + " the following offers will not be linked to a contract event : "
 							+ currentContract.getSingleOffersIdsStr());
 				}
-				stopCurrentContract(consumerAgent, null, comment);
+				stopCurrentContract(consumerAgent, null, comment, mainContractPower);
 				hasChanged = true;
 			}
 		}
@@ -379,15 +499,89 @@ public class ContractProcessingData {
 		//return false;
 	}
 
-	public boolean mergeContract(EnergyAgent consumerAgent, Contract otherContract) throws Exception {
+	public boolean mergeContract(EnergyAgent consumerAgent, Contract otherContract) throws HandlingException {
 		boolean result = false;
 		if(currentContract!=null) {
+			this.refreshCreditUsedHWcurrentContract("mergeContract");
 			result = currentContract.merge(otherContract);
 			if(currentContract.hasGap()) {
 				logger.error("mergeContract currentContract has gap after merge : " + currentContract);
 			}
-			generateUpdateEvent(consumerAgent, WarningType.CONTRACT_MERGE);
+			generateUpdateEvent(consumerAgent, WarningType.CONTRACT_MERGE, null);
 		}
 		return result;
+	}
+
+	public Date getLasEventDate() {
+		EnergyEvent lastEvent = this.getLastEvent();
+		if(lastEvent != null) {
+			return lastEvent.getBeginDate();
+		}
+		return null;
+	}
+
+	public boolean manageAwardCreditUsage(String step) {
+		if (isAwardsActivated) {
+			Date lastEventDate = this.getLasEventDate();
+			// Check if there is an event has been created recently
+			boolean toRefresh = lastEventDate != null && eventDateLastRefresh != null
+					&& lastEventDate.after(eventDateLastRefresh);
+			String step2 = step + (toRefresh? " [reventEvent]" : "");
+			if (!toRefresh) {
+			//  check if the current contract is about to expire
+				toRefresh = isContractIsAboutToExpire();
+				step2 = step + (toRefresh? " [contractIsAboutToExpire]" : "");
+			}
+			if (lastRefreshAwardCreditUsage != null && !toRefresh) {
+				// check if no refresh has been done for more than x minutes
+				Date minLastUpdate = UtilDates.shiftDateMinutes(getCurrentDate(), -10);
+				toRefresh = lastRefreshAwardCreditUsage.before(minLastUpdate);
+				step2 = step + (toRefresh? " [noRecentRefresh]" : "");
+			}
+			eventDateLastRefresh = getLasEventDate();
+			if (toRefresh) {
+				computeAllAwardCreditUsage(step2);
+			}
+			return toRefresh;
+		}
+		return false;
+	}
+
+	public boolean isContractIsAboutToExpire() {
+		return currentContract != null && currentContract.isOnGoing() && currentContract.isAboutToExpire(3);
+	}
+
+	public void refreshCreditUsedHWcurrentContract(String step) {
+		if (isAwardsActivated) {
+			if (currentContract != null) {
+				logger.info("refreshCreditUsedHWcurrentContract " + currentContract.getConsumerAgent() + " " + step);
+				double lastCreaditUsage = currentContract.computeCreditUsedWH(step, logger);
+				if (Math.abs(lastCreaditUsage) >= 0.001) {
+					this.awardCreaditUsage.put(currentContract.getBeginDate(), lastCreaditUsage);
+				}
+				logger.info("refreshCreditUsedHWcurrentContract " + currentContract.getConsumerAgent() + " "
+						+ step + ", lastCreaditUsage = " + SapereUtil.roundPower(lastCreaditUsage));
+				this.lastRefreshAwardCreditUsage = getCurrentDate();
+			}
+		}
+	}
+
+	public Map<Date, Double> computeAllAwardCreditUsage(String step) {
+		Map<Date, Double> result = new TreeMap<Date, Double>();
+		if (isAwardsActivated) {
+			refreshCreditUsedHWcurrentContract(step + " > computeAllAwardCreditUsage ");
+			for (Date contractDate : awardCreaditUsage.keySet()) {
+				result.put(contractDate, awardCreaditUsage.get(contractDate));
+			}
+		}
+		return result;
+	}
+
+	public void clearAllAwardCreditUsage() {
+		awardCreaditUsage.clear();
+	}
+
+	public Date getCurrentDate() {
+		return UtilDates.getNewDateNoMilliSec(this.timeShiftMS);
 	}
 }
