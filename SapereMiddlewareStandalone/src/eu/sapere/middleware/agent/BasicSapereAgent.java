@@ -24,9 +24,11 @@ public class BasicSapereAgent extends Agent {
 	 * 
 	 * @param agentName
 	 *            The name of the Agent
+	 * @param activateQoS
+	 * 			Activation of Quality of service
 	 */
-	public BasicSapereAgent(String agentName) {
-		super(agentName, null, new String[] {""},new String[] {""}, LsaType.System);
+	public BasicSapereAgent(String agentName, boolean activateQoS) {
+		super(agentName, new AgentAuthentication(agentName, "BasicSapereAgent", "", NodeManager.getNodeLocation()), new String[] {""},new String[] {""}, LsaType.System, activateQoS);
 		this.opMng = NodeManager.instance().getOperationManager();
 	}
 

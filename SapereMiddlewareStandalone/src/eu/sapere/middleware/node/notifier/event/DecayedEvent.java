@@ -9,7 +9,6 @@ import eu.sapere.middleware.lsa.Lsa;
 public class DecayedEvent extends AbstractSapereEvent {
 
 	private static final long serialVersionUID = -7035112534612356142L;
-	private Lsa lsa = null;
 
 	/**
 	 * Instantiates the Event
@@ -21,13 +20,5 @@ public class DecayedEvent extends AbstractSapereEvent {
 		this.lsa = lsa;
 	}
 
-	/**
-	 * Gets the removed LSA
-	 * 
-	 * @return The removed LSA
-	 */
-	public Lsa getLsa() {
-		return lsa;
-	}
 
 }

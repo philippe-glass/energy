@@ -3,24 +3,16 @@ package eu.sapere.middleware.lsa.values;
 import java.util.List;
 
 import eu.sapere.middleware.agent.AgentAuthentication;
+import eu.sapere.middleware.lsa.AggregatorProperty;
+import eu.sapere.middleware.lsa.AggregatorType;
 import eu.sapere.middleware.lsa.Lsa;
 
 public abstract class StandardAggregationOperator extends AbstractAggregationOperator {
 	abstract Object apply(List<Lsa> allLsa, AgentAuthentication agentAuthentication);
 
-	String name;
-
-	public String getName() {
-		return name;
-	}
-
-	public void setName(String name) {
-		this.name = name;
-	}
-
-	public StandardAggregationOperator(String name) {
+	public StandardAggregationOperator(String name, String aggregatorField) {
 		super();
-		this.name = name;
+		this.property = new AggregatorProperty(name, AggregatorType.STANDARD, aggregatorField, Boolean.FALSE);
 	}
 
 	@Override

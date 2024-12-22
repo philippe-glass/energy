@@ -9,7 +9,6 @@ import eu.sapere.middleware.lsa.Lsa;
 public class BondEvent extends AbstractSapereEvent {
 
 	private static final long serialVersionUID = 899040460408932860L;
-	private Lsa lsa = null;
 	private Lsa bondedLsa = null;
 
 	/**
@@ -22,13 +21,6 @@ public class BondEvent extends AbstractSapereEvent {
 	public BondEvent(Lsa lsa, Lsa bondedLsa) {
 		this.lsa = lsa;
 		this.bondedLsa = bondedLsa;
-	}
-
-	/**
-	 * @return The Lsa
-	 */
-	public Lsa getLsa() {
-		return lsa;
 	}
 
 	/**

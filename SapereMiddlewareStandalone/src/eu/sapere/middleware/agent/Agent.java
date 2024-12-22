@@ -1,14 +1,22 @@
 package eu.sapere.middleware.agent;
 
 import java.io.Serializable;
-import java.util.Arrays;
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
-import java.util.Random;
 
+
+import eu.sapere.middleware.log.MiddlewareLogger;
+import eu.sapere.middleware.lsa.AggregatorProperty;
+import eu.sapere.middleware.lsa.AggregatorType;
 import eu.sapere.middleware.lsa.Lsa;
 import eu.sapere.middleware.lsa.LsaType;
+import eu.sapere.middleware.lsa.Property;
 import eu.sapere.middleware.lsa.SyntheticPropertyName;
+import eu.sapere.middleware.lsa.values.StandardAggregationOperator;
+import eu.sapere.middleware.node.NodeManager;
+import eu.sapere.middleware.node.lsaspace.ecolaws.Aggregation;
 import eu.sapere.middleware.node.notifier.AbstractSubscriber;
 
 /**
@@ -20,137 +28,124 @@ public abstract class Agent extends AbstractSubscriber implements Serializable {
 	private static final long serialVersionUID = -4461048586246658298L;
 
 	protected String agentName = null;
-	protected AgentAuthentication authentication = null;
 	/** The managed LSA */
 	protected Lsa lsa;
-	//private QoS qos;
-	private double epsilon = 0.2; // greedy policy 0.2
-	private Map<String, int[]> R; // Reward lookup
-	private Map<String, Double[]> Q; // Q learning
-	private final double alpha = 0.3; // Learning rate 0.3
-	private final double gamma = 0.9; // Eagerness - 0 looks in the near future, 1 looks in the distant future
-	private final int actionsCount = 2; // Non react, React, -Spread
-	private Random rand;
-    //private static DecimalFormat df = new DecimalFormat("0.00");
-    protected int debugLevel = 0;
+	protected AgentLearningData learningData;
+	protected List<Property> waitingProperties = new ArrayList<Property>();
+
+	protected int debugLevel = 0;
 
 	/**
 	 * @param agentName       The name of this Agent
-	 * @param _authentication 
+	 * @param _authentication
 	 * @param subdescriptions
 	 * @param propertiesName
 	 * @param type
+	 * @param activateQoS 
 	 */
-	public Agent(String agentName, AgentAuthentication _authentication, String[] subdescriptions, String[] propertiesName, LsaType type) {
+	public Agent(String agentName, AgentAuthentication _authentication, String[] subdescriptions,
+			String[] propertiesName, LsaType type, boolean activateQoS) {
 		this.agentName = agentName;
-		this. authentication = _authentication;
-		lsa = new Lsa("");
-		//Random r = new Random();
-		//double randomValue =  3.0 * r.nextDouble();
-		lsa.addSyntheticProperty(SyntheticPropertyName.OUTPUT, String.join(",", propertiesName));
-		lsa.addSyntheticProperty(SyntheticPropertyName.STATE, "");
+		lsa = new Lsa(_authentication);
+		// Random r = new Random();
+		// double randomValue = 3.0 * r.nextDouble();
+		updateLsaPropertyTags(subdescriptions, propertiesName);
 		lsa.addSyntheticProperty(SyntheticPropertyName.TYPE, type);
-	//	lsa.addSyntheticProperty(SyntheticPropertyName.QOS, df.format(randomValue));
-		lsa.addSubDescription(subdescriptions);
-		R = new HashMap<String, int[]>();
-		Q = new HashMap<String, Double[]>();
-		rand = new Random();
-		//qos = new QoS();
+		// lsa.addSyntheticProperty(SyntheticPropertyName.QOS, df.format(randomValue));
+		if(activateQoS) {
+			lsa.addSyntheticProperty(SyntheticPropertyName.STATE, "");
+		}
+		if (activateQoS) {
+			learningData = new AgentLearningData(this.agentName);
+		} else {
+			learningData = null;
+		}
+		// qos = new QoS();
+	}
+
+	public void reInitializeLsa(String[] subdescriptions, String[] propertiesName, LsaType type) {
+		lsa.removeContent();
+		updateLsaPropertyTags(subdescriptions, propertiesName);
+		lsa.addSyntheticProperty(SyntheticPropertyName.TYPE, type);
+	}
+
+	public boolean isQoSactivated() {
+		return learningData != null;
 	}
 
 	public int[] getRewardState(String state) {
-		return R.get(state);
+		if (learningData == null) {
+			return new int[0];
+		} else {
+			return learningData.getRewardState(state);
+		}
 	}
 
 	public void addPreviousReward(String state, int[] previousReward) {
-		if (!Q.containsKey(state)) {
-			Q.put(state, new Double[] { 0.0, 5.0, 0.0 });
+		if (learningData != null) {
+			learningData.addPreviousReward(state, previousReward);
 		}
-		R.put(state, previousReward);
 	}
 
 	public void addState(String state, int action, int reward, double maxQSt1) {
-		System.out.println(state + " , "+action+" updated by "+reward + "- "+maxQSt1);
-		if (!R.containsKey(state)) {
-			R.put(state, new int[] { 0, 0, 0 });
-			Q.put(state, new Double[] { 0.0, 5.0, 0.0 });
-		}
-		if (action == 0 ) // NReact
-		{
-			R.get(state)[0] = 10;
-			updateQ(state, action, 0);
-		} else if (action == 1) { // React
-			if (reward > 0) { // check
-				R.get(state)[0] = -10; // update reward function
-				R.get(state)[1] = reward; // update reward function
-			} else {
-				R.get(state)[0] = 10;
-				R.get(state)[1] = reward;
-			}
-			updateQ(state, 1, maxQSt1);
-			updateQ(state, 0, 0);
-			//updateQ(state, 0, getBestActionQvalue(state));
+		if (learningData != null) {
+			learningData.addState(state, action, reward, maxQSt1);
 		}
 	}
 
-
 	public int getActionToTake(String crtState) {
-		if (!R.containsKey(crtState)) {
-			R.put(crtState, new int[] { 0, 0, 0 });
-			Q.put(crtState, new Double[] { 0.0, 5.0, 0.0 });
-		}
-		int action = 0; // NReact
-		double max = -100.0;
-		if (rand.nextDouble() > epsilon) {
-			for (int i = 0; i < 2; i++) { // replace 2 with actionsCount
-				if (Q.get(crtState) != null && Q.get(crtState)[i] >= max) {
-					max = Q.get(crtState)[i];
-					action = i;
-				}
-			}
+		if (learningData == null) {
+			return -1;
 		} else {
-			if(Q.get(crtState)[0]==0) {
-				action=1;}
-			else {
-			action = rand.nextInt(2);}
+			return learningData.getActionToTake(crtState);
 		}
-		if(debugLevel>2) {
-			System.out.println("from " + this.agentName + "State " + crtState + " ->action to take: " + action);
-		}
-		return action;
 	}
 
 	protected double getBestActionQvalue(String crtState) {
-		double qValue = -100;
-		for (int i = 0; i < actionsCount; i++) {
-			if (Q.get(crtState) != null && Q.get(crtState)[i] > qValue) {
-				qValue = Q.get(crtState)[i];
-			}
+		if (learningData == null) {
+			return -1;
+		} else {
+			return learningData.getBestActionQvalue(crtState);
 		}
-		return qValue;
-	}
-
-	private void updateQ(String crtState, int crtAction, double maxQSt1) {
-		double q = Q.get(crtState)[crtAction];
-		int r = R.get(crtState)[crtAction];
-
-		double value = (1 - alpha) * q + alpha * (r + gamma * maxQSt1);
-		Q.get(crtState)[crtAction] = value;
-		System.out.println(q + " - "+ r + " - "+ maxQSt1);
-
 	}
 
 	public void printQ() {
-		System.out.println("**** Q - " + agentName + " ****");
-		for (Map.Entry<String, Double[]> row : Q.entrySet()) {
-			System.out.println(row.getKey() + " " + Arrays.toString(row.getValue()));
+		if (learningData != null) {
+			learningData.printQ();
 		}
 	}
 
 	public void printR() {
-		System.out.println("**** R - " + agentName + " ****");
-		for (Map.Entry<String, int[]> row : R.entrySet()) {
-			System.out.println(row.getKey() + " " + Arrays.toString(row.getValue()));
+		if (learningData != null) {
+			learningData.printR();
+		}
+	}
+
+	public Map<String, Double[]> getQ() {
+		if (learningData == null) {
+			return new HashMap<String, Double[]>();
+		} else {
+			return learningData.getQ();
+		}
+	}
+
+	public void setQ(Map<String, Double[]> q) {
+		if (learningData != null) {
+			learningData.setQ(q);
+		}
+	}
+
+	public double getEpsilon() {
+		if (learningData == null) {
+			return -1.0;
+		} else {
+			return learningData.getEpsilon();
+		}
+	}
+
+	public void setEpsilon(double epsilon) {
+		if (learningData != null) {
+			learningData.setEpsilon(epsilon);
 		}
 	}
 
@@ -166,22 +161,6 @@ public abstract class Agent extends AbstractSubscriber implements Serializable {
 		return agentName;
 	}
 
-	public Map<String, Double[]> getQ() {
-		return Q;
-	}
-
-	public void setQ(Map<String, Double[]> q) {
-		Q = q;
-	}
-
-	public double getEpsilon() {
-		return epsilon;
-	}
-
-	public void setEpsilon(double epsilon) {
-		this.epsilon = epsilon;
-	}
-
 	public int getDebugLevel() {
 		return debugLevel;
 	}
@@ -191,12 +170,116 @@ public abstract class Agent extends AbstractSubscriber implements Serializable {
 	}
 
 	public AgentAuthentication getAuthentication() {
-		return authentication;
+		return lsa.getAgentAuthentication();
 	}
 
-	public void setAuthentication(AgentAuthentication authentication) {
-		this.authentication = authentication;
+	public void addProperty(Property propertyToAdd) {
+		if (lsa.getProperties().size() >= Lsa.PROPERTIESSIZE) {
+			waitingProperties.add(propertyToAdd);
+			MiddlewareLogger.getInstance().info(this.agentName + " addProperty : cannot post property " + propertyToAdd.getValue()
+					+ " in lsa. Put it waiting queue.");
+		} else {
+			lsa.addProperty(propertyToAdd);
+		}
 	}
-	
 
+	protected void checkWaitingProperties() {
+		while (this.waitingProperties.size() > 0 && lsa.getProperties().size() < Lsa.PROPERTIESSIZE) {
+			Property prop = waitingProperties.remove(0);
+			MiddlewareLogger.getInstance().info("checkWaitingProperties " + this.agentName + " : submit waiting property in LSA : " + prop);
+			lsa.addProperty(prop);
+		}
+		if (this.waitingProperties.size() > 0) {
+			MiddlewareLogger.getInstance().info("checkWaitingProperties : prwaitingPropertiesopertiesToPost.size = " + waitingProperties.size());
+			for (Property nextProp : waitingProperties) {
+				MiddlewareLogger.getInstance().info("checkWaitingProperties : nextProp is still waiting : " + nextProp.getValue());
+			}
+		}
+	}
+
+	public void replacePropertyWithName(Property prop) {
+		String propName = prop.getName();
+		if (lsa.hasProperty(propName)) {
+			lsa.removePropertiesByName(propName);
+		}
+		addProperty(prop);
+	}
+
+	public void activateSpreading() {
+		lsa.addSyntheticProperty(SyntheticPropertyName.DIFFUSE, "1");
+		lsa.addSyntheticProperty(SyntheticPropertyName.GRADIENT_HOP, "1");
+	}
+
+	/**
+	 * @param nHop The number of hops
+	 */
+	public void addGradient(int nHop) {
+		lsa.addSyntheticProperty(SyntheticPropertyName.GRADIENT_HOP, nHop + "");
+		lsa.addSyntheticProperty(SyntheticPropertyName.DIFFUSE, "1");
+		lsa.addSyntheticProperty(SyntheticPropertyName.PREVIOUS, NodeManager.getLocationAddress());
+	}
+
+	/**
+	 * @param lsa
+	 * @param ip
+	 */
+	public void sendTo(Lsa lsa, String ip) {
+		lsa.addSyntheticProperty(SyntheticPropertyName.DESTINATION, ip);
+		lsa.addSyntheticProperty(SyntheticPropertyName.DIFFUSE, "1");
+		lsa.addSyntheticProperty(SyntheticPropertyName.PREVIOUS, NodeManager.getLocationAddress());
+	}
+
+	/**
+	 * Adds a decay property
+	 *
+	 * @param decayValue The initial decay value
+	 */
+	public void addDecay(int decayValue) {
+		lsa.addSyntheticProperty(SyntheticPropertyName.DECAY, decayValue + "");
+	}
+
+	public void addStandardAggregation(StandardAggregationOperator aggregationOperator, String fieldName, boolean aggregateAllNodes) {
+		Map<String, AggregatorProperty> mapAggregationProperties = Aggregation.getMapAggregationProperties(lsa);
+		AggregatorProperty aggregatorProperty = aggregationOperator.getProperty();
+		mapAggregationProperties.put(fieldName, aggregatorProperty);
+		lsa.addSyntheticProperty(SyntheticPropertyName.AGGREGATION, mapAggregationProperties);
+	}
+
+	public void addCustomizedAggregation(String customizedAggregationOp, String fieldName, boolean aggregateAllNodes) {
+		Map<String, AggregatorProperty> mapAggregationProperties = Aggregation.getMapAggregationProperties(lsa);
+		AggregatorProperty newAggregatorProperty = new AggregatorProperty(
+				customizedAggregationOp, AggregatorType.CUSTOMIZED, fieldName, aggregateAllNodes);
+		mapAggregationProperties.put(fieldName, newAggregatorProperty);
+		lsa.addSyntheticProperty(SyntheticPropertyName.AGGREGATION, mapAggregationProperties);
+	}
+
+	public String[] getInput() {
+		List<String> subDescription = lsa.getSubDescription();
+		String[] input = new String[subDescription.size()];
+		for(int i = 0; i < subDescription.size(); i++) {
+			input[i] = subDescription.get(i);
+		}
+		return input;
+	}
+
+	public String[] getOutput() {
+		String sOuputs = "" + lsa.getSyntheticProperty(SyntheticPropertyName.OUTPUT);
+		String[] ouputs = sOuputs.split(",");
+		return ouputs;
+	}
+
+	public String getUrl() {
+		String url = lsa.getAgentAuthentication().getNodeLocation().getMainServiceAddress();
+		return url;
+	}
+
+	protected boolean hasTargetedProperty(Lsa bondedLsa) {
+		return lsa.hasTargetedProperty(bondedLsa);
+	}
+
+	public void updateLsaPropertyTags(String[] lsaInputTags, String[] lsaOutputTags) {
+		lsa.getSubDescription().clear();
+		lsa.addSubDescription(lsaInputTags);
+		lsa.addSyntheticProperty(SyntheticPropertyName.OUTPUT, String.join(",", lsaOutputTags));
+	}
 }

@@ -9,14 +9,13 @@ import eu.sapere.middleware.node.notifier.event.AbstractSapereEvent;
  */
 public class Subscription {
 
-	private AbstractSapereEvent eventType;
+	private String eventType;
 	private AbstractSubscriber subscriber;
 	private String subscriberName;
 
 	/**
 	 * Instantiates a Subscription
-	 * 
-	 * @param anEventType
+	 * @param eventClass
 	 *            The type of event
 	 * @param aFilter
 	 *            The filter for events
@@ -25,8 +24,8 @@ public class Subscription {
 	 * @param subscriberName
 	 *            The name of the Subscriber
 	 */
-	public Subscription(AbstractSapereEvent anEventType, AbstractSubscriber aSubscriber, String subscriberName) {
-		this.eventType = anEventType;
+	public Subscription(Class<?> eventClass, AbstractSubscriber aSubscriber, String subscriberName) {
+		this.eventType = eventClass.getSimpleName();
 		this.subscriber = aSubscriber;
 		this.subscriberName = subscriberName;
 	}
@@ -64,8 +63,12 @@ public class Subscription {
 	 * 
 	 * @return The EventType
 	 */
-	public Class<? extends AbstractSapereEvent> getEventType() {
-		return eventType.getClass();
+	public String getEventType() {
+		return eventType;
 	}
 
+	public boolean isSubscribed(AbstractSapereEvent event) {
+		String eventTypeToCompare = event.getClass().getSimpleName();
+		return eventType.equals(eventTypeToCompare);
+	}
 }

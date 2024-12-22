@@ -1,6 +1,10 @@
 package eu.sapere.middleware.lsa;
 
 import java.io.Serializable;
+import java.util.Map;
+
+import eu.sapere.middleware.log.MiddlewareLogger;
+import eu.sapere.middleware.node.NodeLocation;
 
 public class Property implements Serializable {
 
@@ -13,6 +17,7 @@ public class Property implements Serializable {
 	private String state;
 	private String ip;
 	private Boolean chosen;
+	private Object aggregatedValue;
 
 	public Property(String name, Object value, String query, String bond, String state, String ip, Boolean chosen) {
 		this.name = name;
@@ -22,6 +27,7 @@ public class Property implements Serializable {
 		this.state = state;
 		this.ip = ip;
 		this.chosen = chosen;
+		this.aggregatedValue = null;
 	}
 
 	public Property(String name, Object value) {
@@ -32,6 +38,7 @@ public class Property implements Serializable {
 		this.state = "";
 		this.ip = "";
 		this.chosen = false;
+		this.aggregatedValue = null;
 	}
 
 	public Boolean getChosen() {
@@ -90,9 +97,41 @@ public class Property implements Serializable {
 		this.state = state;
 	}
 
+	public Object getAggregatedValue() {
+		return aggregatedValue;
+	}
+
+	public void setAggregatedValue(Object aggregatedValue) {
+		this.aggregatedValue = aggregatedValue;
+	}
+
+	public Property copyForLSA() {
+		Object valueCopy = value;
+		if(value instanceof IPropertyObject) {
+			IPropertyObject valueToCopy = (IPropertyObject) value;
+			try {
+				valueCopy = valueToCopy.copyForLSA(MiddlewareLogger.getInstance());
+			} catch (Throwable e) {
+				MiddlewareLogger.getInstance().error(e);
+			}
+		}
+		Property result = new Property(name, valueCopy, query, bond, state, ip, chosen);
+		return result;
+	}
+
+	public void completeInvolvedLocations(Lsa bondedLsa, Map<String, NodeLocation> mapNodeLocation) {
+		if(value instanceof IPropertyObject) {
+			IPropertyObject propValue = (IPropertyObject) value;
+			propValue.completeInvolvedLocations(bondedLsa, mapNodeLocation, MiddlewareLogger.getInstance());
+		}
+	}
+
 	@Override
 	public String toString() {
-		return "<"+name + ":" + value+">" + " #B:" + bond + " #Q:" + query + " #S=" + state + " #" + chosen; // +"-"+ip;
-
+		String sAggregated = "";
+		if(aggregatedValue != null) {
+			sAggregated = " #Aggregated:" + aggregatedValue;
+		}
+		return "<"+name + ":" + value+">" + " #B:" + bond + " #Q:" + query + " #S=" + state + " #" + chosen + sAggregated; // +"-"+ip;
 	}
 }

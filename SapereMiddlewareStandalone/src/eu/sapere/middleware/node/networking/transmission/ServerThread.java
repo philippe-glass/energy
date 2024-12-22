@@ -2,6 +2,8 @@ package eu.sapere.middleware.node.networking.transmission;
 
 import java.io.ObjectInputStream;
 import java.net.Socket;
+
+import eu.sapere.middleware.log.MiddlewareLogger;
 import eu.sapere.middleware.lsa.Lsa;
 
 /**
@@ -36,7 +38,7 @@ public class ServerThread extends Thread {
 			listener.onLsaReceived(receivedLsa);
 			socket.close();
 		} catch (Exception e) {
-			e.printStackTrace();
+			MiddlewareLogger.getInstance().error(e);
 		}
 	}
 }

@@ -4,13 +4,16 @@ import java.util.Date;
 import java.util.Iterator;
 import java.util.Queue;
 import java.util.concurrent.ConcurrentLinkedQueue;
+
+import eu.sapere.middleware.log.MiddlewareLogger;
+import eu.sapere.middleware.lsa.SyntheticPropertyName;
 import eu.sapere.middleware.node.NodeManager;
 import eu.sapere.middleware.node.notifier.Notifier;
 import eu.sapere.middleware.node.notifier.Subscription;
 import eu.sapere.middleware.node.notifier.event.BondEvent;
 import eu.sapere.middleware.node.notifier.event.DecayedEvent;
-import eu.sapere.middleware.node.notifier.event.LsaUpdatedEvent;
-import eu.sapere.middleware.node.notifier.event.PropagationEvent;
+import eu.sapere.middleware.node.notifier.event.AggregationEvent;
+import eu.sapere.middleware.node.notifier.event.SpreadingEvent;
 import eu.sapere.middleware.node.notifier.event.RewardEvent;
 
 public class OperationManager {
@@ -40,14 +43,22 @@ public class OperationManager {
 	 */
 	public void exec() {
 		long startTime = new Date().getTime();
+		long currentTime = startTime;
 		boolean ended = false;
 		do {
 			if (!operationsQueue.isEmpty()) {
 				execNextOp();
 			} else {
 				ended = true;
+				try {
+					Thread.sleep(10);
+				} catch (InterruptedException e) {
+					MiddlewareLogger.getInstance().error(e);
+				}
 			}
-		} while ((new Date().getTime() - startTime < NodeManager.SLEEPTIME) && !ended);
+			currentTime = new Date().getTime();
+		} while ((currentTime - startTime < NodeManager.SLEEPTIME) && !ended);
+		MiddlewareLogger.getInstance().info("OperationManager.exec spentTime (MS) = " + (currentTime - startTime));
 	}
 
 	/**
@@ -72,14 +83,16 @@ public class OperationManager {
 	 * @param nextOp the operation to be executed
 	 */
 	private void execOp(Operation nextOp) {
-		System.out.println("execOp:" + nextOp.getOpType().toString());
+		boolean debug = false;
+		if(!debug) {
+			System.out.println("execOp:" + nextOp.getOpType().toString());
+		}
 		if (nextOp.getOpType() == OperationType.INJECT) {
-			if (!nextOp.getLsa().getAgentName().contains("*"))
+			//if (!nextOp.getLsa().getAgentName().contains("*"))
+			if (nextOp.getLsa().isLocal())
 				space.inject(nextOp.getLsa());
 			else {
-				if (!space.getAllLsa().containsKey(
-						nextOp.getLsa().getAgentName().substring(0, nextOp.getLsa().getAgentName().indexOf('*'))))
-					space.inject(nextOp.getLsa());
+				space.inject(nextOp.getLsa());
 			}
 		}
 		if (nextOp.getOpType() == OperationType.REMOVE) {
@@ -89,7 +102,9 @@ public class OperationManager {
 			space.update(nextOp.getLsa(), nextOp.getRequestingAgent(), true, true);
 		}
 		if (nextOp.getOpType() == OperationType.REWARD) {
-			System.out.println("Reward operation");
+			if(!debug) {
+				System.out.println("Reward operation");
+			}
 			space.reward(nextOp.getLsa(), nextOp.query, nextOp.reward, nextOp.maxQst1);
 		}
 	}
@@ -102,41 +117,53 @@ public class OperationManager {
 	 *         otherwise
 	 */
 	public void queueOperation(Operation operation) {
-		System.out.println("queueOperations:" + operation.getOpType().toString());
+		boolean toDebug = true;
+		//System.out.println("queueOperations:" + operation.getOpType().toString());
+		if(operation.getLsa() != null) {
+			// Clean subscriptions that are already linked to the same agent
+			String agentName = operation.getLsa().getAgentName();
+			if(notifier.hasSubscriptions(agentName)) {
+				if(toDebug) {
+					MiddlewareLogger.getInstance().info("queueOperations : clean " + operation.getOpType()  + " subscriptions linked to " + agentName);
+				}
+				notifier.unsubscribe(agentName);
+			}
+		}
 		if (operation.getOpType() == OperationType.INJECT || operation.getOpType() == OperationType.UPDATE) {
-			DecayedEvent eventDecay = new DecayedEvent(operation.getLsa());
-			Subscription subsDecay = new Subscription(eventDecay, operation.getRequestingAgent(),
+			Subscription subsDecay = new Subscription(DecayedEvent.class, operation.getRequestingAgent(),
 					operation.getLsa().getAgentName());
 			notifier.subscribe(subsDecay);
 
-			BondEvent eventBond = new BondEvent(operation.getLsa(), null);
-			Subscription subsBond = new Subscription(eventBond, operation.getRequestingAgent(),
+			Subscription subsBond = new Subscription(BondEvent.class, operation.getRequestingAgent(),
 					operation.getLsa().getAgentName());
 			notifier.subscribe(subsBond);
 
-			PropagationEvent eventPropagation = new PropagationEvent(null);
-			Subscription subsPropagation = new Subscription(eventPropagation, operation.getRequestingAgent(),
+			Subscription subsSpreading = new Subscription(SpreadingEvent.class, operation.getRequestingAgent(),
 					operation.getLsa().getAgentName());
-			notifier.subscribe(subsPropagation);
+			notifier.subscribe(subsSpreading);
 
-			LsaUpdatedEvent eventUpdate = new LsaUpdatedEvent(null);
-			Subscription subsUpdate = new Subscription(eventUpdate, operation.getRequestingAgent(),
-					operation.getLsa().getAgentName());
-			notifier.subscribe(subsUpdate);
+			if(operation.getLsa().hasSyntheticProperty(SyntheticPropertyName.AGGREGATION)) {
+				Subscription subsUpdate = new Subscription(AggregationEvent.class, operation.getRequestingAgent(),
+						operation.getLsa().getAgentName());
+				notifier.subscribe(subsUpdate);
+			}
 
-			RewardEvent eventReward = new RewardEvent(operation.getLsa(), operation.query, operation.getReward(),
-					operation.maxQst1);
-			Subscription subsReward = new Subscription(eventReward, operation.getRequestingAgent(),
-					operation.getLsa().getAgentName());
-			notifier.subscribe(subsReward);
-
-		} 
+			// Check if quality of service is activated for the agent
+			if(operation.isQoSactivated()) {
+				Subscription subsReward = new Subscription(RewardEvent.class, operation.getRequestingAgent(),
+						operation.getLsa().getAgentName());
+				notifier.subscribe(subsReward);
+			}
+		}
 		else if (operation.getOpType() == OperationType.REMOVE) {
-			LsaUpdatedEvent event = new LsaUpdatedEvent(operation.getLsa());
-			Subscription s = new Subscription(event, operation.getRequestingAgent(), null);
+			Subscription s = new Subscription(AggregationEvent.class, operation.getRequestingAgent(), null);
 			notifier.unsubscribe(s);
 		}
 		// Adds the operation to the queue
 		operationsQueue.add(operation);
+	}
+
+	public void logNotifier() {
+		notifier.log();
 	}
 }

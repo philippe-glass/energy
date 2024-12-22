@@ -6,13 +6,12 @@ import eu.sapere.middleware.node.NodeManager;
 import eu.sapere.middleware.node.lsaspace.Operation;
 import eu.sapere.middleware.node.lsaspace.OperationManager;
 import eu.sapere.middleware.node.notifier.INotifier;
-import eu.sapere.middleware.node.notifier.Subscription;
 import eu.sapere.middleware.node.notifier.event.AbstractSapereEvent;
+import eu.sapere.middleware.node.notifier.event.AggregationEvent;
 import eu.sapere.middleware.node.notifier.event.BondEvent;
 import eu.sapere.middleware.node.notifier.event.DecayedEvent;
-import eu.sapere.middleware.node.notifier.event.LsaUpdatedEvent;
-import eu.sapere.middleware.node.notifier.event.PropagationEvent;
 import eu.sapere.middleware.node.notifier.event.RewardEvent;
+import eu.sapere.middleware.node.notifier.event.SpreadingEvent;
 
 /**
  * Internal class that implements actions for Agents that manages LSA
@@ -35,10 +34,11 @@ public abstract class LsaAgent extends Agent implements ISapereAgent {
 	 * @param authentication 
 	 * @param subdescriptions 
 	 * @param propertiesName 
+	 * @param activateQoS
 	 * @param type 
 	 */
-	public LsaAgent(String agentName, AgentAuthentication authentication, String[] subdescriptions, String[] propertiesName, LsaType type) {
-		super(agentName, authentication, subdescriptions, propertiesName, type);
+	public LsaAgent(String agentName, AgentAuthentication authentication, String[] subdescriptions, String[] propertiesName, LsaType type, boolean activateQoS) {
+		super(agentName, authentication, subdescriptions, propertiesName, type, activateQoS);
 		this.opMng = NodeManager.instance().getOperationManager();
 		this.notifier = NodeManager.instance().getNotifier();
 	}
@@ -71,9 +71,11 @@ public abstract class LsaAgent extends Agent implements ISapereAgent {
 	 * Attributes Id to LSA
 	 */
 	protected void submitOperation() {
-		if (lsa.getAgentName().equals("")) {
-			lsa.setAgentName(getAgentName());
-			lsa.setAgentAuthentication(authentication);
+		boolean isInSpace = NodeManager.instance().getSpace().getAllLsa().containsKey(agentName);
+		if (!isInSpace) {
+		//if (lsa.getAgentName().equals(""))
+			//lsa.setAgentName(getAgentName());
+			//lsa.setAgentAuthentication(authentication);
 			Operation op = new Operation().injectOperation(lsa, this);
 			opMng.queueOperation(op);
 		} else {
@@ -90,16 +92,18 @@ public abstract class LsaAgent extends Agent implements ISapereAgent {
 		if (event.getClass().isAssignableFrom(RewardEvent.class)) {
 			onRewardEvent((RewardEvent) event);
 		}
-		if (event.getClass().isAssignableFrom(PropagationEvent.class)) {
-			onPropagationEvent((PropagationEvent) event);
+		if (event.getClass().isAssignableFrom(SpreadingEvent.class)) {
+			onSpreadingEvent((SpreadingEvent) event);
 		}
-		if (event.getClass().isAssignableFrom(LsaUpdatedEvent.class)) {
-			onLsaUpdatedEvent((LsaUpdatedEvent) event);
+		if (event.getClass().isAssignableFrom(AggregationEvent.class)) {
+			onAggregationEvent((AggregationEvent) event);
 		}
 		if (event.getClass().isAssignableFrom(DecayedEvent.class)) {
 			onDecayedNotification((DecayedEvent) event);
-			Subscription s = new Subscription(event, this, this.getAgentName());
+			/*
+			Subscription s = new Subscription(event.getClass(), this, this.getAgentName());
 			notifier.unsubscribe(s);
+			*/
 		}
 	}
 }

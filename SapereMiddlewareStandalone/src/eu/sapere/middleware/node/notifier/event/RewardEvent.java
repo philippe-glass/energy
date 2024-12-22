@@ -9,7 +9,6 @@ import eu.sapere.middleware.lsa.Lsa;
 public class RewardEvent extends AbstractSapereEvent {
 
 	private static final long serialVersionUID = 899040460408932860L;
-	private Lsa lsa = null;
 	private String query;
 	private int reward = 0;
 	private double maxQst1;
@@ -32,12 +31,6 @@ public class RewardEvent extends AbstractSapereEvent {
 		return maxQst1;
 	}
 
-	/**
-	 * @return The Lsa
-	 */
-	public Lsa getLsa() {
-		return lsa;
-	}
 
 	/**
 	 * @return 

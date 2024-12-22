@@ -2,22 +2,23 @@ package eu.sapere.middleware.agent;
 
 import java.io.Serializable;
 
+import eu.sapere.middleware.node.NodeLocation;
+
 public class AgentAuthentication implements Serializable {
 	private static final long serialVersionUID = 1784L;
 	private String agentName;
 	private String agentType;
 	private String authenticationKey;
-	private String agentNode;
-	private String agentLocation;
+	private NodeLocation nodeLocation;
 
-	public AgentAuthentication(String agentName, String agentType, String authenticationKey, String agentNode,
-			String _agentLocation) {
+	public AgentAuthentication(String agentName, String agentType, String authenticationKey
+			, NodeLocation _nodeLocation
+			) {
 		super();
 		this.agentName = agentName;
 		this.agentType = agentType;
 		this.authenticationKey = authenticationKey;
-		this.agentNode = agentNode;
-		this.agentLocation = _agentLocation;
+		this.nodeLocation = _nodeLocation;
 	}
 
 	public String getAgentName() {
@@ -32,14 +33,6 @@ public class AgentAuthentication implements Serializable {
 		return authenticationKey;
 	}
 
-	public String getAgentNode() {
-		return agentNode;
-	}
-
-	public String getAgentLocation() {
-		return agentLocation;
-	}
-
 	public void setAgentName(String agentName) {
 		this.agentName = agentName;
 	}
@@ -52,12 +45,16 @@ public class AgentAuthentication implements Serializable {
 		this.authenticationKey = authenticationKey;
 	}
 
-	public void setAgentNode(String agentNode) {
-		this.agentNode = agentNode;
+	public NodeLocation getNodeLocation() {
+		return nodeLocation;
 	}
 
-	public void setAgentLocation(String _agentLocation) {
-		this.agentLocation = _agentLocation;
+	public void setNodeLocation(NodeLocation nodeLocation) {
+		this.nodeLocation = nodeLocation;
 	}
 
+	public AgentAuthentication copy() {
+		NodeLocation nodeLocationCopy = nodeLocation.copy();
+		return new AgentAuthentication(agentName, agentType, authenticationKey, nodeLocationCopy);
+	}
 }

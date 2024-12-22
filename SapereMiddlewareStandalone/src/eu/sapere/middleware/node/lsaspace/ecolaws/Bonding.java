@@ -1,5 +1,6 @@
 package eu.sapere.middleware.node.lsaspace.ecolaws;
 
+import eu.sapere.middleware.log.MiddlewareLogger;
 import eu.sapere.middleware.lsa.Lsa;
 import eu.sapere.middleware.lsa.LsaType;
 import eu.sapere.middleware.lsa.SyntheticPropertyName;
@@ -33,18 +34,25 @@ public class Bonding extends AbstractEcoLaw {
 	}
 
 	private void execBondsFromLSA() {
+		int nbEventPublished = 0;
 		for (Lsa outerLsa : getLSAs().values()) {
-			if (!outerLsa.isSubdescriptionEmpty()) {
+			if (!outerLsa.isSubdescriptionEmpty() && outerLsa.isLocal()) {
 				for (Lsa targetLsa : getLSAs().values()) {
-					if (syntactic_match(outerLsa, targetLsa) && outerLsa.shouldBound(targetLsa)
+					if (syntactic_match(outerLsa, targetLsa)
+							&& outerLsa.shouldBound(targetLsa)
+							&& outerLsa.hasTargetedProperty(targetLsa)
 							&& !targetLsa.checkNullPropertiesByQuery(
 									targetLsa.getSyntheticProperty(SyntheticPropertyName.QUERY).toString())
-							&& !targetLsa.getProperties().isEmpty() && !outerLsa.getAgentName().contains("*")) {
-						bondLSAToLSA(outerLsa, targetLsa);
+							&& !targetLsa.getProperties().isEmpty()) {
+						boolean isPublished = bondLSAToLSA(outerLsa, targetLsa);
+						if(isPublished) {
+							nbEventPublished++;
+						}
 					}
 				}
 			}
 		}
+		MiddlewareLogger.getInstance().info("execBondsFromLSA : nbEventPublished = " + nbEventPublished);
 	}
 
 	/**
@@ -72,8 +80,8 @@ public class Bonding extends AbstractEcoLaw {
 		return false;
 	}
 
-	private void bondLSAToLSA(Lsa outerLsa, Lsa targetLsa) {
-
+	private boolean bondLSAToLSA(Lsa outerLsa, Lsa targetLsa) {
+		boolean evtPublished = false;
 		outerLsa.addSyntheticProperty(SyntheticPropertyName.BOND, targetLsa.getAgentName());
 		if (!outerLsa.getSyntheticProperty(SyntheticPropertyName.TYPE).equals(LsaType.Query)) {
 			outerLsa.addSyntheticProperty(SyntheticPropertyName.QUERY,
@@ -85,6 +93,8 @@ public class Bonding extends AbstractEcoLaw {
 			AbstractSapereEvent lsaBondedEvent = new BondEvent(outerLsa, targetLsa);
 			lsaBondedEvent.setRequiringAgent(outerLsa.getAgentName());
 			publish(lsaBondedEvent);
+			evtPublished = true;
 		}
+		return evtPublished;
 	}
 }

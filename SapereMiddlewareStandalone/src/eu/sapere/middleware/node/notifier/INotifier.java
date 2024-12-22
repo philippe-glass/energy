@@ -42,4 +42,11 @@ public interface INotifier {
 	 */
 	public void unsubscribe(String subscriberName);
 
+	/**
+	 * Removes subscription by a subscriber and event class from the Notifier
+	 * @param subscriberName
+	 * @param eventClass
+	 */
+	public void unsubscribe(String subscriberName, Class<?> eventClass);
+
 }

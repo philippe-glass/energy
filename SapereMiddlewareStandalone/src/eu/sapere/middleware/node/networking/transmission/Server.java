@@ -5,6 +5,8 @@ import java.net.ServerSocket;
 import java.net.Socket;
 import java.util.concurrent.Executor;
 import java.util.concurrent.Executors;
+
+import eu.sapere.middleware.log.MiddlewareLogger;
 import eu.sapere.middleware.lsa.Lsa;
 
 /**
@@ -40,7 +42,7 @@ public class Server extends Thread implements LsaReceived {
 			executor = Executors.newCachedThreadPool();
 			start();
 		} catch (IOException e) {
-			e.printStackTrace();
+			MiddlewareLogger.getInstance().error(e);
 		}
 	}
 	@Override
@@ -51,7 +53,7 @@ public class Server extends Thread implements LsaReceived {
 				ServerThread serverThread = new ServerThread(socket, this);
 				executor.execute(serverThread);
 			} catch (IOException e) {
-				e.printStackTrace();
+				MiddlewareLogger.getInstance().error(e);
 			}
 		}
 	}
@@ -69,7 +71,7 @@ public class Server extends Thread implements LsaReceived {
 		try {
 			serverSocket.close();
 		} catch (IOException e) {
-			e.printStackTrace();
+			MiddlewareLogger.getInstance().error(e);
 		}
 
 	}

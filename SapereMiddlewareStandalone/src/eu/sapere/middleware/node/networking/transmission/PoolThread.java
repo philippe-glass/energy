@@ -1,12 +1,15 @@
 package eu.sapere.middleware.node.networking.transmission;
 
 import java.util.HashMap;
+
+import eu.sapere.middleware.log.MiddlewareLogger;
 import eu.sapere.middleware.lsa.Lsa;
 import eu.sapere.middleware.node.NodeManager;
 
 public final class PoolThread {
 	private HashMap<String, ThreadSender> senders;
 	private static PoolThread singleton = null;
+	private static int debugLevel = 10;
 
 	/**
 	 * @return
@@ -30,6 +33,9 @@ public final class PoolThread {
 		if (senders.containsKey(key))
 			return;
 
+		if(debugLevel >= 10) {
+			MiddlewareLogger.getInstance().info("PoolThread : send to "+ ip + ":" + port);
+		}
 		ThreadSender sender = new ThreadSender(this, ip, port);
 		// create a new thread sender
 		senders.put(key, sender);

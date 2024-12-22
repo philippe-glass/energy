@@ -14,6 +14,8 @@ public class SpaceRunner implements Runnable {
 	private OperationManager operationManager = null;
 	/** The eco-laws engine */
 	private EcoLawsEngine ecoLawsEngine = null;
+	/** activateLog activation */
+	boolean activateLog = false;
 
 	/**
 	 * Creates an instance of the SpaceRunner and initializes the OperationManager
@@ -34,6 +36,9 @@ public class SpaceRunner implements Runnable {
 		while (!stop) {
 			operationManager.exec();
 			ecoLawsEngine.exec();
+			if(activateLog) {
+				operationManager.logNotifier();
+			}
 			try {
 				Thread.sleep(NodeManager.SLEEPTIME);
 			} catch (Exception e) {

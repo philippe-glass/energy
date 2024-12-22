@@ -41,7 +41,7 @@ public class Space {
 	public void inject(Lsa lsa) {
 		lsa.addSyntheticProperty(SyntheticPropertyName.LOCATION, NodeManager.getNodeName());
 		if (!lsa.hasSyntheticProperty(SyntheticPropertyName.SOURCE))
-			lsa.addSyntheticProperty(SyntheticPropertyName.SOURCE, NodeManager.getLocation());
+			lsa.addSyntheticProperty(SyntheticPropertyName.SOURCE, NodeManager.getLocationAddress());
 		if (!lsa.hasSyntheticProperty(SyntheticPropertyName.BOND))
 			lsa.addSyntheticProperty(SyntheticPropertyName.BOND, "");
 		

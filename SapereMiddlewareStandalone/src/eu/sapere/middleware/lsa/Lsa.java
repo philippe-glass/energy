@@ -10,44 +10,43 @@ import java.util.List;
 import java.util.Map;
 
 import eu.sapere.middleware.agent.AgentAuthentication;
-import eu.sapere.middleware.lsa.values.AbstractAggregationOperator;
-import eu.sapere.middleware.lsa.values.CustomizedAggregationOperator;
-import eu.sapere.middleware.lsa.values.MapStandardOperators;
-import eu.sapere.middleware.lsa.values.StandardAggregationOperator;
+import eu.sapere.middleware.log.MiddlewareLogger;
+import eu.sapere.middleware.node.NodeLocation;
+import eu.sapere.middleware.node.NodeManager;
 
 public class Lsa implements Serializable {
 
 	private static final long serialVersionUID = 1L;
 
 	/** The id of the LSA */
-	private String agentName;
 	private AgentAuthentication agentAuthentication = null;
 	private List<Property> propertyList;
 	protected List<String> subDescription;
 	private Map<SyntheticPropertyName, Object> syntheticProperties;
-	public static final int PROPERTIESSIZE = 10;
+	public static final int PROPERTIESSIZE = 3*10;
+
 
 	/**
 	 * Initializes an empty LSA with the given agentName
 	 * 
-	 * @param agentName
+	 * @param agentAuthentication
 	 */
-	public Lsa(String agentName) {
-		this.agentName = agentName;
+	public Lsa(AgentAuthentication  agentAuthentication) {
 		subDescription = new ArrayList<String>();
 		syntheticProperties = new HashMap<SyntheticPropertyName, Object>();
 		propertyList = new ArrayList<Property>();
+		this.agentAuthentication = agentAuthentication;
 	}
 
 	/**
-	 * @param agentName
+	 * @param agentAuthentication
 	 * @param properties
 	 * @param subDescription
 	 * @param syntheticProperties
 	 */
-	public Lsa(String agentName, List<Property> properties, List<String> subDescription,
+	public Lsa(AgentAuthentication  agentAuthentication, List<Property> properties, List<String> subDescription,
 			Map<SyntheticPropertyName, Object> syntheticProperties) {
-		this.agentName = agentName;
+		this.agentAuthentication = agentAuthentication;
 		this.subDescription = subDescription;
 		this.syntheticProperties = syntheticProperties;
 		this.propertyList = properties;
@@ -60,19 +59,14 @@ public class Lsa implements Serializable {
 	 * @return the id of the LSA
 	 */
 	public String getAgentName() {
-		return agentName;
+		return agentAuthentication.getAgentName();
 	}
+
 
 	/**
-	 * Sets the id of the LSA
 	 * 
-	 * @param agentName The agentName of the LSA
+	 * @return
 	 */
-	public void setAgentName(String agentName) {
-		this.agentName = agentName;
-	}
-
-
 	public AgentAuthentication getAgentAuthentication() {
 		return agentAuthentication;
 	}
@@ -88,20 +82,60 @@ public class Lsa implements Serializable {
 		return propertyList == null && subDescription == null && syntheticProperties == null;
 	}
 
+	public boolean isLocal() {
+		boolean isLocal = NodeManager.isLocal(agentAuthentication.getNodeLocation());
+		return isLocal;
+	}
+
+	public boolean isPropagated() {
+		return !isLocal();
+	}
+
+
 	/**
 	 * Returns the copy of the LSA
 	 * 
 	 * @return the copy of the LSA
 	 */
 
-	public Lsa getCopy() {
-		Lsa copy = new Lsa("");
-		copy.setAgentName(agentName);
-		copy.setAgentAuthentication(agentAuthentication);
-		copy.propertyList = new ArrayList<Property>(this.propertyList);
+	public Lsa copy() {
+		Lsa copy = new Lsa(agentAuthentication.copy());
+		copy.setAgentAuthentication(agentAuthentication.copy());
+		List<Property> copyPropertyList = new ArrayList<Property>();
+		for (Property property : this.propertyList) {
+			copyPropertyList.add(property.copyForLSA());
+		}
+		copy.propertyList = copyPropertyList;
 		copy.subDescription = new ArrayList<String>(this.subDescription);
 		copy.syntheticProperties = new HashMap<SyntheticPropertyName, Object>(this.syntheticProperties);
 		return copy;
+	}
+
+	public void completeInvolvedLocations(Map<String, NodeLocation> mapNodeLocation) {
+		for (Property property : propertyList) {
+			property.completeInvolvedLocations(this, mapNodeLocation);
+		}
+	}
+
+	public List<NodeLocation> retrieveInvolvedLocations() {
+		List<NodeLocation> result = new ArrayList<NodeLocation>();
+		try {
+			result.add(agentAuthentication.getNodeLocation());
+			for (Property prop : propertyList) {
+				Object value = prop.getValue();
+				if (value instanceof IPropertyObject) {
+					IPropertyObject propObject = (IPropertyObject) value;
+					for (NodeLocation nextNodeLocation : propObject.retrieveInvolvedLocations()) {
+						if (!result.contains(nextNodeLocation)) {
+							result.add(nextNodeLocation);
+						}
+					}
+				}
+			}
+		} catch (Throwable e) {
+			MiddlewareLogger.getInstance().error(e);
+		}
+		return result;
 	}
 
 	/**
@@ -123,7 +157,7 @@ public class Lsa implements Serializable {
 	public Boolean contains(Property prop) {
 		Boolean exist = false;
 		for (Property p : propertyList) {
-			if (p.getQuery() !=null && p.getQuery().equals(prop.getQuery()) && p.getBond().equals(prop.getBond())) {
+			if (p.getQuery() != null && p.getQuery().equals(prop.getQuery()) && p.getBond().equals(prop.getBond())) {
 				exist = true;
 				break;
 			}
@@ -133,7 +167,7 @@ public class Lsa implements Serializable {
 	}
 
 	public void removeAllProperties() {
-		while(propertyList.size()>0) {
+		while (propertyList.size() > 0) {
 			Property p = propertyList.get(0);
 			propertyList.remove(p);
 		}
@@ -141,7 +175,7 @@ public class Lsa implements Serializable {
 
 	public List<Property> removePropertiesByQueryAndName(String query, String name) {
 		List<Property> result = getPropertiesByQueryAndName(query, name);
-		for(Property p : result) {
+		for (Property p : result) {
 			propertyList.remove(p);
 		}
 		return result;
@@ -149,7 +183,7 @@ public class Lsa implements Serializable {
 
 	public List<Property> removePropertiesByQueryAndNames(String query, String[] names) {
 		List<Property> result = new ArrayList<Property>();
-		for(String name : names) {
+		for (String name : names) {
 			result.addAll(removePropertiesByQueryAndName(query, name));
 		}
 		return result;
@@ -157,7 +191,7 @@ public class Lsa implements Serializable {
 
 	public List<Property> removePropertiesByName(String name) {
 		List<Property> result = getPropertiesByName(name);
-		for(Property p : result) {
+		for (Property p : result) {
 			propertyList.remove(p);
 		}
 		return result;
@@ -165,7 +199,7 @@ public class Lsa implements Serializable {
 
 	public void replacePropertyWithName(Property prop) {
 		String propName = prop.getName();
-		if(hasProperty(propName)) {
+		if (hasProperty(propName)) {
 			removePropertiesByName(propName);
 		}
 		addProperty(prop);
@@ -173,7 +207,7 @@ public class Lsa implements Serializable {
 
 	public List<Property> removePropertiesByNames(String[] names) {
 		List<Property> result = new ArrayList<Property>();
-		for(String name : names) {
+		for (String name : names) {
 			result.addAll(removePropertiesByName(name));
 		}
 		return result;
@@ -190,7 +224,7 @@ public class Lsa implements Serializable {
 	public List<Property> getPropertiesByQueryAndName(String query, String name) {
 		List<Property> props = new ArrayList<Property>();
 		for (Property prop : propertyList) {
-			if (prop.getQuery()!= null && prop.getQuery().equals(query) && prop.getName().equals(name)) {
+			if (prop.getQuery() != null && prop.getQuery().equals(query) && prop.getName().equals(name)) {
 				props.add(prop);
 			}
 		}
@@ -258,7 +292,7 @@ public class Lsa implements Serializable {
 	public boolean checkNullPropertiesByQuery(String query) {
 		boolean exist = false;
 		for (Property prop : propertyList) {
-			if (prop.getQuery() !=null && prop.getQuery().equals(query) && prop.getValue() == null) {
+			if (prop.getQuery() != null && prop.getQuery().equals(query) && prop.getValue() == null) {
 				exist = true;
 				break;
 			}
@@ -276,7 +310,7 @@ public class Lsa implements Serializable {
 	public List<Property> getPropertiesByQuery(String query) {
 		List<Property> props = new ArrayList<Property>();
 		for (Property prop : propertyList) {
-			if (prop.getQuery()!=null && prop.getQuery().equals(query)) {
+			if (prop.getQuery() != null && prop.getQuery().equals(query)) {
 				props.add(prop);
 			}
 		}
@@ -379,8 +413,30 @@ public class Lsa implements Serializable {
 	 * @return the String representation of the LSA
 	 */
 	public String toVisualString() {
+		String agentName = getAgentName();
 		return "<" + agentName + " , " + subDescription.toString() + " , " + propertyList.toString() + " , "
 				+ syntheticProperties.toString() + ">";
+	}
+
+	public String toReducedString() {
+		String agentName = getAgentName();
+		List<String> propNames = new ArrayList<String>();
+		for (Property prop : propertyList) {
+			propNames.add(prop.getName());
+		}
+		return "<" + agentName + " , " + subDescription.toString() + "," + propNames + " , "
+				+ syntheticProperties.toString() + ">";
+	}
+
+	public String toReducedString2() {
+		String agentName = getAgentName();
+		StringBuffer result = new StringBuffer();
+		String nodeName = agentAuthentication.getNodeLocation() == null ? ""
+				: agentAuthentication.getNodeLocation().getName();
+		result.append("<").append(agentName).append(" (node ").append(nodeName).append(")").append(" , path:")
+				.append(getSyntheticProperty(SyntheticPropertyName.PATH)).append(", sendings:")
+				.append(getSyntheticProperty(SyntheticPropertyName.SENDINGS)).append(">");
+		return result.toString();
 	}
 
 	public List<String> getSubDescription() {
@@ -397,9 +453,10 @@ public class Lsa implements Serializable {
 			if (this.getProperties().isEmpty()) {
 				bond = true;
 			} else if (getSyntheticProperty(SyntheticPropertyName.TYPE).equals(LsaType.Query)) {
+				String agentName = getAgentName();
 				for (Property targetProp : targetLsa.getProperties()) { // if there is a property in the target LSA
 																		// corresponding to the query
-					if (targetProp.getQuery()!=null && targetProp.getQuery().equals(agentName)) {
+					if (targetProp.getQuery() != null && targetProp.getQuery().equals(agentName)) {
 						bond = true;
 						break;
 					}
@@ -423,7 +480,7 @@ public class Lsa implements Serializable {
 	public Boolean hasBondedBefore(String bondedAgentName, String query) {
 		Boolean hasBonded = false;
 		for (Property p : getProperties()) {
-			if (p.getQuery()!=null && p.getQuery().equals(query)) { // same query
+			if (p.getQuery() != null && p.getQuery().equals(query)) { // same query
 				for (String s : p.getBond().split(",")) {
 
 					if (s.equals(bondedAgentName)) {
@@ -436,7 +493,6 @@ public class Lsa implements Serializable {
 		return hasBonded;
 	}
 
-
 	/**
 	 *
 	 * @param fieldName
@@ -445,7 +501,7 @@ public class Lsa implements Serializable {
 	public Object getOneValue(String fieldName) {
 		Object propValue = null;
 		if (SyntheticPropertyName.isSyntheticProperty(fieldName)) {
-			SyntheticPropertyName  syntheticPropertyName = SyntheticPropertyName.getByText(fieldName);
+			SyntheticPropertyName syntheticPropertyName = SyntheticPropertyName.getByText(fieldName);
 			propValue = getSyntheticProperty(syntheticPropertyName);
 		} else {
 			Property prop = getOnePropertyByName(fieldName);
@@ -456,6 +512,36 @@ public class Lsa implements Serializable {
 		return propValue;
 	}
 
+	public boolean hasAggregatedValue(String fieldName) {
+		for(Property property : getPropertiesByName(fieldName)) {
+			if(property.getAggregatedValue() != null) {
+				return true;
+			}
+		}
+		return false;
+	}
+
+	public Object getOneAggregatedValue(String fieldName) {
+		for(Property property : getPropertiesByName(fieldName)) {
+			if(property.getAggregatedValue() != null) {
+				return property.getAggregatedValue();
+			}
+		}
+		return null;
+	}
+
+	public void setAggredatedValue(String fieldName, Object aggregatedValue) {
+		for(Property property : getPropertiesByName(fieldName)) {
+			property.setAggregatedValue(aggregatedValue);
+		}
+	}
+
+	public void clearAggredatedValue(String fieldName) {
+		for(Property property : getPropertiesByName(fieldName)) {
+			property.setAggregatedValue(null);
+		}
+	}
+
 	/**
 	 *
 	 * @param fieldName
@@ -463,7 +549,7 @@ public class Lsa implements Serializable {
 	 */
 	public Date getDateValue(String fieldName) {
 		Object propValue = getOneValue(fieldName);
-		if(propValue != null && propValue instanceof Date) {
+		if (propValue != null && propValue instanceof Date) {
 			return (Date) propValue;
 		}
 		return null;
@@ -476,8 +562,8 @@ public class Lsa implements Serializable {
 	 */
 	public BigDecimal getBigDecimalValue(String fieldName) {
 		Object propValue = getOneValue(fieldName);
-		if(propValue != null) {
-			return new BigDecimal(""+ propValue);
+		if (propValue != null) {
+			return new BigDecimal("" + propValue);
 		}
 		return null;
 	}
@@ -489,18 +575,19 @@ public class Lsa implements Serializable {
 	 */
 	public Integer getIntegerValue(String fieldName) {
 		Object propValue = getOneValue(fieldName);
-		if(propValue != null) {
-			return Integer.parseInt(""+ propValue);
+		if (propValue != null) {
+			return Integer.parseInt("" + propValue);
 		}
 		return null;
 	}
 
 	/**
 	 * Added for Aggregation ecolaw
-	 * @return  id
+	 * 
+	 * @return id
 	 */
 	public String getId() {
-		return this.agentAuthentication.getAgentNode()+ "-" + this.agentAuthentication.getAgentName();
+		return this.agentAuthentication.getNodeLocation().getName() + "-" + this.agentAuthentication.getAgentName();
 	}
 
 	public boolean hasProperty(String query, String propName) {
@@ -513,77 +600,81 @@ public class Lsa implements Serializable {
 		return (listProp.size() > 0);
 	}
 
-	/**
-	 *
-	 * @return true if the LSA has the Aggregation Operator Property, false
-	 *         otherwise
-	 */
-	public boolean hasAggregationOp() {
-		return hasSyntheticProperty(SyntheticPropertyName.AGGREGATION_STANDARD_OP)
-			|| hasSyntheticProperty(SyntheticPropertyName.AGGREGATION_CUSTOM_OP);
+	public boolean isFrom(String location) {
+		return this.agentAuthentication.getNodeLocation().getMainServiceAddress().equals(location);
 	}
 
-	/**
-	 *
-	 * @return the value of the Aggregation Operator Property
-	 */
-	public String getStandardAggregationOp() {
-		if(hasSyntheticProperty(SyntheticPropertyName.AGGREGATION_STANDARD_OP)) {
-			return "" + getSyntheticProperty(SyntheticPropertyName.AGGREGATION_STANDARD_OP);
+	public boolean hasAlreadyBeenReceivedIn(String location) {
+		List<String> sendings = getPath();
+		return sendings.contains(location);
+	}
+
+	public boolean hasAlreadyBeenSentTo(String location) {
+		List<String> sendings = getSendings();
+		return sendings.contains(location);
+	}
+
+	public void addLocationInPath(String location) {
+		List<String> path = getPath();
+		boolean addPath = false;
+		if (path.size() > 0) {
+			String lastLoaction = path.get(0);
+			addPath = !lastLoaction.equals(location);
+		} else {
+			addPath = true;
 		}
-		return null;
-	}
-
-	public String getCustomizedAggregationOp() {
-		if(hasSyntheticProperty(SyntheticPropertyName.AGGREGATION_CUSTOM_OP)) {
-			return "" + getSyntheticProperty(SyntheticPropertyName.AGGREGATION_CUSTOM_OP);
+		if (addPath) {
+			path.add(location);
+			this.addSyntheticProperty(SyntheticPropertyName.PATH, path);
 		}
-		return null;
 	}
 
-	/**
-	 *
-	 * @return
-	 */
-	public AbstractAggregationOperator getAggregationOperator() {
-		if(hasAggregationBy()) {
-			String customizeOpName = getCustomizedAggregationOp();
-			if(customizeOpName != null) {
-				return new CustomizedAggregationOperator();
-			} else {
-				String aggregationOpName = getStandardAggregationOp();
-				StandardAggregationOperator aggregationOp = MapStandardOperators.getOperator(aggregationOpName);
-				//AggregationOperator aggregationOp = AggregationOperator.getByLabel(aggregationOp);
-				return aggregationOp;
+	public void addLocationInSending(String location) {
+		aux_addStrInProperty(SyntheticPropertyName.SENDINGS, location);
+	}
+
+	public void aux_addStrInProperty(SyntheticPropertyName propName, String location) {
+		List<String> listStr = aux_getListStr(propName);
+		if (!listStr.contains(location)) {
+			listStr.add(location);
+			this.addSyntheticProperty(propName, listStr);
+		}
+	}
+
+	public List<String> aux_getListStr(SyntheticPropertyName propName) {
+		if (hasSyntheticProperty(propName)) {
+			Object oCurrentPath = getSyntheticProperty(propName);
+			if (oCurrentPath instanceof List<?>) {
+				List<String> currentPath = (List) oCurrentPath;
+				return currentPath;
 			}
 		}
-		return null;
+		return new ArrayList<String>();
 	}
 
-	/**
-	 * @return true if the LSA is subject to self Aggregation
-	 */
-	public boolean explicitAggregationApplies() {
-		return (hasAggregationOp() && hasAggregationBy() && hasSource());
+	public List<String> getPath() {
+		return aux_getListStr(SyntheticPropertyName.PATH);
 	}
 
-	/**
-	 * @return true if the LSA has the Property AGGREGATION_BY Value, false otherwise
-	 */
-	public boolean hasAggregationBy() {
-		return hasSyntheticProperty(SyntheticPropertyName.AGGREGATION_BY);
+	public List<String> getSendings() {
+		return aux_getListStr(SyntheticPropertyName.SENDINGS);
 	}
 
-	/**
-	 * @return the value of the Field Value Property
-	 */
-	public String getAggregationBy() {
-		return "" + getSyntheticProperty(SyntheticPropertyName.AGGREGATION_BY);
+	public int getSourceDistance() {
+		List<String> path = getPath();
+		return path.size();
 	}
 
-	public boolean getAggregationAllNodes() {
-		String aggregationAllNodes = "" + getSyntheticProperty(SyntheticPropertyName.AGGREGATION_ALLNODES);
-		return "1".equals(aggregationAllNodes);
+	public long getTimeElapsedSinceSendingMS() {
+		long result = -1;
+		if (hasSyntheticProperty(SyntheticPropertyName.LAST_SENDING)) {
+			Object oSendingDate = syntheticProperties.get(SyntheticPropertyName.LAST_SENDING);
+			if (oSendingDate instanceof Date) {
+				Date sendingDate = (Date) oSendingDate;
+				result = new Date().getTime() - sendingDate.getTime();
+			}
+		}
+		return result;
 	}
 
 	/**
@@ -591,6 +682,10 @@ public class Lsa implements Serializable {
 	 */
 	public boolean hasSource() {
 		return hasSyntheticProperty(SyntheticPropertyName.SOURCE);
+	}
+
+	public boolean hasAggregation() {
+		return hasSyntheticProperty(SyntheticPropertyName.AGGREGATION);
 	}
 
 	/**
@@ -603,18 +698,41 @@ public class Lsa implements Serializable {
 		return null;
 	}
 
-	/**
-	 * @return true is the LSA is subject to other Aggregation
-	 */
-	public boolean requestedAggregationApplies() {
-		return (hasAggregationOp() && hasAggregationBy() && !hasSource());
+	public boolean hasPropertiesQueryAndName(String query, String name) {
+		for (Property prop : propertyList) {
+			if (prop.getQuery() != null && prop.getQuery().equals(query) && prop.getName().equals(name)) {
+				return true;
+			}
+		}
+		return false;
 	}
 
-	/**
-	 * @return true if the LSA is subject to the Aggregation eco-law, false
-	 *         otherwise
-	 */
-	public boolean aggregationApplies() {
-		return ((hasAggregationOp() && hasAggregationBy() && hasSource()) || (hasAggregationOp() && hasAggregationBy()));
+	public boolean hasPropertiesName(String name) {
+		for (Property prop : propertyList) {
+			if (prop.getName().equals(name)) {
+				return true;
+			}
+		}
+		return false;
+	}
+
+	public boolean hasTargetedProperty(Lsa bondedLsa) {
+		// Loop on targeted properties
+		String agentName = getAgentName();
+		for (String nextTargetedProperty : subDescription) {
+			if (bondedLsa.hasPropertiesQueryAndName(agentName, nextTargetedProperty)) {
+				return true;
+			}
+			if (bondedLsa.hasPropertiesName(nextTargetedProperty)) {
+				return true;
+			}
+		}
+		return false;
+	}
+
+	public void updateLsaPropertyTags(String[] lsaInputTags, String[] lsaOutputTags) {
+		subDescription.clear();
+		this.addSubDescription(lsaInputTags);
+		this.addSyntheticProperty(SyntheticPropertyName.OUTPUT, String.join(",", lsaOutputTags));
 	}
 }

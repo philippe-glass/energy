@@ -2,8 +2,8 @@ package eu.sapere.middleware.agent;
 
 import eu.sapere.middleware.node.notifier.event.BondEvent;
 import eu.sapere.middleware.node.notifier.event.DecayedEvent;
-import eu.sapere.middleware.node.notifier.event.LsaUpdatedEvent;
-import eu.sapere.middleware.node.notifier.event.PropagationEvent;
+import eu.sapere.middleware.node.notifier.event.AggregationEvent;
+import eu.sapere.middleware.node.notifier.event.SpreadingEvent;
 import eu.sapere.middleware.node.notifier.event.RewardEvent;
 
 /**
@@ -32,9 +32,9 @@ public interface ISapereAgent {
 	 * Called when the LSA is propagated
 	 * 
 	 * @param event
-	 *            The PropagationEvent
+	 *            The SpreadingEvent
 	 */
-	public void onPropagationEvent(PropagationEvent event);
+	public void onSpreadingEvent(SpreadingEvent event);
 
 	/**
 	 * Called when the LSA is rewarded 
@@ -48,8 +48,8 @@ public interface ISapereAgent {
 	 * Called when the LSA is updated by an eco-law
 	 * 
 	 * @param event
-	 *            The LsaUpdatedEvent
+	 *            The AggregationEvent
 	 */
-	public void onLsaUpdatedEvent(LsaUpdatedEvent event);
+	public void onAggregationEvent(AggregationEvent event);
 
 }

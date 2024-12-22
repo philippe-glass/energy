@@ -45,15 +45,6 @@ public class Operation implements Serializable {
 		return reward;
 	}
 
-	/**
-	 * Sets the Id of the lsa involved in the Operation
-	 * 
-	 * @param lsaAgentName
-	 *            the lsaId of the involved Lsa
-	 */
-	public void setLsaAgentName(String lsaAgentName) {
-		this.lsa.setAgentName(lsaAgentName);
-	}
 
 	/**
 	 * Gets the type of the Operation
@@ -125,6 +116,10 @@ public class Operation implements Serializable {
 		this.requestingAgent = requestingAgent;
 		this.lsa = lsa;
 		return this;
+	}
+
+	public boolean isQoSactivated() {
+		return this.requestingAgent.isQoSactivated();
 	}
 
 	/**

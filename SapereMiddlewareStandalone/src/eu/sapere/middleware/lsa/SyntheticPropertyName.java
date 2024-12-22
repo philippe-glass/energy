@@ -1,6 +1,5 @@
 package eu.sapere.middleware.lsa;
 
-
 /**
  * Synthetic Properties
  * 
@@ -9,7 +8,7 @@ public enum SyntheticPropertyName {
 
 //	CREATION_TIME("creationTime"), 
 //	CREATOR_ID("creatorId"), 
-	LAST_MODIFIED("lastModified"), 		// added for aggregation
+	LAST_SENDING("lastSending"),
 	DECAY("decay"),
 	QUERY("query"), //Query LSA
 	REWARD("reward"), //Reward LSA
@@ -17,17 +16,17 @@ public enum SyntheticPropertyName {
 	SOURCE("source"),
 	BOND("bond"),
 	DESTINATION("destination"),
+	PATH("path"),
+	SENDINGS("sendings"),
 	TYPE("type"),
 	STATE("state"),
 	DIFFUSE("diffuse"),
 	PREVIOUS("previous"),
 	GRADIENT_HOP("gradient_hop"),
-	AGGREGATION_STANDARD_OP("aggregation_std_op"),	// added for aggregation
-	AGGREGATION_CUSTOM_OP("aggregation_cust_op"),	// added for aggregation
-	AGGREGATION_ALLNODES("aggregation_all_nodes"),	// added for aggregation
-	AGGREGATION_BY("aggregation_by"),	// added for aggregation
-	//QOS("qos"),
+	AGGREGATION("aggregation"),
+	LAST_AGGREGATION("lastAggregation"), 		// added for aggregation
 	LOCATION("location");
+
 
 	private SyntheticPropertyName(final String text) {
 		this.text = text;
