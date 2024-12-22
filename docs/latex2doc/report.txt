@@ -1,236 +1,258 @@
 
 
 
-\geometry{
+
+
+
+
+
+
 a4paper,
-top=40mm,
-bottom=40mm,
-left=40mm,
-right=40mm
+ top=40mm,
+ bottom=40mm,
+ left=40mm,
+ right=40mm
+ 
 
 
-\title{State of the art for the thesis:
-Coordination model and digital twins for managing energy consumption and production in a smart grid
+Coordination model and digital twins for managing energy consumption and production in a smart grid:
 
-
-Philippe \textsc{Glass
-\newline{}{ supervised by Giovanna \textsc{Di Marzo Serugendo}}
-
+Philippe Glass 
+ supervised by Giovanna Di Marzo Serugendo
 UNIGE, Geneva, Switzerland
 
-September 2023
+August 2024
 
 
-Because of their complexity, smart grids call on a wide range of research fields. This paper focuses on three research areas that are essential for designing a smart grid solution based on coordination systems: coordination models in theme-self, Multi-agents systems, and machine learning applied to energy. Coordination models constitute a relevant solution for designing a bio-inspired environment in which entities representing connected devices can interact with each other and dynamically generate services. The bio-inspired coordination models seem to be the most appropriate.
-Multi-agents systems are essential to design entities as intelligent and autonomous agents and a number of research works have adapted such systems in the field of energy. The holon model is relevant for generic entities that can be integrated into a multi-level smart grid. In addition, the concept of digital twin can be used to designate agents that are virtual representatives of electrical appliances. Concerning machine learning, given the highly volatile nature of renewable energies, we will examine existing adaptations of learning models and frameworks used to distribute computations between different computational units. The "gossip" approach, which uses a purely distributed model, seems to be the most suitable for microgrid infrastructures.
 
 
-\begin{keywords
-Smart grids, Coordination model, Coordination law, Digital twin, Tuple space, Node, Self-composition of services, Federated Learning, Gossip Learning.
-\end{keywords
+Smart grids play an important role for energy management directly supporting the socio-ecological transition of neighbourhoods. This research provides the design of a coordination model to enable the management and exchange of electrical energy between producers and consumers at a micro-grid level. This model, which derives from the SAPERE coordination model, allows intelligent digital twins to interact and generate data on the fly to meet different needs in real time. We have designed producer and consumer digital twins, which autonomously generate supply contracts in the form of a transaction, and supervisor digital twins, which regulate energy at the node level, managing threshold violations and proactively avoiding future threshold violations, using predictions. This coordination model allows energy exchanges in a single node and in a micro-grid structure that contains several neighbouring nodes. redTODO : We also used the interactions between entities to manage peak shaving, to share the knowledge acquired through federated learning and to set up a system aimed at improving the social well-being of the various prosumer members of the microgrid community.
+We have implemented and tested the platform with realistic data, based on the consumption statistics of a real household, and with real data, collected in the living-lab of "Les Vergers" located near Geneva. Results show that the combination of a coordination model and intelligent digital twins actually supports self-adaptive energy management in a smart grid. Such approaches are fundamental to develop efficient and reliable smart grids.
+
+
+keywords
+Smart grid; coordination model; Coordination law; Digital twin; Tuple space; LSA; Node; Self-composition of services; Node state; Kilowatt Hour; Gossip Federated Learning;
+keywords
+
 
 
 Introduction:
 
+Related works:
+
 The development of smart grids has become an important issue in recent years, reinforced by the drastic rise in energy costs, the growing risk of energy shortages and the need to increase the share of renewable energies in energy supplies.
 
-In this paper, we define smart grids as electricity networks that use computer technologies to adjust the flow of electricity between suppliers and consumers. By collecting information on the state of the network, they contribute to improve the balance between production, distribution, and consumption. A smart grid is made up of a number of interconnected nodes containing computing units, which are generally connected to electrical devices that consume or produce electricity - except for the highest-level nodes.
+blackFirst of all, we call smart grid an infrastructure for managing flows of electricity between connected electrical entities, using a combination of information, electricity, and network technologies. By optimising distribution, a smart grid strives to ensure a constant balance between production and consumption. Certain entities, called "nodes", contain calculation units, and generally interact with a set of directly connected electrical appliances, via sensors and actuators. It is worth noting that some higher-level nodes, which interact with lower-level nodes, may not interact directly with electrical devices.
 
-According to surveys that examine the use of the smart grid concept [1], there are a multitude of definitions which differ according to the user's point of view (technical or economic or commercial) or according to the region. However, certain concepts of the various existing definitions seem to converge, such as dynamic infrastructures that combine the circulation of information and electricity, the real-time interactivity, and the cooperation of different power system actors within the same network.
+According to surveys that examine the use of the smart grid concept [1], there are a multitude of definitions which differ according to the user's point of view (technical or economic or commercial) or according to the region. However, certain concepts of the various definitions are recurrent: these include dynamic infrastructures (combining the circulation of information and electricity), the real-time interactivity, and the different power system actors which cooperate within the same network.
 
-Today, the development of such infrastructures is still at a "pioneering" stage and has not yet reached a sufficiently mature state: indeed, to date, smart grid designers have to contend with a number of definite issues, such as the lack of standardisation both in the design and development of such infrastructures, and at the legal level, which further complicates their implementation, especially when stakeholders from different countries are involved. The fact that smart grids combine many scientific and technical fields also complicates their implementation.
+Today, the development of such infrastructures is still at a "pioneering" stage and has not yet reached a sufficiently mature state: indeed, to date, smart grid designers have to contend with a number of definite issues, such as the lack of standardisation both in the design and development of smart grid infrastructures, and at the legal level, which further complicates their implementation, especially when stakeholders from different countries are involved. The fact that smart grids combine many scientific and technical fields also complicates their implementation.
 
-However, according to Mozina [2], there are some attempts at standardisation, such as IEEE 1547, which defines the rules for interconnecting Distributed Generators on a smart grid. The standard cites obvious requirements for the interconnection of Distributed Generators but offers few methods, solutions or options for meeting these requirements. Some more recent supplementary standards deal with issues that were only briefly addressed in 1547, such as the following standards that apply to resources distributed with power supply systems:
--  1547.1: Conformance Test Procedures.
--  1547.2: Application Guide for Interconnecting Distributed Resources with Electric Power Systems.
--  1547.3: Draft Guide for Monitoring, Information Exchange, and Control.
+However, according to Mozina [2], there are some attempts at standardisation, such as IEEE 1547, which defines the rules for interconnecting Distributed Generators on a smart grid. The standard cites obvious requirements for the interconnection of Distributed Generators but offers few methods, solutions or options for meeting these requirements.
 
+Choice of research areas:
 
-Smart grids involve many areas of research. The aim of this study is to use coordination models to design a smart grid application. We will thus focus on 3 areas that are relevant to this objective:
--  Coordination models, which make it possible to design a system in which agents interact dynamically: a coordination model provides an infrastructure in which different agents interact with each other in a dynamic and decentralised way.
--  Multi-agents approaches to exchanging energy, an unavoidable research area, given that any smart grid infrastructure comprises various autonomous actors seeking to buy or sell electricity locally.
--  Learning approaches applied to energy use, on a micro grid scale.
-
+blackSmart grid entities need an infrastructure equipped with digital applications that enables them to interact locally and adapt to constant changes. To be more precise, entities interact by negotiating, exchanging, and regulating energy (to avoid peaks). At the same time, they need to forecast consumption and production to anticipate needs of peak shaving.
+blackWe are therefore interested in paradigms based on decentralised architectures and the principle of dynamic adaptation, enabling local entities to interact with each other and generate new data on the fly. Among these paradigms, we find multi-agent systems and coordination models.
+Given that participants in a power grid need to forecast consumption and production with massive amounts of load data that are volatile over time, we also need to focus on machine learning and distributed learning framework adapted for a micro-grid network. In summary, we will focus on the following three areas:
+-  Coordination models, which make it possible to design a system in which agents interact dynamically: a coordination model provides coordination support and mechanisms that enables different agents to interact with each other in a dynamic, decentralised way.
+-  Multi-agents approaches to exchanging energy, an unavoidable research area, given that any smart grid infrastructure comprises various autonomous actors seeking to negotiate, to buy or sell electricity locally and to manage peak shaving.
+-  The digital twin approach, which enables physical entities such as electrical appliances or supervision devices to be represented by virtual â€œtwinâ€� entities.
+-  Machine learning approaches applied to energy at the scale of a micro-grid and applied in a distributed manner. The objective is to predict electricity consumption and production at the level of a micro-grid (the forecast obtained is then used to manage peak shaving).
 
 Coordination models:
 
-The proliferation of ubiquitous embedded systems producing huge amounts of data has shown the limits of centralised systems and has led to the search for alternative solutions meeting several requirements [3]:
--  Location: services are now time and space dependent as they depend on the physical and social environment.
+blackWith the advent of connected objects whose data production is exploding, distributed applications could offer solutions that go beyond the limits of centralised systems. By using dynamic adaptation at a local level, distributed application can adapt more easily to permanent changing conditions and to localised needs which depends on space topology [3]. These changes particularly concern smart-grid applications since the integration of renewable energies [4]. The paradigm of coordination models fits perfectly into this digital transformation: it allows to decentralise processing by creating self-organisation from the interaction between entities.
+The coordination model concept:
 
--  Self-adaptation: to cope with the unpredictability of the environment, the entities that make up the system must be autonomous and proactive.
+blackCoordination models ensure interaction between agents of heterogeneous natures, using a virtual environment for sharing data (called medium) and a biochemical-inspired transformation mechanism for disseminating and updating this shared data (called coordination laws) [5].
+Each entity is represented by an agent that interact throw the coordination model: the agent then provides a set of services and submits data about itself, (properties and capabilities) under the form of a tuple (couple, triple or more of properties with a value attached). In this way, a set of agents is able to generate a data built on the fly to respond spontaneously to a request.
+blackThanks to the use of distributed bio-inspired patterns, coordination models improve resilience, adaptive capacities and the distribution of treatments between agents.
+Fernandez-Marquez et al. [6] represent a coordination model architecture in 3 layers:
+-  The agents: these are autonomous and pro-active software entities running at a hosting company.
+-  The infrastructure: represents a layer composed of a set of connected hosts and infrastructure agents. A host entity provides computing and communication capabilities, sensors, and actuators while an infrastructure agent acts to implement environmental behaviours present in nature, such as diffusion, evaporation and aggregation.
+-  The environment: represents the real-world space where the infrastructure is located. The agent can detect an event using the sensors provided by the hosts.
+The biological model, which is often compared to the computational model, consists solely of the "environment" and "organism" layers. These two layers are reconciled respectively with the "environment" and "agent" layers of the computational model (see figure 1).
 
--  Diversity: the model must allow the integration of heterogeneous devices and the dynamic integrating of new services and components at any time.
+The two entity models: biological and computer, according to Fernandez-Marquez et al. [7]:
 
 Background of coordination models:
 
-To meet such a challenge, researchers have modelled coordination models in which responsibilities are decentralised (hence the emergence of self-organisation). Such models offer systems better scalability, better robustness and better distribution of computational loads on the different entities.
-Gelernter et al. [4] define a coordination model as the glue that binds separate activities into an ensemble. This general definition has been applied to open Multi-agents systems, in which active agents are defined as distinct entities that can be easily integrated into the ensemble. Such models enable large-scale deployment of open Multi-agents systems.
+The design of coordination models has drawn inspiration from various concepts of science:
+-  The concept of stigmergy, introduced in zoology: the principle of stigmergy is that the trace left in the environment by the initial action of an agent stimulates a subsequent action, performed by a surrounding agent. In this way, successive actions tend to reinforce each other and thus lead to the spontaneous emergence of a coherent, apparently systematic activity. Various searches [8] have used extensively this principle to coordinate the movements of robots swarms.
 
-A solution inspired by ecosystems:
+-  The chemical reactions: they represent simple laws that regulate the evolution of complex phenomena, thus coordinating the behaviour of a large number of components.
+blackThese coordination mechanisms rely on a coordination medium, which contains the data shared between the different entities. A tuple space is an example of a medium where shared data is defined as a tuple of properties.
+Chemical reactions define combinations of logical fragments [9] applied on the fly to a set of tuples. As a result, the reaction modifies some tuples or produces new ones. In the Gamma coordination model, BanÃ¢tre et al. [10] use molecules to represent coordinated entities and chemical reactions to represent states transformations.
 
+-  The Gravitational and electromagnetic fields: some models make the agents evolve from calculation rules analogous to the calculation of a resultant of force vectors in physics. For example, the Co-fields model [11] exploits composite computational fields to coordinate the movement of users and robots in an environment.
 
-The Multi-agents approach has made it possible to respond to this type of requirement by proposing decentralised and adaptive systems that promote interaction and collaboration between entities. Such systems generate services built on the fly to respond spontaneously to a request.
-From this was born the coordination model: it provides a framework composed of an abstraction layer and an associated infrastructure that provides the basic technologies to guarantee interactions between heterogeneous components. Each device agent provides a set of services and submits data about itself (properties and capabilities) under the form of a tuple (couple, triple or more of properties with a value attached)
-
-Coordination models have largely drawn inspiration from nature, and biological systems. Such systems present interesting characteristics because they are robust, resilient, able to adapt to environmental changes and able to obtain complex behaviours by applying elementary rules.
-Fernandez-Marquez et al. [5] represent the biological in two layers: the organisms and the environment. The corresponding computational model contains an additional layer: the infrastructure layer, which is necessary to host the agents in devices (see figure 1).
-
-
-Element caption: The two entity models: biological and computer, inspired from Fernandez-Marquez et al.~cite{FernandezMarquez2011BIOCOREBS:
-The entities used in the computational model are the following:
--  The agents: these are autonomous and pro-active software entities running at a hosting company.
--  The infrastructure: an entity composed of a set of connected hosts and infrastructure agents. A host entity provides computing and communication capabilities, sensors, actuators while an infrastructure agent acts at the infrastructure level to implement environmental behaviours present in nature, such as diffusion, evaporation and aggregation.
--  The environment: this is the real-world space where the infrastructure is located. The agent can detect an event using the sensors provided by the hosts.
-
-The design of coordination models is the result of analysing the interactions between the mechanisms of existing self-organising systems and experimenting with high-level mechanisms already well known in the scientific literature.
-
-First inspiration: the concept of stigmergy:
-
-
-Stigmergy is the first recognised mechanism in the definition of spatial coordination systems. The zoologist Pierre Paul GrassÃ© first introduced it in 1959 [6] by observing insect colonies such as termites or ants, which use pheromones.
-The principle of stigmergy is that the trace left in the environment by the initial action of an agent stimulates a subsequent action, performed by the same or a different agent. In this way, successive actions tend to reinforce each other and thus lead to the spontaneous emergence of a coherent, apparently systematic activity.
-Various searches  [7] have used extensively this principle in intelligent systems, notably in robotics, to coordinate the movements of swarms of robots or to help find directions in an unknown environment, and in dynamic networks, to compute the most efficient routing between two nodes.
-
-The inspirations of chemistry:
-
-
-Chemistry was also one of the first sources of inspiration: it has been a starting point to realise dynamic service composition or knowledge aggregation schemes.
-
- This approach considers chemical reactions as simple laws that regulate the evolution of complex physical phenomena, thus coordinating the behaviour of a large number of components. This contributes to the evolution of complex systems such as biological or meteorological organisms.
-Gamma was the first "chemical" model: it considers an abstract chemical machine in which molecules (representing coordinated entities) interact according to a set of chemical reactions. BanÃ¢tre et al. [8] use chemical reactions to represent states transformations.
-Meyer et al. [9] have used this model for example in dynamic routing with the "Fraglet" approach, which defines a "Fraglet" as a sample of information and routing instructions. Fraglets thus circulate through the network and evolve after applying successive chemical reactions.
-
-The inspirations of physics:
-
-
-Other coordination models have drawn inspiration from the way physical masses move and self-organise according to gravitational and electromagnetic fields [10]. These models make the agents evolve from calculation rules analogous to the calculation of a resultant of force vectors in physics. For example, the Co-fields model [11] exploits composite computational fields to coordinate the movement of users and robots in an environment.
-Other approaches suggest the adoption of virtual force fields to control the shape of the hardware self-assembly. The TOTA model [12] ("Tuples On The Air") manages the coordination of robot agents (either in motion or reconfiguration) based on tuples that propagate in the environment.
-
-The inspirations of biochemistry:
-
-
-Biochemical models are more advanced, although they are also based on chemical reactions. They allow to address some of the limitations of purely chemical models. The biochemical tuple space [13] improves the chemical tuple space by introducing distribution and topology. More precisely, these are 'first-order' coordination concepts, such as compartmentalisation of the environment, diffusion (borrowed from physical coordination models), neighbourhood, which structures the topology of coordination, and local spaces for carrying out chemical reactions.
-Biochemical coordination models appear to be very flexible in enabling the spatial formation of both localised and distributed patterns of activity.
-The chemical reactions mechanism has allowed to build different pattern of behaviours identified in natural environments of information systems. Fernandez-Marquez et al. [14] have defined a set of modular elementary pattern, and high-level pattern, which are composed of elementary pattern. For example, the pattern "Gradient" is composed of the patterns "Spreading" and "Aggregation".
-Werfel et al., Lee et al. have exploited biochemical models in many ubiquitous middleware for particular uses, such as crowd mobility management [15] or participatory sensing [16].
+-  The concepts of distribution and topology: they have enriched the chemical tuple space, forming the biochemical tuple space [12]. Distribution an topology introduce new coordination concepts, such as environment compartmentalisation, diffusion (borrowed from physical coordination models), neighbourhood, which structures the topology of coordination, and local spaces for carrying out chemical reactions.
 
 Use of coordination models in the field of electricity:
 
-There are some uses of bio-inspired coordination models in the field of electricity, which apply algorithms inspired by insect colonies or generic reproduction. These very simple models are limited to biological concepts and do not use those borrowed from chemistry, physics or topology.
-Peres et al. [17] present a coordination model and optimisation methodologies inspired by ants, bats and genetic algorithms to solve the problem of tuning stabilisers for electrical systems. The objective of the optimisation presented is to maximise the closed-loop damping ratio that satisfies pre-specified operating conditions.
+blackIn the literature, examples of applications in the field of elctrcity present the use of coordination models in the form of bio-inspired algorithms. These applicaitons do not make use of the inspiration of chemistry, nor of any particular coordination support (such as a tuple space).
 
+blackFor example, in [13], the authors propose a coordination mechanism that uses ant, bat and genetic algorithms to improve the electrical stability of rotor generators (by optimising the synchronisation torque and damping torque of electric generators).
 
-Zhao et al. [18] propose a wind power consumption dispatching model using a multi-time scale coordination model to overcome the obstruction problem of large-scale wind power consumption. An improved version of the model uses swarm optimisation to minimise system operating costs and optimise energy configuration.
+blackIn [14], the authors present a coordination mechanism based on particle swarm optimisation to regulate the energy produced by wind power plants. Energy regulation uses a multi-scale model to transfer energy to a longer-term supply or, conversely, to a shorter-term supply, depending on energy production and consumption needs.
 
-Bhattacharyya et al. [19] try to solve reactive power planning problems by using bio-inspired coordination models based on Particle Swarm Optimisation. They have also used this model to evaluate the system's total operating cost and optimisation gains.
-Note that these approaches are limited to the use of coordination model concepts in algorithms: they do not use a coordination medium strictly speaking (such as a tuple space or other type of environment capable of propagating and transforming data asynchronously between autonomous agents).
-On a more general note, to date, very few bio-chemical inspiration models have been used in the field of electricity.
-However, the University of Geneva has carried out some bio-chemical model experiments aimed at exchanging energy on a very small scale.
+Bhattacharyya et al. [15] try to solve reactive power planning problems by using bio-inspired coordination models based on Particle Swarm Optimisation. They have also used this model to evaluate the system's total operating cost and optimisation gains.
 
-Ben Mahfoudh et al. [20] have adapted the middleware of the SAPERE model to design spatial services to exchange energy between autonomous agents connected to different locations in a network, and considering different criteria in the negotiation process, such as price, time availability, quantity, energy type, and section bandwidth.
+blackShan et al. [16] have also implemented the same type of bio-inspired models to minimise the operational cost of a microgrid, taking into account the electrical constraints of the various devices, in island mode or in a grid-connected mode.
+blackIn  [17], the authors have implemented a coordination model to manage electricity transactions between the prosumers of a microgrid participating in an organised market. At each cycle, the model recalculates all supply and demand prices, taking into account the preferences of each prosumer as well as the energy available at each bus in the power grid.
+blackIt is worth nothing that these implementations are limited to the use of bio-inspired algorithms and do not use support as such to share data between coordinated entities and apply coordination laws to update data or disseminate it to the set of entities.
 
-Glass et al. [21] have adapted the SAPERE coordination model for the exchange of electricity between producer and consumer devices at the scale of a house and by considering power demand and power availability. They carried out simulations based on household consumption statistics.
+blackIn  [18], Ben Mahfoudh have used the SAPERE biochemical model to experiment with energy exchanges between agents (representing connected lamps), which trade energy taking into account pricing and network bandwidth.
 
+blackIn [19], this same model has also been used to simulate a micogrid (based on real data collected in the "Les Vergers" living lab near Geneva), in which prosumers exchange electrical energy according to demand and availability.
 
 Synthesis:
 
 In terms of research, coordination models have reached an advanced level of maturity. They have drawn inspiration from living systems, chemistry and physics.
-The SAPERE model [22] seems to be the only biochemical model that can support coordination using stigmergy, chemistry and physics at the same time.
+The SAPERE model [20] seems to be the only biochemical model that can support coordination using stigmergy, chemistry and topology at the same time. Table 2 summarises the evaluation of some coordination models based on different criteria.
 
-Table 2 summarises the evaluation of some coordination models based on different criteria.
+caption{Review of coordination models: 
 
 
-Element caption: caption{Review of coordination models:
+
+
 Table 3 summarises the evaluation of some use of coordination models based on different criteria.
-This table shows that, to date, the use of coordination models is still very marginal in the field of electricity. Of the various inspirations, the biological inspiration is still predominant, and the bio-chemical inspiration has not yet been tested, except at the University of Geneva. Furthermore, there are no applications on physics-based models.
+This table underlines the fact that, to date, the use of coordination models is still very marginal in the field of electricity. Among the various inspirations, biological inspiration remains predominant, while bio-chemical inspiration has not yet been tested, except at the University of Geneva. Furthermore, there are no applications using physics-based models.
 
-Element caption: caption{Review of coordination model applications for electricity:
+
+caption{Review of coordination model applications for electricity: 
+
+
+
+
 
 Multi-agents approach for energy exchanges:
 
-Multi-agents systems are the ideal solution for implementing distributed applications to solve complex problems, such as crowd management, robot automation, biomedical simulations or energy engineering. Jennings et al.  [23] define a Multi-agents System (MAS) as a system made up of a set of agents active in a certain environment and interacting according to certain rules. In a MAS, an agent is a physical or software, autonomous entity that is pro-active, reactive, social, able to participate to an organised activity, to achieve its goals, by interacting with other agents.
-According to Daneshfar et al.'s review [24], agents have 3 main characteristics:
+Multi-agents systems are the ideal solution for implementing distributed applications to solve complex problems, such as crowd management, robot automation, biomedical simulations or energy engineering. Jennings et al. [21] define a Multi-agents System (MAS) as a system made up of a set of agents active in a certain environment and interacting according to certain rules. In a MAS, an agent is an autonomous physical or software entity that attempts to achieve its own goals: it is a pro-active, reactive and social entity, taking part in an organised activity and interacting with other agents.
+According to Daneshfar et al.'s review [22], agents have 3 main characteristics:
 -  Reactivity: they can react quickly to changes in their environment.
 -  Pro-activity: they are motivated by their own objectives.
 -  Social capacity: they can negotiate, cooperate or compete. They communicate with each other using a common language (defined in an ontology).
 
-According to Roche et al.'s review [25], Multi-agents System offer several advantages over centralised systems:
--  Agents only act locally: if the view and knowledge of agents is limited to their neighbours in the microgrid they belong to, the amount of data to be transmitted (and the corresponding costs) is dramatically reduced in comparison to other communication intensive methods.
+According to Roche et al.'s review [23], Multi-agents System offer several advantages over centralised systems:
+-  Agents only act locally: if the view and knowledge of agents is limited to the micro-grid neighbourhood they belong to, the amount of data to be transmitted (and the corresponding costs) is dramatically reduced in comparison to other communication intensive methods.
 -  Agents are flexible, plug \& play, and fault tolerant. The structure of a Multi-agents Systems or of its environment can change without any significant consequence for the functioning of the system itself.
 -  Multi-agents Systems are well-suited for solving difficult problems, where the computation can be distributed among several agents.
 
-According to Malik et al.'s comprehensive review of the smart grid literature [26], some research works [27] have designed smart grid models using intelligent agents as key entities to solve specific problems: grid security, load management (storage or battery supply as needed), supply and demand management, power sales, pricing, outage management, frequency control, and voltage control. Each type of agent addresses a specific problem, and its decisions have impact in the smart grid structure.
+blackMahela et al. [24] have published a comprehensive analysis of the use of multi-agent systems to control smart grids. This analysis shows that the multi-agent system is the most effective paradigm for integrating the different types of entities and processes involved at different levels of smart grid organisation. Indeed, each autonomous agent, with its own responsibilities, can represent an entity and focus on a specific issue independently - for example, energy pricing, energy transaction processing, energy flow monitoring, intrusion detection or fault handling. Depending on its hierarchical level within the organisation, its decisions have a greater or lesser impact on other agents.
 
+blackIn [25], Binyamin et al. have identified different ways of using multi-agent systems for smart grid applications: the different issues to address, the classification of agents used to manage smart grid entities, and the techniques implemented.
+
+blackIn the field of data security, an example of a technique often used is the blockchain mechanism [26], which aims to monitor the updates of resources exchanged between agents in a smart grid.
 
 Using of Multi-agents Framework:
 
-Many different tools are available for designing and implementing Multi-agents System. The most commonly used for the type of applications is Java-based JADE [28], which facilitate the development of agent applications in line with the FIPA specifications for inter-operable intelligent Multi-agents systems. FIPA protocols include the simple inquiry protocol, the contract-net negotiation protocol, and the English and Dutch auctions. JADE [29] provides a distributed agent platform that can be distributed across several hosts. Is also provides services and functionalities, such as a Directory Facilitator, a programming interface to simplify registration of agent services, a transport mechanism exchange messages with other agents, a compliant IIOP protocol to connect different agent platforms, and a Graphical User Interface to manage agents and platforms.
+blackThe scientific and technical literature attests to the existence of a wide variety of frameworks for designing multi-agent systems.
+The most commonly used for this type of application is JADE [27], which facilitate the development of agent applications in line with the FIPA specifications for inter-operable intelligent Multi-agents systems. FIPA protocols include the simple inquiry protocol, the contract-net negotiation protocol, and the English and Dutch auctions.
+For example, Qasim et al. [28] have implemented a negotiation mechanism between agents in real time blackusing a FIPA-based protocol enriched with time-stamped data to manage the temporal aspect of negotiations. 
+
+
+JADE [29] provides a distributed agent platform that can be distributed across several hosts. It also provides services and functionalities, such as a Directory Facilitator, a programming interface to simplify registration of agent services, a transport mechanism exchange messages with other agents, a compliant IIOP protocol to connect different agent platforms, and a Graphical User Interface to manage agents and platforms.
+
+
+
 Some other MAS framework exists, such as ZEUS, SkeletonAgent or MadKit.
+
+
 In the field of electricity, Kuzin et al. [30] have proposed a method for controlling smart grids in case of failure detection of a main alternative current power source.
 They used the JADE Multi-agents framework to implement a flexible protection of critical loads against main grid failures and the MACsimJX interface to ensure communication between agents and the smart grid model. According to the simulation results, they achieved good response times and effective control of energy resources to ensure smart grid stability.
+
+
 Mocci et al. [31] have used hierarchical Multi-agents systems working with JADE to integrate smart charging of electric vehicles with active demand participation via an aggregator agent. The proposed Multi-agents System operates with hierarchical and decentralised control and simulates a dynamic non-cooperative single-objective game, which converges to the Nash equilibrium.
+
+
+Pinto et al. [32] have used a framework architecture that combines different Multi-agent systems, each dealing with a particular aspect such as portfolio optimisation, market simulation, or strategy selection based on the current context. The whole system allows to maximise the profits of the micro-grid actors by using all the different markets in parallel, from the local market to the wholesale market.
 
 Using of Multi-agents Architectures:
 
 The architecture of the Multi-agents system reflects the structure of the organisation we wish to set up between the different agents. It defines in particular the possible roles of the different agents and may or may not include different hierarchical levels.
 
-3-level hierarchical architecture:
 
 
-According to Roche et al. [32], despite the multiplicity of systems to manage and the degrees of intelligence of agents, most articles in the literature show a basic structure, generally based on three hierarchical layers:
--  The top layer, corresponding to distribution network operators and higher-level networks. This layer coordinates several micro-grids and optimises global energy market operations at a strategic level.
--  The intermediary layer, corresponding to microgrid coordinator. This layer optimises microgrid operation by distributing energy between generators and loads.
--  The bottom layer, corresponding to generators, load and storage agents. In this layer, each agent controls a more or less intelligent device that enables it to react in real time.
-In the field of electricity, Logenthiran et al. [33] and Dimeas et al. [34] have used a 3 layers architecture with the following agent roles:
--  The top layer contains two agents managing the entire network: the Distribution Network Operator and the Market Operator.
--  The intermediary layer contains the central Micro Grid Controller.
--  The bottom layer contains the 2 following types of local controllers: the micro-source and the load controllers.
+3-level hierarchical architecture
+
+According to Roche et al. [33], despite the multiplicity of systems to manage and the degrees of intelligence of agents, most articles in the literature show a basic structure, generally based on three hierarchical layers:
+  -  The top layer, corresponding to distribution network operators and higher-level networks. This layer coordinates several micro-grids and optimises global energy market operations at a strategic level.
+  -  The intermediary layer, corresponding to the micro-grid coordinator. This layer optimises micro-grid operation by distributing energy between generators and loads.
+  -  The bottom layer, corresponding to generators, load and storage agents. In this layer, each agent controls a more or less intelligent device that enables it to react in real time.
+In the field of electricity, Logenthiran et al. [34] and Dimeas et al. [35] have used a 3 layers architecture with the following agent roles:
+  -  The top layer, which contains two agents managing the entire network: the Distribution Network Operator and the Market Operator.
+  -  The intermediary layer, which contains the central Micro Grid Controller.
+  -  The bottom layer, which contains the 2 following types of local controllers: the micro-source and the load controllers.
 Dimeas et al. also propose to use auction algorithms to manage price negotiation between producers and consumers.
-Rumley et al. [35] propose other types of architecture by defining feeder and load agent. Feeder agents use dynamic adaptation to reconfigure their links in case of shortages or excesses of energy resources, or major losses due to energy transport.
-James et al. [36] propose an architecture which include the following agent types: buyer, seller, bulletin board, physical device, and others.
 
 
+Rumley et al. [36] propose other types of architecture by defining feeder and load agents. Feeder agents use dynamic adaptation to reconfigure their links in case of shortage or excess of energy resources, or in case of significant loss due to energy transport.
+James et al. [37] propose an architecture which includes the following agent types: buyer, seller, bulletin board, physical device, and others.
 However, other research, as described below, has developed more sophisticated architectures that take greater account of the diversity of issues to address in a smart grid.
 
 
-"Link" based architecture:
 
 
-Albana [37] proposes the "Link" paradigm to enables the grid market to flourish, by encouraging consumers to actively participate in grid operation and making the decentralised operating structure in a smart grid more reliable. The proposed architecture contains three main components: the Grid-Link, the Producer-Link and the Storage-Link. The "Link" generic component represents all components in the entire power grid and the customer plants. This architecture reduces in a minimum the number of exchanged data and enables a secure, reliable, and sustainable operation in normal and emergency cases.
+"Link" based architecture :
 
-Using holonic structures:
+Albana [38] proposes the "Link" paradigm to enables the grid market to flourish, by encouraging consumers to actively participate in grid operations and by making the operating structure in a smart grid more reliable. The proposed architecture contains three main components: the Grid-Link, the Producer-Link and the Storage-Link, where a "link" element defines a generic element found throughout the power grid or in customer power plants. This architecture minimises the volume of exchanged data, and guarantees safe, reliable and durable operation in both normal and emergency situations.
+The holonic architecture[39], which has also been used to represent smart grid infrastructures, is of particular interest.
+Basically, Holonic word comes from the Greek word "holon", a union formed from the words "holos", meaning whole and the word "on", meaning parts. In a hierarchical structure, Ada et al. consider a holon both as an entire element and as a part of a higher-level element.
 
+blackThey define a holonic MAS as a multi-agent system composed of a set of holonic entities, and they define a holon recursively, as an entity that is both a member of an organisation and an organisation itself: this latter organisation manages other holonic entities that are at a lower level. Figure  4 represents a holonic structure comprising smart grid entities. For example, a holon representing a household is a member of the microgrid organisation and manages a lower-level organisation containing its electrical appliances. This paradigm facilitates the integration of heterogeneous entities at different hierarchical levels.
 
-Some approaches have modelled smart grid networks using holonic structure [38]. Holonic word, comes from the Greek word "holon", a union formed from the words "holos", meaning whole and the word "on", meaning parts. In this way, Ada et al. consider a holon in a hierarchical structure both as an entire element and as a part of a higher-level element. In a Holonic Multi-agents system (HMAS), the holon is an agent participating in one organisation that also represents an entire organisation itself. As represented in figure 4, such a structure allows the recursive integration of heterogeneous controls at different scales of the network (at the level of an electrical appliance, a house, a neighbourhood). This model aims to meet certain requirements such as the implementation of multiple authorities at different levels, the integration of heterogeneous systems, the need for permanent adaptation and the need to satisfy demands that can be contradictory. Some tests performed on a prototype implementation has proved that it is indeed possible to meet these requirements.
-
-
-Element caption: Generic Holonic architecture control, inspired from~cite{frey2015generic:. This schema represents a simplified micro-grid with district-level, house-level and appliance-level goals.
-The Kansas State University also used the holonic approach to model and implement a smart power distribution system [39]. The university has built an evolutionary and iterative framework suitable for the development of complex, adaptive, and autonomous systems. This framework, which is based on the definition of different goals, roles and state transitions, starts with a simple implementation and allows iterative enrichment. It uses a recommendation system to evolve the structure.
-
-In terms of design tools, Cossentino et al. [40] have implemented agent-oriented framework such as ASPECS (Agent-oriented Software Process for Engineering Complex Systems) to design a holonic organisational meta-model with a step-by-step guide from requirements to code allowing the modelling of a system at different levels of details using a set of refinement methods.
+In addition, this model helps to meet certain requirements such as the implementation of multiple authorities at different levels, the integration of heterogeneous systems, the need for permanent adaptation and the need to satisfy demands that can be contradictory. Some tests performed on a prototype implementation has proved that it is indeed possible to meet these requirements.
 
 
-Use of Intelligent Digital Twin concept:
 
-The joint use of technologies such as IoT, Artificial Intelligence, Cloud Computing or Virtualisation has favoured the development of digital twins. Grieves et al. [41] defines a Digital Twin as a virtual representation of a physical product containing information about said product, with its origins in the field of product life-cycle management. In a survey on Digital Twin, Barricelli et al. [42] define it as a computer-based model that is simulating, emulating, mirroring, or "twinning" the life of a physical entity, which may be an object, a process, a human, or a human-related feature. A digital twin benefit from the autonomy (sensing and acting) available to agents in Multi-agents systems [43].
+Generic Holonic architecture control, inspired from [40]. This schema represents a simplified micro-grid with district-level, house-level and appliance-level goals.:
 
-According to Marah et al. [44], autonomous agents have powerful capabilities that enable to fulfil the requirements for integrating it with a Digital Twin. Therefore, Multi-agents System (MAS) is the main model for programming agents in a cyber-physical systems layer as well as in the Digital Twin layer.
+blackIn [41], Taleb et al. simulated a holonic smart grid under different conditions: connected mode, island mode and disturbed mode. The results show that holonic structures tend to increase the adaptive capacity of agents in the face of disturbances and power shortages.
 
-They are actually also "intelligent" digital twins, since they interact, make decisions based on the information collected, have advanced capabilities such as negotiating or learning [45].
-Tzanis et al. [46] have implemented a hybrid Digital Twins model for fault identification in a smart-grids containing distributed energy resources. The model is composed of a data-driven machine learning subsystem and a discrete deterministic one. This model, which combines machine learning sub-models and differential equations based sub-models, enable the Digital Twin to reduce the calculation time, and ensure a sufficient speed to work on real time.
-Ebrahimi et al. [47] has designed a digital twin model of complex renewable energy generators as wind or hydro power plant. They present a comprehensive modelling strategy which contains different level of modelling and apply uncertainty and intelligent algorithm tools.
+Many holonic approaches have designed or used frameworks to implement such an organisation.
 
+For example, Case et al. [42] blackhave designed a framework that helps implement a holonic organisation, iteratively and integrating entities one after the other (defining for each entity, its goals, roles and state transitions).
+
+This framework starts with a simple implementation, and allows iterative enrichment based on a recommendation system to evolve the structure.
+Cossentino et al. [43] have implemented the ASPECS agent-oriented framework (Agent-oriented Software Process for Engineering Complex Systems) to design a holonic organisational meta-model with a step-by-step guide from requirements to programming, enabling the modelling of a system at different levels of detail.
+blackIn  [44], Wallis et al. present a framework that integrates prosumers as independent holons within a dynamic microgrid structure. With the aim of maintaining a balance between generation and consumption, this approach uses a strategy selection mechanism based on the forecasting results of load consumption and photovoltaic power generation at different horizons.
+
+Use of Intelligent Digital twins:
+
+blackDigital twins were born in the context of the emergence of Industry 4.0, which seeks to automate industrial processes by transferring part of the physical equipment to the virtual world [45]. They result from the fusion of several disciplines, such as AI, the Internet of Things and virtualisation. In this context, the need has arisen to reproduce the dynamics of a physical system in the digital world, with computerised control of testing, analysis and risk prevention.
+
+black{Grieve [46] defines the digital twin model based on its 3 following components:
+-  The physical space and products, which continue to exist and function in the real world.
+-  Its digital representation (called virtual space), which contains its information and its abstract model.
+-  The bidirectional connection between the physical space and the virtual space (often referred to as the "digital thread"), which enables the two spaces to interact with each other.
+
+In a survey on Digital Twin, Barricelli et al. [47] define it as a computer-based model that is simulating, emulating, mirroring, or "twinning" the life of a physical entity, which can be an object, a process, a human, or a human-related feature. A digital twin benefits from the autonomy (sensing and acting) available to agents in Multi-agents systems [48].
+
+According to Marah et al. [49], autonomous agents have powerful capabilities that enable them to meet the requirements of integration into a digital twin. Therefore, Multi-agents System (MAS) is the main model for programming agents in the cyber-physical systems layer as well as in the Digital Twin layer.
+
+blackDepending on the industrial field and its applications, digital twins may possess cognitive abilities such as self-adaptation, communication, negotiation, reasoning and learning [50]. As a result, they can be considered as "intelligent".
+
+
+blackIn [51], the authors present an approach based on cybernetic digital twins to anticipate future power failures in a smart grid within a very short time frame. In this approach, each twin combines a machine learning model and a discrete deterministic mathematical model. Experiments have shown promising results on low-latency networks.
+Ebrahimi et al. [52] have designed a digital twin model of complex renewable energy generators such as wind or hydro power plants. They present a comprehensive modelling strategy that contains different modelling levels and applies uncertainty and smart algorithm tools.
 
 Synthesis:
 
-Table 5 summarises the evaluation of some Multi-agents systems applications in the field of electricity, based on different criteria: it shows that there are no electrical applications using both Multi-agents systems and digital twins. On the other hand, Multi-agents systems are widely used, especially in comparison with digital twins. This may be explained by the relative novelty of the digital twin concept. In addition, some M.A.S. applications seem complete: they use both a dedicated framework and a scalable architecture. This further underlines the maturity of Multi-agents systems.
+Table 5 summarises the evaluation of some Multi-agents systems applications in the field of electricity, based on different criteria: it shows that there are no electrical applications using both Multi-agents systems and digital twins. On the other hand, Multi-agents systems are widely used, particularly compared to more traditional digital twins. This may be explained by the relative novelty of the digital twin concept. In addition, some M.A.S. applications seem complete as they use both a dedicated framework and a scalable architecture. This further underlines the maturity of Multi-agents systems.
 
 
-Element caption: caption{Review of Multi-agents systems:
-Multi-agents learning:
 
-In a microgrid structure, a node, also called an edge device, is a computational entity able to store and process data and software. Typically, the coordination platform and the digital twins execute within a node (e.g., an edge device).
-In this paragraph, we study machine learning methods to allow edge devices to predict the consumption and production at its own level (that is, locally) or at the micro-grid level (that is, globally). As a result, we need to distinguish between the learning model itself, which an edge device (e.g., a node) in the network runs at its level to predict electrical behaviours based on data observed at its level, and the framework used at the microgrid level to federate the learning done by the individual nodes. These two orthogonal elements constitute the learning techniques implemented throughout a microgrid.
+caption{Review of Multi-agents systems: 
+
+
+
+
+Algorithms for Federated and Ensemble learning:
+
+In a micro-grid structure, a node, also called an edge device, is a computational entity able to store and process data and software. Typically, the coordination platform and the digital twins execute within a node (e.g., an edge device).
+In this paragraph, we study machine learning methods to allow edge devices to predict the consumption and production at its own level (that is, locally) or at the micro-grid level (that is, globally). As a result, we need to distinguish between the learning model itself, which an edge device (e.g., a node) in the network runs at its level to predict electrical behaviours based on data observed at its level, and the framework used at the micro-grid level to federate the learning done by the individual nodes. These two orthogonal elements constitute the learning techniques implemented throughout a micro-grid.
 
 In what follows, the first subsection focuses on frameworks used to federate learning between different computational units, while the second subsection focuses on the different types of learning models used by a computational unit in the domain of energy.
 
@@ -238,96 +260,1024 @@ Distributed collaborative Machine Learning frameworks:
 
 In terms of frameworks, we present here two main families of approaches, one called federated learning, which uses a centralised model, and the other called "gossip", which uses a purely distributed model.
 
-Federated Learning: the general approach:
+
+Federated Learning: the general approach
 
 
-Federated learning (FL) is a paradigm in which multiple machines collaboratively train an artificial learning model while keeping their training data at the local level. Thus, the machines involved in learning simply send the models learned on their local training data, not the data itself, to a central machine (see figure 6). The central server aggregates the model weights (e.g., with an average function). Federated learning paradigm contrasts with centralised learning, in which all machines send all data to a central server to execute the learning model.
+Federated learning (FL) is a paradigm in which multiple machines collaboratively train an artificial learning model while keeping their training data at the local level. Thus, the machines involved in learning simply send the models learned on their local training data, not the data itself, to a central machine (see figure 6). The central server aggregates the model weights (e.g., with an average function). The federated learning paradigm contrasts with purely centralised learning, in which all machines send their data to a central server, which is the only entity to execute the learning model.
 
-Element caption: Federated Learning approach, inspired from~cite{savi2021short:. In this approach, a central server, represented in the middle of the diagram, manages the distribution and collection of model weights that the subordinate nodes update.
+Federated Learning approach, inspired from [53]. In this approach, a central server, represented in the middle of the diagram, manages the distribution and collection of model weights that the subordinate nodes update.:
 
-In the general approach, according to Savi et al. [48], each node receives the model weights from the central server, computes the model at its level, and sends the updated weight back to the central server. The central server then manages the communication and aggregation of the weights calculated and returned by each node.
-In the field of energy, Ibrahem et al. [49] have proposed a federated learning approach that uses a privacy-preserving aggregation scheme for energy theft detection in smart grids. They have designed an aggregator server that receives only the encrypted form of model parameters from individual nodes. This protects the network from external intrusions and preserves the privacy of the nodes.
-Experimental results have shown that the proposed approach detects energy theft with greater accuracy and less computational and communication overhead.
-
-
-"Gossip-based" Federated Learning:
+In the general approach, according to Savi et al. [54], each node receives the model weights from the central server, updates the model at its level and then sends the updated weights back to the central server. The central server then manages the communication and aggregation of the model weights calculated and returned by each node.
+In the field of energy, Ibrahem et al. [55] have proposed a federated learning approach that uses a privacy-preserving aggregation scheme for energy theft detection in smart grids. They have designed an aggregator server that receives only the encrypted form of model parameters from individual nodes. This protects the network from external intrusions and preserves the nodes privacy.
+Experimental results have shown that the proposed approach detects energy theft with a greater accuracy and less computational and communication overhead.
 
 
-Another variant, called "decentralised federated learning" or also "Gossip based" [50], is completely decentralised. Indeed, in this approach, the local node also manages the aggregation and communication operations.
+"Gossip-based" Federated Learning :
+
+Another variant, called "decentralised federated learning" or also "Gossip based" [56], is completely decentralised. Indeed, in this approach, the local node also manages aggregation and communication operations.
 
 In more general terms, the "Gossip" mechanism is a composition of aggregation and spreading mechanisms.
-Fernandez-Marquez et al. [51] also define it as a mechanism that seeks to reach a shared agreement on the value of certain system parameters in a decentralised way: all the agents that execute Gossip mechanism work together to gradually reach this agreement by aggregating their own knowledge with that of their neighbours and by disseminating this aggregated knowledge. In this way, the aggregation scheme increases the knowledge and reduces the uncertainty of a single agent by considering the needs of the whole population.
+Fernandez-Marquez et al. [57] also define it as a mechanism that seeks to reach a shared agreement on the value of certain system parameters in a decentralised way: all the agents that execute Gossip mechanism work together to gradually reach this agreement by aggregating their own knowledge with that of their neighbours and by disseminating this aggregated knowledge. In this way, the aggregation scheme increases the knowledge and reduces the uncertainty of a single agent by considering the needs of the whole population.
 
-The figure 7 represents the "Gossip based" Learning which is an application of the gossip mechanism to a set of nodes that train a learning model. This mechanism, also called "decentralised and federated learning" is a framework in which a local node performs locally all actions. More precisely, each node executes alternatively the computation phase and the inter-nodes communication phase.
--  During the computation phase, the node applies several local updates of the learning model.
--  During the inter-node communication phase, the node applies several cycles of inter-node communication: first, it retrieves weights from its neighbours and merges them with its local weights (obtained through local learning), secondly, it sends the resulting merged weights to the neighbour nodes. It also updates its own weights with the merged weights. An aggregation function provides the merge result, typically the average of inputs, but not necessarily. Note that the aggregation function can be customised or defined on the fly.
+The figure 7 represents the "Gossip based" Learning which is an application of the gossip mechanism to a set of nodes that train a learning model. This mechanism, also called "decentralised and federated learning" is a framework in which a local node performs all actions locally. More precisely, each node executes alternatively the computation phase and the inter-nodes communication phase.
+-  During the computation phase, the node locally applies several trainings of the learning model with its own private data. This results in a modification of the model weights.
+-  During the inter-node communication phase, the node applies several cycles of model merging and exchange. First, it receives model weights from its direct neighbours. Secondly it merges all received models and its local one (obtained through local learning). Finally, it sends the merged models to direct neighbouring nodes and copies this merged version into its own mode. An aggregation function provides the merge result, typically the average of inputs, but not necessarily. Note that the aggregation function can be customised or defined on the fly.
 
-According to Liu et al. [52], this approach reduces the communication traffic among the nodes and prevents disclosing sensitive local data to other nodes. During the inter-node communication phase, one node only sends the computed weights of its learning model. It does not send the data that the learning model receives as input.
+According to Liu et al. [58], this approach reduces the communication traffic among nodes and prevents disclosing sensitive local data to other nodes. During the inter-node communication phase, one node only sends the computed weights of its learning model. It does not send the local data that the learning model receives as input.
 
-Element caption: "Gossip based" Decentralised Federated Learning approach, inspired from Liu et al.~cite{liu2022decentralized:
+"Gossip based" Decentralised Federated Learning approach, inspired from Liu et al. [59]:
 
-An empirical study [53] provides a systematic comparison of Federated Learning and Gossip Learning approaches, using experimental scenarios including a real unsubscribe trace collected on cell phones, under different conditions: continuous or in bursts communication, different bandwidth, network size, and techniques of compression.
+An empirical study [60] provides a systematic comparison of Federated Learning and Gossip Learning approaches, using experimental scenarios including a real unsubscribe trace collected on cell phones under different conditions: communication regularity (continuous or in bursts), bandwidth, network size, and compression techniques.
 One might think that, because of the use of lighter computing units (located at node level and not in the cloud), gossip learning performance would be much poorer.
 Surprisingly, the results showed that best gossip variants perform comparably to the best federated learning variants.
 
-Another approach has experimented Gossip Learning on an ultra-dynamic configuration, such a network of electric vehicles that are moving in an urban environment [54]. In order to predict the trajectories of different vehicles, this experiment has applied Gossip learning to a fleet of moving cars, with each vehicle device locally executing the LTSM learning model. The results suggest that in this type of highly dynamic configuration, we can improve accuracy by encouraging nodes with better-trained models to opportunistically propagate data to nodes with insufficiently trained models.
+Another approach has experimented Gossip Learning on an ultra-dynamic configuration, such as a network of electric vehicles moving in an urban environment [61]. In order to predict the vehicles trajectories, this experiment has applied Gossip learning to a fleet of moving cars, with each vehicle device locally executing the LSTM learning model. The results confirmed that in this type of highly dynamic configuration, gossip-based learning significantly improves the accuracy of poor-experienced vehicles, by taking advantage of the learning experience of better-trained models that move in the vicinity.
 As the "Gossip based" federated learning approach is new, there are still very few applications in the field of energy.
-Giuseppi et al. [55] has proposed a decentralised federated learning algorithm for non-intrusive load monitoring (NILM) applied to a network of energy communities. NILM is a process for analysing voltage and current variations that occur in a home: it aims to deduct the appliances used, as well as individual energy consumption. For different types of appliances, they have compared the predictive accuracy between decentralised and centralised Federated Learning: the results confirmed that the decentralised version tends to outperform the centralised version.
+Giuseppi [62] has proposed a decentralised federated learning algorithm for non-intrusive load monitoring (NILM) applied to a network of energy communities. NILM is a process for analysing voltage and current variations that occur in a home: it aims to deduct the appliances used, as well as individual energy consumption. For different types of appliances, they have compared the obtained prediction accuracy between decentralised and centralised Federated Learning: the results confirmed that the decentralised version tends to outperform the centralised version.
 
-Moussa et al. [56] are currently preparing an experiment with gossip-based federated learning on a microgrid network composed of Grid Edge Devices, on which the LSTM learning model is executed locally on each node. The gossip mechanisms will be executed on the weights of the learning model, using a coordination platform. To date, the integration of gossip mechanisms is in progress.
+Moussa et al. [63] are currently preparing an experiment with gossip-based federated learning on a micro-grid network composed of Grid Edge Devices. The LSTM learning model is executed locally on each edge device, and the gossip mechanism will be implemented using a coordination platform, to federate the resulting models. To date, the integration of the gossip mechanism is in progress.
+
+
+redTODO : add sub-section about Ensemble Learning.
 
 Machine learning models:
 
-The increasingly massive deployment of sensors to monitor energy consumption has resulted in the production of a huge amount of data.
+The increasingly massive deployment of sensors to monitor energy consumption has resulted in the production of an enormous amount of data.
 In addition, the advent of renewable energies has led to high data volatility over time.
 We must therefore choose appropriate learning methods to meet such a challenge: they must be able to understand data that is both large, dimensional, and volatile, while operating seamlessly from an embedded device with limited memory space.
 
-The Markov Chain model:
+The Markov Chains model :
 
 
-The Markov chains model uses a discrete-time Markov random processes, for which stochastic matrices give the probabilities of all possible state transitions [57].
-For these random processes, the probability of future states depends only on the present state and not on past states: this characterises the "absence of memory".
-This stochastic model allows continuous learning with newly collected data (both the weight vector and the chains). The University of Mashhad has experimented with this model to predict the energy produced by photo-voltaic cells [58]. The results obtained confirmed the performance of Markov chains for energy production, after sufficient training of the model. This model also has the advantage of being able to slide in time by applying a learning window. This allows the model to adapt more easily when observed behaviours change significantly over time.
+The Markov chains model uses discrete-time Markov random processes, for which stochastic matrices give the probabilities of all possible state transitions [64].
+For these random processes, the probability of a future state depends only on the present state and not on past states: this characterises the "absence of memory".
+This stochastic model allows continuous learning with newly collected data (both the weight vectors and the chains). The University of Mashhad has experimented with this model to predict the energy produced by photo-voltaic cells [65]. The results obtained confirmed the performance of Markov chains for energy production, after sufficient training of the model. This model also has the advantage of being able to slide in time by applying a learning window. This allows the model to adapt more easily when observed behaviours change significantly over time.
 
-Gradient Boosting (XGBoost):
-
-
-XGBoost [59], which stands for extreme gradient boosting, is a supervised machine training method for classification and regression used by the AutoML Training tool. This method is based on decision trees and improves on other methods such as random forest and gradient optimisation. It is effective with large, complex datasets, using a variety of optimisation methods. Data scientists use widely XGBoost and XGBoost provides state-of-the-art results on many problems.
-In the field of energy, Gupta et al. [60] have experimented XGBoost model for solar power prediction. According to the result, the XGB model outperforms the FB prophet model with is also suitable for a large dataset with a high seasonality.
+Gradient Boosting (XGBoost) :
 
 
-LSTM:
+XGBoost [66], which stands for Extreme Gradient Boosting, is a supervised machine learning method for classification and regression used by the AutoML training tool. This method is based on decision trees and improves on other methods such as Random Forest and gradient optimisation. It is effective with large, complex datasets, using a variety of optimisation methods. Data scientists use widely XGBoost and XGBoost provides state-of-the-art results on many problems.
+In the field of energy, Gupta et al. [67] have experimented XGBoost model for solar power prediction. According to the result, the XGBoost model outperforms the Facebook prophet model with is also suitable for a large dataset with significant seasonality.
+
+LSTM :
+
+In the field of energy, the LSTM model (Long Short-Term Memory) [68], which is an advanced and more flexible Recurrent Neural Network architecture, has become one of the most popular models for predicting time series with large fluctuations over time. LSTM is a recurrent neural network: the principle is that the current state also depends on previous states, which is not the case with the Markov model or conventional neural networks. A LSTM cell uses gates to regulate the various signals it receives from input variables or from the preceding cell. As a result, this model helps to memorise past behaviours and to regulate their importance: it is a natural candidate model to adopt in the context of short-term load forecasting. One of the first evaluations of LSTM in this field [69] reveals that LSTM outperforms classical Artificial Neural Networks: in particular, LSTM performs much better in learning long-term temporal correlations. This research has tested the LSTM model on a publicly available residential smart meter dataset, whose performance is compared to various references, including the state of the art in load forecasting.
 
 
-In the field of energy, the LSTM model (Long Short-Term Memory) [61], which is an advanced and more flexible Recurrent Neural Network architecture, has become one of the most popular models for predicting time series with large fluctuations over time. It is a natural candidate model to adopt in the context of short-term load forecasting. One of the first evaluations of LSTM in this field [62] reveals that LSTM outperforms classical Artificial Neural Networks: LSTM is especially much better at learning long-term temporal correlations. This research has tested LSTM model on a publicly available residential smart meter dataset, whose performance is compared to various references, including the state of the art in load forecasting.
+Multi-agents reinforcement learning :
 
+Reinforcement learning (RL) [70] is an area of machine learning concerned with how intelligent agents learn to make decisions in an environment in order to maximise the notion of cumulative reward. As a result, RL differs from supervised learning in that it does not require the presentation of labelled input/output pairs, nor the explicit correction of sub-optimal actions. It's worth noting that the RL problem is mathematically known as a Markov Decision Process (MDP), where, at each time unit, an agent in a state $s$ performs an action $a$, receives a scalar reward $r$, and moves to the next state $s'$ according to the environment dynamics.
 
-Multi-agents reinforcement learning:
+In the field of electricity, Roesch et al. [71] have used reinforcement learning to minimise the global cost at the scale of a complex micro-grid system composed of generation resources, a storage battery and a short-term market trading platform. In the modelling, the total cost includes electricity and production costs, as well as real-time fluctuations in market electricity prices. The reward function, meanwhile, considers the different types of costs as well as the different types of interacting agents (resource, battery, and market agents). Experiments have shown that this approach outperforms more conventional optimisation approaches such as reactive rule-based benchmark-scenario, both in terms of cost optimisation and calculation time.
+Chakraborty et al. [72] have also proposed the use of reinforcement learning in a micro-grid application. In their proposal, the aim of reinforcement learning is to select a prosumer peer with whom negotiation of an electricity contract is most likely to succeed. A negotiation between two agents A and B is only successful if they find a contract that satisfies both A's and B's requirements. The results confirmed a significant increase in the success rate of negotiations thanks to reinforcement learning.
 
-
-Reinforcement learning (RL) [63] is an area of machine learning concerned with how intelligent agents learn to make decisions in an environment in order to maximise the notion of cumulative reward. As a result, RL differs from supervised learning in that it does not require the presentation of labelled input/output pairs, nor the explicit correction of sub-optimal actions. Note that RL problem is mathematically known as a Markov Decision Process (MDP), where, at each time unit, an agent in a state $s$ performs an action $a$, receives a scalar reward $r$, and moves to the next state $s'$ according to the environment dynamics.
-In the field of electricity, Roesch et al. [64] has used reinforcement learning to minimise the global cost at the scale of complex micro-grid system composed of production resource, battery storage, and short-term market trading. In the modelling, the total cost includes electricity and production costs and fluctuations of electricity prices in real-time market. The reward function, meanwhile, considers the different types of costs as well as the different types of interacting agents (resource, battery, and market agents). Experiments have shown that this approach outperforms more conventional optimisation approaches such as reactive rule-based benchmark-scenario, both in terms of cost optimisation and calculation time.
-Chakraborty et al. [65] have also proposed the use of reinforcement learning in a microgrid application. In their proposal, the aim of reinforcement learning is to select a prosumer peer with whom negotiation of an electricity contract is most likely to succeed. The negotiation between two pairs A and B succeeds only if A and B find a contract that satisfies both A and B requirements. The results confirmed a significant increase in the ratio of successful negotiations with the use of reinforcement learning.
 Synthesis:
 
-Table 8 summarises the evaluation of some applications in the field of electricity, based on different criteria: it shows that machine learning models are widely used locally, at the device level. However, few applications use distribution frameworks to manage learning weight exchanges between nodes, and in particular, the decentralised "Gossip" approach remains largely unexplored to date.
+Table 8 summarises the evaluation of some applications in the field of electricity, based on different criteria: it shows that machine learning models are widely used locally, at the device level. However, few applications use distribution frameworks to manage the exchange of learning weights between nodes, and in particular, the decentralised "Gossip" approach remains largely unexplored to date.
 
-Element caption: caption{Review of collaborative ML frameworks:
+caption{Review of collaborative ML frameworks: 
+
+
+
+
 
 General synthesis:
 
-In order to provide an overall summary of the various related work carried out, table 9 summarises the evaluation of the different references, taking into account the main features we are studying in this paper: the use of a coordination model, digital twins, Multi-agents systems, machine learning algorithms and the use of a decentralised distribution framework (Gossip Learning type).
-Please note that for reasons of impartiality, we have removed from this table the references directly involved in the work of the thesis "Coordination model and digital twins for managing energy consumption and production in a smart grid".
-Looking at this table, it's interesting to note that no research work has yet combined all the areas we're looking at. Multi-agents systems and automatic learning techniques are the most explored in the context of smart grids, but for example, do not also use coordination models and digital twins.
 
-Element caption: caption{General review
+
+In order to provide an overall summary of the various related work carried out, table 9 summarises the evaluation of the different references, taking into account the main features we are studying in this thesis: the use of coordination models, digital twins, Multi-agents systems, machine learning algorithms, and the use of a decentralised distribution framework (Gossip Learning type).
+Looking at this table, it's interesting to note that no research work has yet combined all the areas we're studying. Multi-agent systems and machine learning techniques are the most widely explored in the context of smart grids, but, for example, they do not also make use of coordination models and digital twins.
+caption{General review 
+
+
+
+
+
+In this sectop,, we have reviewed some research areas that we consider essential for designing digital smart grids applications, such as energy exchange and negotiation, energy forecasting (consumption or production), and peak shaving. We therefore focused on the 4 following main areas: coordination models, Multi-agents systems, Digital Twins, and machine learning applied to energy. Coordination models have reached an advanced level of maturity in terms of research and use interesting concepts borrowed from biology, chemistry and physics. To date, although some power grid applications use bio-inspired coordination models, no bio-chemical model has yet been used in smart grid infrastructure.
+Multi-agent systems have reached a much more advanced level of maturity, since MAS applications have developed considerably in the field of electricity since the 2000s: there is a wide variety of architectures, and some applications use frameworks such as JADE to facilitate agent integration. Few applications use the much more recent concept of Digital Twin.
+As far as automatic learning techniques are concerned, a number of algorithms have been explored for predicting electrical behaviours. Depending on the specific use, the most popular models seem to vary, but they are all well suited to highly volatile time series.
+A number of approaches use a distribution framework to federate model learning across nodes. The vast majority of applications use the conventional federated learning approach, based on an aggregation server. The decentralised gossip approach is still marginal in the field of smart grids, although some applications of gossip learning are emerging for electric vehicle management.
+
+
+This state of the art review suggests that the different areas of research we are exploring correspond to contrasting levels of maturity in the implementation of smart grids. Multi-agents systems as well as Machine Learning techniques are used almost systematically, while coordination models as well as collaborative and decentralised ML frameworks are still in their infancy in the fields of smart grids, although they are used for other areas.
+
+
+According to the general overview of selected smart grid implementations, no approach has yet combined coordination models, Multi-agents systems, digital twins, machine learning techniques and machine learning distribution frameworks. Therefore, it would be interesting to experiment with a smart grid implementation combining these different domains. Each of these research areas could bring a potential gain.
+
+
+
+Design and implementation of a coordination model and the Digital Twins for smart grids:
+
+The coordination model (see definition 10) constitutes the main building block: indeed, our entire approach to managing energy exchange and regulation is based on coordination between intelligent digital twins that can interact with each other and generate data on the fly.
+
+
+A coordination model provides a coordination medium, for sharing data among the coordinated entities; and coordination laws applying on the shared data (transformation, propagation) [73]. We consider coordination laws as self-organising mechanisms inspired by bio-inspired systems. The coordination model uses the stigmergy principle allowing the exchange of asynchronous information among the coordinated entities that use the coordination medium. Such a service has its own logic, controlled by an autonomous software agent (also called intelligent digital twins).
+
+Adaptation of SAPERE coordination model:
+
+The coordination model used derives from the SAPERE coordination model and SAPERE middleware [74]. Ben Mahfoudh [75] provided the most recent extension.
+Figure 11 represents the SAPERE coordination model in the form currently used, which draws inspiration from biochemistry. It contains a shared virtual environment, called tuple space (see definition 12), in which digital twins can share data by submitting or retrieving data properties.
+
+Digital twins can thus submit and retrieve LSAs (see definition 13). LSAs contain tuples of properties provided from other digital twins or generated by the coordination laws (see definition 14) at any time.
+
+
+
+A tuple space is a shared virtual space containing all tuples of a node. There is a shared space for each coordination platform (see definition 15).
+
+
+A Live semantic annotation (LSA) is the tuple of data containing the digital twin properties that travel and evolve in the tuple space. Digital twins can thus submit and retrieve LSAs (tuples of properties) provided from other digital twins or generated by the coordination laws at any time.
+
+
+
+A Coordination law is a Mechanism that applies to entities in the environment. Coordination laws are modelled with bio-inspired design patterns [76] and classified into three hierarchical levels:
+-  The bottom layer which contains the atomic mechanisms.
+-  The middle layer which contains the mechanisms using those of the lower layer.
+-  The upper layer which contains the mechanisms using those of the two lower levels.
+
+A coordination model distinguishes itself from a publish/subscribe model as the digital twins interacting in the system, do so through the use of the tuple space (a blackboard) to share information in an indirect stigmergy-like manner (submitting LSAs, and retrieving LSAs that match specific criteria they are looking for). A coordination platform (which instantiates the model, see 16) runs in a computational node (see definition 17).
+
+
+A Coordination platform is a system that implements and runs the coordination model. The coordination platform executes within a Grid Edge Device and communicates through the network with other coordination platforms in other Grid Edge Devices (thanks to the Spreading Coordination eco-law, a specific type of broadcasting communication described below).
+The software agents generate new data on the fly by coordinating their activities through the coordination platform: they submit and retrieve data from the platform. The data submitted corresponds to: (1) data generated by an actual physical object linked to the environment (e.g., consumption or production level); (2) data exchanged among digital twins for managing energy (e.g., requests or offers of energy, peak shaving schedules); or (3) data provided by other services (possibly processed or transformed dynamically by self-organisation mechanisms).
+
+
+A node is a local computing entity of the environment. It is associated with a network address and a set of direct neighbour nodes. In the context of the thesis, a node is associated with a building and is also called a GED (Grid Edge Device).
+
+
+Coordination model:
+
+Coordination laws:
+
+Coordination laws (also called "eco-laws"(Foot note: as they derive from the SAPERE coordination model [77])), act like chemical reactions, and cause the content of LSAs, in the tuple space, to evolve over time. They transform LSAs and propagate the data between the different nodes of the system. LSAs contain data and are submitted to coordination laws, they are not themselves coordination laws. The coordination laws currently defined are the following:
+-  "Bonding", which binds (provides the matching of) a digital twin to data provided by another digital twin (see definition 18).
+-  "Decay" (evaporation), which periodically decreases the relevance of data and removes data that has become obsolete.
+-  "Spreading", which disseminates information within a network across different nodes.
+-  "Aggregation", which aggregates certain data retrieved from different nodes. We define the aggregation function in the digital twins and give it as a parameter in this coordination law. In this way, the Aggregation coordination law remains generic and independent of the aggregation function implementation.
+
+A digital twin (see definition 19), which we also call "agents"(Foot note: a digital twin is essentially a software agent [78]), is generally a detailed virtual replica of a physical object or system, also called the physical twin. A digital twin may also incorporate real-time changes in the physical world based on direct observations and data transmitted by the object itself, most often through sensors or IoT devices. Within the coordination model, digital twins go beyond real-time replicas, since they are equipped with advanced functionalities (e.g., sensing, acting, learning, negotiating, etc.) [79]. They are actual software agents working on behalf of actual devices or users. They coordinate their activities by submitting and retrieving LSAs into and from the LSA tuple space.
+
+
+A Digital twin is a software agent that interacts on the one hand with end-user applications (or with consumption/production edge devices), and on the other hand, coordinates its actions with other digital twins through the coordination platform. To do so, it submits LSAs into the tuple space or retrieves LSAs from the tuple space. Digital twins serve various purposes:
+-  Interaction with the coordination platform.
+-  Coordination of tasks among digital twins.
+-  Real-time representation of their physical twin counterparts (e.g., edge consumption device data).
+
+Generation of data on the fly:
+
+The model uses the principle of stigmergy (indirect communication through the environment, in our case the coordination platform): it allows the asynchronous transformation and propagation of information provided by the digital twin. The coordination laws ensure the different data transformation operations in the environment. One digital twin can submit a data and another digital twin in the same node (or a remote node) can retrieve this same data, in that form or transformed by the coordination laws. We can consider this data as the output of one digital twin, serving as input to another twin. As a result, this model allows digital twins to perform coordinated actions, as well as de facto generating data on the fly [80]. New data arise from the actions of the physical twins in the physical environment.
+
+Coordination platform, nodes, and devices:
+
+The coordination platform is the implementation of the coordination model and typically executes in a computational node or (computational) edge device (e.g., computer, raspberry, etc.).
+
+We distinguish computational devices from energy devices, which are electrical devices that consume or produce energy (e.g., solar panel, boiler, etc.).
+
+Modelling of Intelligent Digital Twins for energy exchanges :
+
+
+
+We have defined different types of digital twins to model the behaviour of the actors who interact in a micro-grid organisation at the scale of a few houses or buildings. We have thus adapted the coordination model for the needs of electricity exchanges and energy regulation. The modelling of actors (see figure 20) includes:
+-  2 types of energy digital twins: the consumers and the producers. Note that the prosumer digital twin, which can consume and supply energy at the same time, is not yet implemented in this version. Further developments will add it as an energy digital twin.
+-  2 types of supervisory digital twins: the learning twin, which tries to predict consumption and production at the node level and the regulator twin, which manages crisis situations at the node level.
+Energy digital twins participate in negotiations regarding energy exchanges. Negotiations involve energy demands submitted by consumers and energy offers submitted by producers. Section 21 provides an explanation of the specific algorithms detailing the establishment of contracts for fulfilling requests based on the received offers. Within a node, there are as many instances of digital energy twins as there are producers and consumers. Supervisory digital twins have only a single instance at the node level and are instantiated when we start the node coordination platform service. In the following, we define the role of each type of digital twin.
+
+-10.5in
+The digital twins that interact with each other: the consumers, the producers, the learning, and the regulator twins. The latter two are unique within a node, while the consumers and producers are multiple, depending on the number of devices connected to the node.:
+-0.5in
+
+For the sake of clarity, we consider the smart grid of Figure 22. The CLEMAP devices are our GED (or nodes, see Definition 23). These devices receive information about data consumed and produced. Namely, we provide one digital twin for each consumer or producer linked to a node, and one learning and one regulator twin per node, as shown in Figure 24.
+
+We consider digital twins as autonomous pro-active agents that go beyond simulated models of physical devices equipped with real-time information. This corresponds to the notion of intelligent digital twin as defined by Di Marzo Serugendo et al. [81].
+
+At the moment, the digital twins actually run in a separate device as shown in Figure 25. In the final version, the CLEMAP device will host a coordination platform and all the corresponding twins.
+
+Producer digital twin:
+
+A producer digital twin (also called "producer twin") represents a device producing electrical energy. It performs the following actions:
+-  It reports any event concerning its activity (start, deactivation, stop).
+-  It generates offers to meet the energy requests submitted by consumers.
+-  After retrieving a new energy supply contract (see 26), it sends a confirmation to give its approval. It repeats this action, until the contract is validated or rejected.
+-  After retrieving an interrupt command from the Regulator twin, it pauses its activity.
+When we shut down the node, the twin de-activates itself and the coordination laws remove the twin's LSA from the tuple space. This LSA cleansing helps reducing the volume of data exchanged and the number of coordination laws executions at each cycle.
+
+
+Consumer digital twin:
+
+A consumer digital twin (also called "consumer twin") represents a device that consumes electrical energy. It performs the following actions:
+-  It reports any event concerning its activity (start, deactivation, stop).
+-  As long as it has not retrieved enough offers to meet its needs, the consumer twin verifies if its request resulted in the emission of new energy offer. If applicable, it checks if all the retrieved offers allow to satisfy its needs. After retrieving satisfactory offers, it generates a new contract and has it validated by the producers concerned.
+-  After retrieving confirmation from a producer, it updates the contract status. It stops and removes it immediately in case of disapproval.
+-  After having the contract validated, it updates its satisfaction indicator to "True".
+-  As long as the contract is still valid, the consumer twin has it reconfirmed periodically by the producers concerned.
+-  After retrieving an interrupt command from the regulator twin, it stops the contract and pauses its activity.
+Similarly, when we shut down the device, the digital twin de-activates itself and the coordination laws remove the digital twin's LSA from the tuple space.
+
+
+Prosumer twins
+
+redTODO: to be completed.
+A prosumer digital twin (also known as a â€œprosumer twinâ€�) represents a higher-level entity that both produces and consumes electrical energy. It may represent an entire household equipped with batteries or photovoltaic panels. At a given moment, a prosumer may need electricity, and at another moment, it may offer electricity to other entities.
+A prosumer twin performs all the following actions already carried out by the consumer and prosumer twins.
+
+Learning twin
+
+The learning digital twin (also called "learning twin") capitalises on the various events occurring at the node and generates prediction data about the state of the node.
+-  After retrieving an event from an energy twin, it updates the global state of the node, including requested, produced, supplied, consumed, missing and available powers. The learning twin stores this data for later use, either by the web application to display the history of the node, or by the regulator, to detect possible over-consumption or over-production in the last recorded node state (see the node state definition in 27).
+-  At each refresh cycle, it updates the global state of the node as well as the node's training data. The learning twin executes the learning model to regenerate a new prediction of the node's state at 5-, 10-, 30-, and 60-minute horizons. The electric devices we use do not provide predictions, they only provide actual consumption and production data every minute (full data: power and voltage), and every 10 sec (only power). The Learning twin has 5-, 10-, 30-, and 60-minute horizons, to provide predictions useful for higher-level services and for the Regulator twin.
+
+
+A node (also called GED), as expressed in Definition 28 is a computational device.
+In this thesis report, we call node state a set of 6 power variables that characterise the current consumption and production of the node, at time t, taking into account all the electrical devices that are linked to the node. We consider the following 6 variables:
+-  Wattage requested: sum of the power demanded by the various electrical devices linked to the node.
+-  Wattage produced: sum of the power produced by the various electrical devices linked to the node.
+-  Wattage consumed: sum of the power consumed by the various electrical devices linked to the node. As some devices demanding energy may not be supplied, we obtain the following inequality:
+-  wattage supplied: sum of the wattages supplied by the various electrical devices linked to the node. As some producer devices may not use all the energy produced for supply, we get the following inequality:
+-  Wattage missing: sum of the power requested and not supplied, for the electrical devices connected to the node.
+-  Wattage available: sum of the power produced and not used, for the electrical devices connected to the node.
+NB: In the case where there are no energy exchanges with the neighbourhood, all producers exclusively supply consumers attached to the same node and all consumers use exclusively wattage produced locally. The wattages supplied and consumed are therefore equal.
+
+
+Regulator twin
+
+The regulator digital twin (also called "regulator twin") supervises the node to ensure stability of the grid, i.e., to perform peak shaving (avoiding excess of production or consumption). It performs the following actions:
+-  At each refresh cycle, it retrieves a complete picture of the node and the twins so as to detect possible production (or consumption) overruns, or various problems that may occur.
+-  After detecting excess of production or consumption, it sends a deactivation order to some twins to instruct them to return below the threshold.
+-  After detecting a technical problem, it sends an order to the concerned twin to correct the problem.
+-  After retrieving a prediction that warns of over-consumption or over-production within the hour, it submits in the coordination platform a LSA that corresponds to an order to postpone certain activities to proactively avoid exceeding the threshold. This LSA is retrieved by the digital twin corresponding to the electrical device that should stop consuming or producing energy.
+
+
+red TODO : to be completed : reward management (for more details, see the paragraph on social acceptance))
+
+
+Design and Implementation of algorithms between digital twins to exchange and regulate electrical energy:
+
+
+In this section, we present the different algorithms that the digital twins apply collectively to meet different needs in a dynamic way, by continuously adapting to the evolution of the situation. These algorithms use the principle of self-adaptation.
+
+Generation of contracts
+
+Many situations lead digital twins to regenerate contracts after a sudden stop of electricity supply. By using self-composition (see definition 29) and dynamic adaptation (cf. figure 30), digital twins can generate a new contract: this allows them to fill a new energy gap in a relatively short time.
+
+
+In the context of a distributed application, a self-composition service is a mechanism that generates a service on the fly without prior intention and without the initiative of a supervising entity. The auto-composition uses the following mechanisms:
+-  a semantics-based mechanism that determines the most appropriate match using a dataset of service descriptions
+-  a scalable and distributed technique for dynamically selecting the most appropriate way to compose a service,
+-  an evaluation of service composition for which the quality of the composition is based solely on the success of its operation.
+Ben Mahfoudh et al. [82] set up such a service to reserve spaces for electric cars on demand at a service station.
+
+
+
+Figure 31 represents the contract life cycle in the form of an UML state-chart and Figure 32 focuses on the sequential aspects: it represents an example of interaction between one consumer needing 50 Watts and two producers with capacities of 13 and 60 watts. In this scenario, the second producer has a lower environmental impact and is therefore chosen first when comparing offers. Table 33 displays examples of combinations of producer capacities with the resulting supplies.
+Combinations of producer capacities and resulting supplies, using 2 or 3 producers to meet a demand of 50 watts. The first row corresponds to the case represented in figure 34 in which the second producer alone supplies the 50 watts. The last line shows a case with 3 producers.:
+
+Dynamic representation of a contract status with UML state-chart:
+
+
+Contract generation in the form of a sequence diagram. The different steps described above appear on the left.:
+
+Steps followed to draw up a contract:
+
+The following lists and describes the different stages of interaction that lead to a new contract between producers and consumers:
+
+-  [Step 1: sending of the request by the consumer:]
+The consumer twin submits its request through its LSA to report its need for energy supply.
+
+-  [Step 2: sending of offers by producers:]
+The producers retrieve the new consumer requests from their LSA. After requests retrieval, each producer then generates new elementary offers to meet the different requests. A producer applies a prioritisation policy to choose the requests to handle first. For example, a policy can classify the requests by decreasing the level of urgency, then by increasing power. The producer generates offers within the limit of its available wattage. As long as its remaining wattage is positive, it generates a new offer, even if it cannot cover all the requested wattage.
+
+-  [Step 3: issuance of a new contract by the consumer:]
+The consumer retrieves the offers that have been issued by the producers. Periodically, it checks whether all its retrieved offers meet the need. Similarly, it applies a policy that determines the offers to choose as a priority. For example, a policy can favour geothermal energies over other types of energy.
+The consumer then goes through the different offers in an iterative way, following the chosen policy: as soon as the offer aggregated (from the elementary offers) meets the need, the consumer issues a new contract based on the selected offers.
+
+-  [Step 4: confirmation of a contract by the producers concerned:]
+To have the contract confirmed by the producers, the consumer twin submits it in its LSA.
+Then, each producer involved retrieves the contract and checks whether it agrees or not with the terms, and then submits its confirmation or refusal in its LSA: in this way, the consumer will retrieve the producer confirmation or refusal and will update the status of the contract validation.
+
+-  [Step 5: validation of a contract by the consumer twin:]
+Each time the consumer twin retrieves one confirmation, it updates the contract status to include the producer's approval (or disapproval), and then, submits the new contract content to its LSA so that all stakeholders involved have the updated version.
+The consumer validates the contract only when all the producers involved have responded positively. If so, all stakeholders involved retrieve a validated contract: the contract then takes effect, and the producers can start supplying energy.
+If any of the stakeholders disapprove the contract, the consumer cancels it, and a new bidding cycle begins immediately.
+
+
+
+
+
+
+Treatment carried out by the prosumer twins:
+
+The 2 following algorithms 35 and 36 represent the actions performed respectively by the consumer and producer digital twins.
+
+NB :
+-  We also consider a prosumer that currently produces energy as producer.
+-  We also consider a prosumer that currently needs energy as consumer.
+
+Contract generation: treatment of the consumer digital twin:
+Comment of algorithm: Initial state: not satisfied and no contract.
+Comment of algorithm: To send the consumer's request to the tuple space.
+$ contract == NULL $ No contract
+Comment of algorithm: Retrieve new offers from LSA.
+($sumWattage(receivedOffers()) >= request.wattage $) Check if the offers can meet the demand.
+Comment of algorithm: New contract
+Comment of algorithm: Submit the new contract in tuple space.
+Comment of algorithm: receiveProducerConfirmation() retrieves producer confirmations.
+Comment of algorithm: Confirmations issued by producers.
+$ contract.hasDisagreement() $ Check for any disagreements in the contract.
+Comment of algorithm: At least one disapproval: cancel the contract.
+Comment of algorithm: All stakeholders have approved the contract.
+Comment of algorithm: Submit the updated contract in tuple space.
+
+
+Contract generation: treatment of the producer digital twin:
+Comment of algorithm: consumers processing table: it contains requests, offers, and contracts.
+% remove obsolete requests, offers and contracts
+Comment of algorithm: remove obsolete requests, offers and contracts.
+request in retrieveRequestsFromLSA()iterate on requests retrieve from LSA.
+Comment of algorithm: inserts new requests into the consumer processing table.
+contract in retrieveContractsFromLSA()iteration on contracts retrieved from LSA.
+$ isConcerned(contract) $ check if the producer is concerned by this contract (nothing to do if it is not the case).
+Comment of algorithm: check if the producer can supply this contract.
+Comment of algorithm: insert this contract in the consumer processing table if not already in.
+Comment of algorithm: value.
+Comment of algorithm: submit the confirmation in the LSA.
+Comment of algorithm: recovery of requests for which the producer has not yet issued an offer.
+Comment of algorithm: Prioritization of requests for processing, according to the producer's offer management policy.
+Comment of algorithm: calculation of the remaining balance in watt.
+Comment of algorithm: the producer responds to the following offers as long as there is a positive remaining balance.
+Comment of algorithm: Creation of a new offer by not exceeding the remaining balance in watt.
+Comment of algorithm: submit the new offer in the LSA.
+Comment of algorithm: refresh of the remaining balance in watts.
+
+
+
+
+Principle of dynamic adaptation.:
+
+Priority demand
+
+It may be the case, that some energy device consumers should have priority over other energy consumers. For instance, we absolutely need to charge an electric vehicle, and this takes priority before a washing machine. To accommodate such cases, we defined the notion of a priority request.
+
+In such a context, a consumer submits an energy request with a priority flag set to true. After retrieving a priority energy request, a producer ensures that current supplies do not prevent it from having sufficient availability to meet this request. If necessary, it interrupts the non-priority supplies (by stopping the contracts). It reiterates this action until the availability becomes sufficient. After having stopped the possible supplies, the producer generates and submits an offer to meet the priority demand. Different simulations have shown that new urgent requests with high wattage have a very significant impact on priority management and can even stop all existing supplies according to the demanded power value.
+Nota bene: even if the producer's capacity is not sufficient to meet the demand on its own, it contributes to meeting it and, in this way, it will have acted to respond collectively to the emergency.
+
+
+Adaptation to meet a growing demand for electricity:
+
+We have introduced a 5\% margin on the power demand in an electricity contract, so
+that the consumer can adjust its consumption by plus or minus 5\% without having to modify the contract.
+The advantage of this flexibility is that most of the contracts avoid stopping when the demand for electricity is constantly fluctuating. However, it has the disadvantage of reducing the producer's availability (the equivalent of the contract margin), as it cannot supply this 5\% margin.
+Finally, the choice of 5\% seems a reasonable compromise to allow contracts to continue without having to solicit a large reserve from the producer. Indeed 1\% is not enough to prevent contract's breaking, while 10\% would cause an excessive energy reserve. The digital twins handle the supply margin as follows:
+
+-  In case the demand decreases by more than 5\%, the contract updates automatically its power range to match the new demand. This on-the-fly adjustment does not require any verification of energy availability, as it is a decrease in supply demand.
+
+-  In case the demand increases by more than 5 
+%, the consumer automatically issues a new demand for electricity to make up the difference: in this way, the consumer does not have to stop its current contract. The consumer will send a secondary demand to cover the increase and a new "temporary" contract will respond to that demand. As a result, the secondary supply will complement the current supply. As soon as the temporary contract is validated, the consumer has two supply contracts, though, after a few seconds, it merges them automatically into one contract. The automatic merge avoids proliferation of contracts, as a consumer cannot have more than 2 contracts at the same time.
+Figure 37 represents the generation a temporary contract to meet an increase in demand of $300W$ on an initial contract of $1000W$; the merged contract has then a power of $1300W$.
+
+
+Adaptation to meet a growing demand for electricity (+ 300 Watts): contract merging:
+
+
+
+Predictions of the local node state
+
+redTODO : to be completed this prediction made with local data.
+We have experimented 2 Learning Models : MC and LSTM
+
+Predictions of the local node state:
+
+The learning twin uses Markov chains model to predict the trend of each power variable at the node level. This learning model is a stochastic model, which uses transition matrices to define the transition probabilities of all possible states.
+
+Definition of Markov states in the classification.:
+The set of Markov states is defined in the same way for all 6 power variables of the node: it is the set of states that each component can potentially take. The set of states represents the level of granularity of the prediction. The greater the number of states, the more accurate the prediction, but the greater the demand on resources.
+In order to keep the data volume and computation time reasonable, we limit ourselves to 7 states, each state representing an interval of values that the component of the node to be predicted can take (see table 38).
+
+Memorising observations number for each transition:
+In the prediction model, we set the step size of the time variable to one minute: this corresponds to the time interval between two observations of the node state. An iteration is defined as the time interval during which observations are attached to the same transition matrix.
+In order to keep the amount of data manageable, each day is broken down into 19 time slots, each corresponding to a one-hour period except for [0h-6h]. We therefore have the following 19 time slots [0-6h], [6h-7h], [7h-8h], ... [11pm-0am]. If some variables vary a lot within the same range during peak hours, it might be wise to re-cut some of the time slots. An iteration corresponds to a given day and time slot. On each subsequent day, we therefore have 19 new iterations for each of the 6 components.
+NB: the implementation does not yet integrate meteorological variables (temperature, pressure, humidity). We therefore limit ourselves to one transition matrix per time slot and per component (6 x 19 = 114 matrices for a given scenario and node).
+Every minute, the learning agent refreshes the state of the node, calculating the total wattage requested, produced, supplied, consumed, missing and available. Each watt value corresponds to one (and only one) Markov state. For each of the 6 components, the learning agent updates the state transition corresponding to the pair [previous Markov state (which has been memorised), current Markov state]. The number of observations associated with the current iteration and the transition [previous Markov state, current Markov state] is then incremented by 1.
+
+Feeding transition matrices:
+For each component and time slot, the transition matrix results from the number of observations collected over the last â€œNâ€� iterations: N corresponds to the learning window associated with the Markov chain. This means that we restrict ourselves to the iterations of the last â€œNâ€� days. In our implementations, the default learning window is 100.
+The transition matrix is calculated in two steps:
+-  Sum of the number of observations for each transition (previous state, next state) within the learning window.
+-  Normalise the values obtained to obtain transition probabilities: number of observations state i to j / Sum (number of observations in line i)
+
+Prediction calculation:
+For each power variable, the learning twin computes a prediction at a target time horizon, using the transition matrices. At each iteration step, the model multiplies the probability vector by the relevant transition matrix. The result of the prediction is a 7-component vector containing the probabilities of reaching each Markov state starting from the initial state (there is one component per Markov state).
+After each prediction, it stores the result in the database. Since it stores the actual state of the node at each refresh, it can reconcile a posteriori the prediction generated at time $t_1$ with the actual perceived state at $t_2$. For each prediction, it thus obtains the assumed Markov state and the actual Markov state at prediction horizon $t_2$. The learning twin also stores the actual state to facilitate the evaluation of the predictions.
+State transition matrices are constructed from the experiments collected, noting the transition [Previous state, New state].
+
+Initialising transition data:
+For the model to be usable across all time slots and components, the transition matrix generated must be complete, i.e. without any â€œemptyâ€� rows (an empty row contains only 0s). This means that for all 19 time slots and 6 components, each state must appear as a starting state in at least one transition with a number of observations greater than 0.
+We generate the initial number of observations at the test simulator level, which has access to the historical production and consumption database of the different electrical devices.
+The initialisation function proceeds as follows:
+-  on the history of production/consumption data for electrical appliances for the previous N days, we calculate the values of 6 variables every minute on the history (using a calculation that simulates probable electrical exchanges between producers/consumers)
+-  calculate the cumulative number of observations for each transition, at each time slot, for these 6 variables
+-  complete the values on the remaining empty lines by adding an â€œartificialâ€� observation to the most explored state around the line
+
+Predictions of the cluster node state
+redTODO : to be completed this prediction made the node total aggregation.
+
+Peak shaving
+
+Peak shaving aims at providing stable conditions for the grid. Decisions are taken either based on actual grid conditions or based on predictions.
+
+Management of production and consumption peak overruns::
+
+We should note that regulation is carried out entirely by the regulator twin (and not by an external or manual system). This digital twin acts locally and its impact is limited to the other digital twins connected to the same node.
+At regular intervals, the regulator twin retrieves the node global state that the learning twin recently stored in the database. From the different totals, the regulator twin detects the production and consumption flows that exceed the alert threshold.
+If the total produced or the total consumed electricity exceeds the threshold, the regulator twin applies a policy to determine the digital twin to stop first so that the node can get back under the alert threshold. The regulator twin thus obtains an ordered list of digital twins to stop. For example, the regulator twin can stop by order of priority the producers with the highest power.
+The regulator twin stops one by one the digital twins contained in this list, as long as the updated total remains above the alert threshold (see algorithm 39).
+
+Choice of producers to deactivate (run by the regulator):
+Comment of algorithm: Designate producers to stop first.
+$ wProduced - sumWattage(listProducersToStop) > THRESHOLD$ Check if the expected power after the producer shutdown still exceeds the threshold.
+Comment of algorithm: Add the producer to the list of producers to stop.
+
+
+Avoidance of over-production or over-consumption based on predictions::
+
+The regulator twin periodically retrieves the result of the last prediction made by the learning twin (see figure 40).
+When the learning twin predicts a peak within the hour, the regulator determines the list of digital twins to reschedule to reduce the node production (or consumption) so as to return to 20 
+% below the maximum threshold. The regulator therefore chooses a policy to prioritise the digital twins to reschedule, for example, by ranking them by increasing wattage.
+After completing the rescheduling table, the regulator submits it through its LSA and then all digital twins retrieve it. The digital twins concerned by the rescheduling then advance their end of activity date so that they stop 10 minutes before the scheduled peak time. By default, they will be able to resume their respective activities only after the end of the shutdown period. For example, in case of over-production, the postponement of production directly concerns certain producer twins. Consequently, it also impacts the consumers supplied by the producers in question, since their production is halted.
+
+
+Mechanism to avoid peak shaving with the replanning of activities.:
+
+From a sequential point of view, the peak avoidance mechanism works as follows:
+-  [Step 1:] the learning twin calculates the probabilities of threshold crossing risk and submits them in its LSA.
+-  [Step 2:] the regulator retrieves the predictions previously submitted by the learning twin and detects the high probability of overshot.
+-  [Step 3:] the regulator determines the rescheduling table of the energy supplies to postpone. The regulator then submits a rescheduling table in its LSA.
+-  [Step 4:] the concerned digital twins retrieve the re-scheduling directives sent by the regulator: they then defer their consumption or production activity.
+
+
+
+
+
+
+Preparing for model evaluation:
+Definition of evaluation metrics:
+
+The first objective of the contribution is to be able to satisfy a maximum number of consumers in a relatively short period of time, while avoiding threshold overruns in terms of production or consumption. To do this, we evaluate the 2 following metrics:
+- [Max response time:] the maximum time during which a request is not satisfied while the power available at the node still permits to satisfy it (see 41 and 42 formulas in appendix).
+- [Failure rate:] quantifies all unfulfilled requests over the event history since the beginning of the scenario. It considers the energy not supplied during the test period. It is the ratio of the demands not supplied (in kWh) even though there is sufficient energy, divided by the total requested in kWh over the total duration of the test (see formula 43 in appendix). Note that this ratio does not consider unsatisfiable requests, e.g., unsatisfied requests whose power exceeds the remaining availability of the node.
+
+Definition of different producer's policies:
+
+For a producer twin, the offer policy defines the priority order of the requests to process. During the tests, we applied different policies of request prioritisation to compare their performances:
+-  The "Random" policy, for which the producer sorts the requests randomly for the same priority level.
+-  The "Prioritisation" policy, for which the producer sorts the requests by consumer node distance, decreasing urgency level, decreasing alert duration, and increasing power. The alert duration is the time (in seconds) during which the demand remains unsatisfied while the power produced is sufficient.
+-  The "Hybrid" policy, which uses by default the random policy. It automatically switches to the prioritisation policy when an unmet request reaches the 8-second alert threshold.
+
+
+Definition of test scenarios:
+
+We have defined and implemented different scenarios to test the coordination model under different conditions. These scenarios identify the challenges that the digital twins may face in meeting power requirements or in regulating the state of the nodes. Some scenarios focus on specific problems while others attempt to replicate realistic conditions. We define the different types of scenarios as follows:
+
+Scenarios for technical tests:
+They are ad hoc scenarios that validate the reliability of a particular algorithm, by running digital twins with very specific conditions, on a short duration: for example, a technical test evaluates the capacity of all digital twins to satisfy simultaneous energy requests. It can also evaluate the ability of digital twins to manage a threshold overrun or to manage a new urgent request that implies stopping certain ongoing supplies. The technical tests also include simulations of over-production, over-consumption, and the tragedy of the commons. During the evaluation, we repeat these tests dozens of times to obtain more meaningful results.
+
+Realistic scenario:
+This scenario seeks to replicate actual consumption and production based on household production and consumption statistics [83]. The statistical data includes the average power consumed or produced at each hour of the day and for each category of appliance in a home.
+The simulator performs periodic processing for each device category:
+-  Random assignment of a total consumption (or production) target power that is close to statistical averages.
+-  Adjustments of device powers to reach the total target (by modifying, starting, and stopping some devices).
+
+We should note that, in the "realistic" scenario, we have pushed the granularity to the maximum by using one digital twin per device. This does not necessarily correspond to the configurations commonly used today. However, the model allows for the representation of aggregations of devices by defining a new higher-level category in the reference data.
+
+Realistic scenario in degraded mode:
+The "degraded mode" is a variant of the "realistic" scenario: this scenario contributes to generating shortages by constantly reducing producers' wattage by half compared to the values of the realistic scenario. In this way, it tests the resilience of digital twins in more difficult situations.
+
+
+
+Scenario of living-lab:
+Since May 2022, we have been collecting measurement data from the living laboratory "Les Vergers", located in Meyrin near Geneva. Seven Clemap smart meters installed in 4 different buildings measure the power data of different electrical appliances (see figure 44). Each smart meter collects power measurements every 10 seconds and sends more complete measurements every minute (including voltage and amperage).
+To facilitate the use of the measurement data, we have set up a script that copies and stores the measurement history in a database accessible from the coordination platform. In this way, we can replay any real scenario that has taken place in the living lab since May 2022. For example, we can run the scenario starting on September 1, 2022, at 1:00 PM: the producer and consumer digital twins will retrieve the corresponding demands and productions (in Watts) that we have registered in the database for the corresponding moment.
+
+Architecture of the living-lab Les Vergers:
+
+We have made the sources of the implementation available in free access, in a GitHub repository. A docker image of the coordination platform is available on docker hub.
+
+
+Definition of network configurations:
+
+The coordination model used ensures interaction between digital twins located at different nodes. The general topology of a network is defined as shown in figure 45: an instance of the coordination platform runs on each node, which is directly linked to a number of neighbouring nodes. All nodes can communicate with each other either directly or indirectly. We can define any mesh topology between the nodes, the only requirement being to run an instance of the coordination platform on each node (which may or may not be physically on different hosts). At each execution cycle, the spreading coordination law propagates the LSA data located at the current node to all direct neighbour nodes (and thus to the entire network after a certain number of cycles).
+-  Each node receives LSAs from neighbouring nodes on a TCP-IP socket server.  The content corresponds to serialised objects.
+-  A node defines its neighbours in emission only. As a consequence, neighbours can be different in transmission and reception. It propagates LSAs to nodes in its own neighbour list, but it can itself receive LSAs from other nodes not included in its neighbour list.
+
+General diagram of a topology with instances of the coordination platform communicating with each other.:
+
+In a test simulator, we have made it possible to configure the list of nodes and assign a node to each device according to its location. This configuration is written as a mapping table in a configuration file as shown in Figure 46. In this configuration file, a node is associated with each location: as each device has a location defined in the test dataset, it can be assigned a node via this mapping table, which means that the digital twin representing this device will be created in the instance of the node's coordination platform. For this example, any device located in the gymnasium will be represented by a digital twin of node N3.
+The $maNodes$ table in the same file contains the address of the REST server for each node. For example, the REST server for the N3 coordination platform is supposed to be running on localhost, port 9393.
+Note that to run the scenario, we need to launch as many instances of the coordination platform as there are nodes used (one for each node) and then, a single instance of the test simulator. In the example shown in figure 47, we therefore need to launch 4 instances of the platform (from N1 to N4). Since the simulator sends REST requests to each platform instance, these must all be launched before the simulator is started.  At launch, the simulator retrieves the list of devices to be integrated into each node and requests the server of each coordination platform to initialise these devices. Digital twins are then created for each node's coordination platform, and energy exchanges are carried out across the set of nodes.
+
+Nodes configuration by location:
+
+As shown in Figure 48, the configuration of each node includes the addresses of its direct neighbours. This can be modified when the server is running. In this way, it is possible to define and update the topology of the various nodes. The network graph can be made "full" by attaching all the other nodes as direct neighbours to each node.
+
+Using scenarios from the Les-Vergers living lab, we have experimented with distributing the devices in a set of 4 nodes, with one node for each geographical location: the primary school, the gymnastic room, the after-school room, and the under-ground. We have also experimented with 2 extreme network topologies:
+-  The minimal topology (see figure 49, of the chain type, for which a node has 2 neighbours, or a single neighbour at the end of the chain.
+-  The maximum topology (see figure 50, of the 'full' type, in which all the nodes are completely interconnected.
+
+The experiments confirmed that the chain topology has the advantage of reducing the number of data transfers between nodes but, on the other hand, increases the number of cycles required to exchange energy between digital twins, particularly when the consumer and producer are at the two extremes of the chain.
+
+Conversely, the "complete" topology increases network traffic drastically but reduces the number of cycles required to exchange energy.
+
+Chained graph topology: each node has two direct neighbours (with the exception of nodes at the end of the chain, which have only one neighbour).:
+
+
+Full graph topology: each node has all other nodes as direct neighbours.:
+
+
+Results:
+
+Results of technical scenarios:
+
+Table 51 displays the results obtained with a purely random scenario: this scenario periodically generates digital twins randomly and in large numbers. It favours requested wattage over produced wattage, which also causes energy scarcity at the node and thus makes contract generation more difficult. The difficulty of fulfilling requests also increases with the number of requests arising at the same time.
+
+Best, worst, and average results obtained on 10 technical tests performed for 10 minutes. The prioritisation policy used consists of sorting energy requests as follows: distance from the consumer node (in ascending order, to favour local requests), urgency level (in descending order), warning duration (in descending order) and power requested (in ascending order). For example, for two requests from the same node and with the same urgency level, the one that has been in warning for longer will be given priority.:
+The prioritisation policy provides the lowest maximal response time and the lowest failure rate. The use of randomness results in very long alert times (average at 141 seconds, maximum at 181 seconds).
+Given the high volume of requests it is more difficult to provide offers that meet the demand with the highest level of alert. Indeed, it usually takes several offers for the same request (often more than ten) to fulfil the requested amount of energy. In the case of a random policy, the concerned consumer therefore has a lower probability of obtaining sufficient offers when compared to the prioritisation policy.
+The prioritisation policy by alert level focuses on the requests to process first. This is the safest strategy, although it sometimes entails longer response times, since the digital twins all focus on one consumer, the most "on alert" at the current moment.
+On simpler scenarios, the hybrid policy achieves better results because it tries to keep response times very low by partially using randomness, while removing the risk of getting very long times by dynamically switching to the prioritisation policy after a certain alert threshold.
+This table shows that the hybrid policy also obtains very degraded performance when the number of digital twins and the difficulty increase.
+
+
+Tests on the 3 main scenarios: realistic, degraded, living-lab:
+
+Table 52 compares the results of maximum response time and failure rates obtained on the 3 main scenarios described in section 53: "realistic, "degraded", and "living lab". The "prioritisation" and "hybrid" policies seem to obtain comparable response times while the random policy still obtains worse response times, although they are acceptable compared to the very poor response times obtained in the "random" scenario.
+In the various tests of the "realistic" scenario, it turns out that shortages are less frequent than in the "random" scenario. Indeed, based on values close to the statistics provided, the quantities produced generally meet the needs. As a result, shortages are less frequent, and the random strategy is less penalised by the difficulty of obtaining a contract when there are multiple demands to satisfy at the same time.
+The results we obtained on the "degraded mode" confirmed a very clear deterioration in the performance of the random policy when shortages are frequent or systematic. This deterioration in performance also concerns the hybrid policy, but to a lesser extent.
+Our results on the "living lab" scenario also confirm a significant deterioration for the random and hybrid policies, but more moderate than the deterioration observed in the degraded mode.
+The tests carried out from a real situation allow us to confirm once again that we have obtained the best performance with the prioritisation policy.
+For the different scenarios, we note that the failure rates follow the same trend as the response times.
+
+Results obtained with the following 3 scenarios: "realistic", "degraded mode" and "living-lab", tested for 60 minutes. We ran each scenario with the 3 producer policies: Prioritisation, Random, and Hybrid policies.:
+
+assessment of local predictions:
+
+
+
+Design of software architecture:
+
+In the implemented model, the coordination platform is the process that runs the coordination model at the node level, i.e., at a single household. It initialises the digital twins that then evolve autonomously in the environment. A client process is a process that sends request to a node coordination platform to create, update or delete a digital twin. It can be a test simulator or a web application that monitors the smart grid at the node level (see figure 54).
+A node coordination platform service uses the SAPERE core as a coordination model.
+The software architecture of the model therefore has 3 layers:
+-  The "derived" SAPERE core: this is the library that manages the tuple space and the coordination laws.
+We have developed the service layer, the SAPERE derivative kernel and the test simulators in Java language. We initially used the "Spring boot 2.3.2" framework to run a coordination platform service as a Restful API.
+-  The service layer: this is the process that executes the model at the level of the nodes (the digital twins and their environment). It uses the SAPERE kernel.
+-  The client layer: these are the processes that send requests to create, modify and delete digital twins.
+
+Software architecture, in a complete development environment.:
+
+The SAPERE derived kernel:
+
+Implemented in java as a separate jar library.
+Contains the core functionalities of framework of the coordination model framework, which is SAPERE derivative.
+-  The node coordination medium with the environment the coordination lows are executed.
+-  The node configuration (its own location and the location of each of its neighbours)
+-  The LSA structure of a twin object and its properties.
+-  The implementation of the different coordination laws and their mechanism.
+-  The server which allow to receive LSA objects from neighbouring nodes. (node that this is not de same server as the REST server). Node that the objects content are serialised and sent via ICP-IP to the neighbour node according to the node configuration.
+
+It should be noted that this library defines mechanisms that are totally independent of the domain of use (which is energy in the case of this thesis).
+~~
+The coordination platform service:
+
+-  the coordination platform server described above used to receive serialised LSA
+-  a linked REST server, which allow to receive request to create or update digital twins, from the web application and the simulator programs.
+
+-  The taxonomy, the structure and behaviour of all digital twins which interact through the coordination platform.
+-  The taxonomy and the structure of data exchanged between the digital twins : energy request, supply, offer, contract, events, message of regulation order
+-  The learning model structure and mechanism (in the case of Markov Chains)
+-  The structure of data exchanged with the web application and the test simulators (received forms and data displayed on web page)
+
+Implementing the REST controllers:
+
+
+Implementing the digital twins:
+
+All digital twin classes inherit from the generic SapereAgent class defined in the middleware library: this class manages interaction with tuple space via LSA, whose property data evolves with each coordination law execution cycle.
+The MicroGridAgent class is used to define the common properties that microgrid agents must have: node context information (NodeContext class), which includes the general configuration parameters of the coordination platform instance, as well as â€œpendingâ€� LSA properties, in the event that too many properties are sent at once (To limit the volume of data exchanged each cycle, the maximum number of LSA properties is set to 10). red[TODO : transfer pending properties to SapereAgent class]
+
+-  Prosumer twin:
+-  Learning twin:
+-  Regulator twin:
+
+Modeling information exchanged between digital twins:
+
+For the sake of simplicity, this sub-section does not describe the class directly deposited in the LSA, since the latter also manages data security. For this reason, the class names shown do not include the â€œProtectedâ€� prefix that characterises a data protection class (see section 55).
+Note that all dates are in java.util.Date format and include the time with a precision of a thousandth of a second, and tables are in java.util.Map format (key-value correspondence table).
+-  Offer issued by a producer and sent to a consumer (SingleOffer class) This class includes: producer name, consumer request, creation date, offer expiry date (creation date + 10 seconds), use date, acceptance date.
+-  Producer confirmation (ConfirmationTable class): name of producer agent, table of confirmations by contract agent. A confirmation is modeled by the ConfirmationItem class, which includes the approval indicator (OK/KO), the confirmation date and the confirmation expiry date.
+-  Energy supply contract between a consumer and suppliers (Contract class). This class includes: the name of the consumer agent, the name of the contract agent, the consumer's request, the contract start and end dates, the wattage table supplied by each producer agent, the expiry date for contract validation and the approvals/disapprovals of the parties involved in the contract.
+-  Regulation data (RegulationWarning class). This class includes the type of alert (overproduction, overconsumption, interruption request, modification request, LSA not present in the tuple space), the names of the agents involved, the alert date, the alert expiry date and the energy request (only entered in the case of a request to modify a request or supply).
+-  Schedule data (RescheduleTable class): This class consists of a key-value table. The key corresponds to the agent's name, and the value corresponds to the associated reschedule. A reschedule is modeled by the RescheduleItem class and includes the wattage and the stop range (start and stop date/time).
+-  Prediction data (PredictionData class). This class contains the date at which the prediction is requested, the horizon, the target date (requested date + horizon), the list of time steps used to calculate the prediction, the values of the node's initial state, the Markov states corresponding to the node's initial state and the result obtained, i.e. the list of prediction vectors of the target state. A node state is considered to correspond to the following 6 components: wattage demanded, wattage produced, wattage supplied, wattage consumed, wattage missing and wattage available.
+
+Figure 56 lists all the LSA properties exchanged in the tuple space.
+redTODO : update the image LSA\_Properties.png
+
+List of data exchanged between digital twins. Each data type in this table is encapsulated in a LSA property whose name appears in the "Label" column. The first column displays the types of digital twins that submit the property, and the second column displays the types of digital twins that retrieve the property.:
+
+redTODO : provide a UML diagram
+
+
+
+Use of relational databases:
+
+Coordination platform database:
+
+redOne database per CP instance
+
+A relational database of the SQLITE type is used to record and histories certain data generated by the coordination platform service: these data concern energy agent events (producers/consumers/contracts), offers generated by producers, node status history (power demanded, produced, consumed, etc.), Markov chain training data, the repository of electrical appliances and energy types.
+Primary keys of the auto-increment type are used to identify each data item, and foreign key constraints are used to link certain tables (composition relationships between 2 data items).
+
+Figures 57 and 58 represent the two main clusters of the relationship diagram between entities:
+-  The one concerning the history of energy exchanges: the data are articulated around the table of events occurring on the consumer/producer/contract agents (Event).
+-  Training data: the data is structured around the transition matrix table: there is one transition matrix per time slot and per node component (the 6 components â€œrequestedâ€�, â€œproducedâ€�, â€œprovidedâ€�, â€œmissingâ€�, â€œconsumedâ€�, â€œavailableâ€�). The transition\_matrix\_cell table stores the content of each element of a transition matrix, while the transition\_matrix\_iteration table identifies an iteration cycle linked to the transition matrix.
+
+Data for simulations:
+
+reddescribe history power data of Les Verges
+There is one instance.
+
+
+
+
+
+Events taxonomy:
+
+Events allow us to trace precisely everything that has happened for each prosumer (or producer or consumer). For example, they can be used to easily calculate electricity deliveries or shortages, at any time since the coordination platform was launched.
+Event types are characterised both by their category (indicating, for example, a start or a stop) and by the type of object to which they refer (request or production or supply).
+
+-  PRODUCTION: concerns a production of electricity by a producer.
+-  REQUEST:concerns a demanded for electricity issued by a consumer.
+-  CONTRACT: concerns a supply of a consumer by one or several producers. We consider a supply to be directly linked to a contract, which is why we use the term â€œCONTRACTâ€�.
+
+-  Start: indicates the beginning of new production, request or supply.
+-  Update: indicates a change of an existing production, request or supply.
+-  Expiry: indicates the expiration of existing production, request or supply.
+-  Stop: indicates the interruption of an existing production, request or supply.
+-  Switch: Indicates the switchover from production to electricity demand or vice versa. This happens to a prosumer when, for example, its internal production drops so low that it can no longer meet its own needs.
+
+Table 59 shows the possible event categories for each event purpose. We can see that only the â€œswitchâ€� event does not exist for contract purpose, as it only concerns production or consumption and does not directly concerns a supply.
+
+use of event categories by event purpose (production, request, contract: and event type (start, update, expiry, switch)
+
+The simulator template programs:
+
+
+The web application:
+
+A web application had been implemented to visualise the current status history at a node level, since the launch of the REST service. As represented on figure 60, data exchanges between the client processes and the coordination platform service is in JSON format is encapsulated into an HTTP request that follows the REST protocol.
+This application uses Angular 9, JavaScript, Node.js and D3JS library.
+
+Each web page follows the MVC (model-view-controller) design pattern. It has the advantage of defining a weak coupling between presentation, data and business components. The â€œviewâ€� part is declared in an extended version of traditional HTML, with new tags and attributes. This extended HTML language is used to declare a bidirectional data link between models and views. In this way, data is automatically synchronised. Services are provided to the component via the dependency injection system.
+-  a file named \#page\_name.component.html, which is the web page template
+-  a file named \#page\_name.component.ts, which is the assorted controller : it describes the interaction between the web page an the REST server. The controller also defines the structure of the data which is displayed on the web page and the structure of the data that is sent to REST server via HTTP forms.
+-  a file named \#page\_name.component.css, which defines the different CSS classes used in the web template.
+
+Node configuration:
+
+Figure 61 displays the configuration screen, showing the node's current configuration.
+The various elements of the node's location appear at the top: node name, its host address, the LSA and REST server port, as well as a list of direct neighbours (identified by their node name).
+
+These configuration parameters can be updated at any time. For example, we can enter a new neighbour node or delete an existing neighbour.
+
+Node configuration:
+
+Node snapshot view management of the node current status:
+
+-  For each consumer, all its supplier is displayed in the column "Supplier(s)" with the exact wattage for each supplier.
+-  Similarly, for each producer, all its supplied consumer is displayed in the column "Client(s)" with the exact wattage for each consumer.
+The filter at the top left displays producers or consumers belonging to a category. A â€œMulti-nodeâ€� option lets you include prosumers from neighbouring nodes.
+Manual modification operations:
+-  add a new producer or consumer twin.
+-  modify an existing prosumer twin (via the button "modify")
+-  stop an existing prosumer twin (via the button "stop")
+-  restart an existing prosumer twin that has been stopped.
+
+Node current snapshot:
+
+
+
+Display of the node history:
+
+Node history (see figure 62): displays in table form the chronology of the node state and of all events that have occurred on the node. The table 63 displays the taxonomy of the different events.
+
+It should be noted that a history line corresponds to the state of the node at a given moment: at that moment, there may be a single event, several events or no events at all: in the latter case, it's a simple refresh performed by the learning twin (hence the â€œRefreshâ€� mentioned in grey, in the â€œEvent typeâ€� column).
+
+The node status contains the following variables: total wattage requested, produced, supplied, consumed, missing and available, as well as the list of unsatisfied requests, the list of requests â€œin warningâ€� (i.e. unsatisfied where as they can be supplied).
+
+
+
+Table of node history. :
+
+
+This table can be used to investigate unsatisfied demands that have been put on â€œalertâ€�, as it allows to visualise in detail everything that has happened. As shown in figure 64 , we can display the offers of energy that have been issued between different historical refresh times.
+
+
+Display of offers on the right column. :
+
+A filter in the top left-hand corner allows to display only events concerning a particular prosumer.
+
+As represented in figure 65, a graphical display shows the evolution of each variable of the node's status over time. It is generated using the d3js library.
+
+
+Graph of node history. :
+
+At the top of the graph, the cumulative and maximum duration of requests â€œon alertâ€� is displayed, as well as the total KWH produced and the ratio of KWH â€œon alertâ€� (KWH requested and not served when availability was sufficient at node level).
+
+
+Display of the learning model weights:
+
+The instantaneous content of the set of learning model matrices. According to the model used, it can either be Markov chain transition matrices or LSTM Neural Network matrices (see figure 66).
+-  Regarding Markov Chains, there is one matrix per time slot and per component of the node state. Each matrix contains the probabilities of each possible transition from a start state to an end state.
+-  Regarding LSTM, there is one matrix per layer and parameter type : w, b or u.
+
+redTODO : display LSTM matrices
+
+Display of Marckov Chains transition matrices:
+
+
+Display of prediction accuracy statistics:
+
+
+The statistics page provides evaluations of the prediction model used, either at node level or at cluster level, depending on whether or not the latter two are enabled in the node configuration parameters. It displays the accuracy obtained on all the predictions generated by the digital learning twin, through its learning model (see figure 67). To do this, the predicted states are compared with the observed states on the horizon (for each prediction recorded in the database, the observed state is then updated at horizon, making it possible to evaluate the difference between predicted and observed states). For each of the 6 electrical power variables, these results are aggregated by time slot of each day, so as to highlight the accuracy by period). The top filter also allows to merge (or not) results by horizon and by time slot.
+The total line displays the result obtained by aggregating all filtered predictions.
+In addition, Shannon entropy and Gini index are evaluated over the same period: the results are displayed in the 2 corresponding columns. This makes it possible to verify whether or not there is a strong correlation between the entropy of the data to be predicted and the drop in accuracy of the prediction model, during the same time slot. For example, the entropy of the power produced by photovoltaic panels is at its highest during the middle of the day: this means that volatility is particularly high during these hours, making it more difficult to predict the electrical state.
+Note that the difference is calculated in two different ways:
+-  either as a single scalar, by comparing the predicted and observed states per prediction
+-  either as a vector, by comparing the actual distribution of the different states over the corresponding period, with the average of the probabilities obtained for each state, at the same period. This evaluation is more relevant when the learning model returns probabilistic vectors, such as Markov Chains.
+
+Display of predictions statistics:
+
+Functionality to generate predictions from a previous moment:
+
+A test function has been implemented to replay predictions, either individually, starting from a single instant (see figure 68), or serially (see figure 69), starting from different instants of an entire time slot. The learning twin then generates these predictions on demand, evaluates the difference from the actual state on the horizon (unless the moment on the horizon has not passed) and returns the set of results obtained for each prediction.
+This feature can be used, for example, to check the impact of variations in prediction model weights over time on the model's performance, by replaying the same prediction each time, from the same points in time and with the same horizons.
+In a similar way to the static display, the result shows the predicted states as well as the accuracy obtained, for each prediction separately, and in the last line, aggregated over the whole series. The entropy of the corresponding time slices is also displayed.
+
+Unitary prediction generation:
+
+
+Generation of a prediction series over an entire time slot:
+
+Real-time verification of learning model aggregation:
+
+As shown in figure 70, a display function has been implemented to visualise the result of the last aggregation that has been applied to learning model: it shows the respective weights assigned to each node in the last weight aggregation calculation. In this example, the weights of each node are aggregated, based on the â€œdist\_power\_histâ€� aggregator shown above. This aggregator is based on the â€œpower profileâ€� distance between nodes (which is based on the history of the power variable to be predicted). In the case where the learning twin applies an aggregation to both training models (i.e. node-level prediction only and cluster-level prediction), it is possible to select each of the two perimeters (nodes or cluster). In the filter, it is also possible to select any time slot and any power variable.
+
+learning model aggregation:
+
+
+Adaptations made to the coordination platform service to reduce memory usage:
+
+For recall the CLEMAP device is an augmented and enhanced Raspberry. Since we are running several independent services on the same Edge device (See Figure 71 , it was necessary to undertake a number of tasks to reduce the memory consumption of the coordination platform, which totalled over 300 megabytes.
+
+
+
+Monitoring of used memory:
+
+Firstly, we have monitored the memory usage by the coordination platform, to detect memory leaks or identify excess memory consumption.
+For this, we used the Visual VM tool which enables real-time monitoring of memory consumption by each instance of the coordination platform. This tool makes it possible to monitor consumption for several hours at the level of each Java class of the application. Consumption is then logged and displayed on a graph. Following various simulations, several memory leaks were identified in the coordination platform (see figure 72). Thanks to these leak detections, we continued investigations and made the necessary fixes to various locations in the application to resolve these leak problems. After each patch, we re-monitored memory consumption with Visual\-VM and ensured that memory leaks disappeared.
+
+Detecting Memory Leaks Using Visual VM. :
+
+The instantaneous consumption appears in blue, and the space allocated by the VM appears in orange. In this screenshot, we can notice that the allocated space increases significantly over time and never decreases, which shows the existence of leaks.
+
+Replacement of spring-boot server by a lighter server:
+
+The coordination platform includes a REST server that receives creation, modification and deletion requests from the various consumers and producers. This server uses Spring-Boot technology, which provides many features to facilitate web application development, but its memory consumption is not suitable for an environment with limited memory space, such as a Raspberry Pi. To reduce memory consumption, we replaced spring-boor with a more basic Rest server that uses the java library com.sun.net.httpserver.HttpServer.
+
+Replacement of MariaDB & MongoDB by SQLite3:
+
+The coordination platform used initially 2 different databases:
+-  a MariaDB database to store the history of electricity requests and exchanges
+-  a MongoDB database to store the configuration
+As both of these database servers consume a lot of memory and are not suitable for an environment with limited memory capacity, we have replaced them with an SQLite-type database: the latter offers fewer functions but is better suited to this type of environment as it only uses a file to store data and does not require a server. This saves disk space and memory and makes deployment easier. We undertook the migration in 2 stages:
+-  Merge the two existing databases into MariaDB so that all data and queries are stored in a single database. As the MongoDB database contains far less data and queries, we transferred the data and queries to the MariaDB database.
+-  Replacing MariaDB with an SQLite3 database. This part of the migration was the most time-consuming, given that the functionalities offered by SQLite are fairly limited. For example, we had to replace SQL functions and stored procedures (which are not accepted in SQLite) with processing to be carried out in the calling code. In addition, most of the queries have been revised, due to the differences in SQL syntax between MariaDB and SQLite.
+
+
+Deactivation of functionalities not used (prediction, quality of service):
+
+In the version of the coordination platform used for the Raspberry-pi edge device, predictions are already calculated by the prediction service and the results of the predictions are retrieved from that service: as a result, the coordination platform does not need to calculate the predictions by itself; this latter feature tends to use up a significant amount of memory and processing time; we therefore added an option to disable prediction using a configuration parameter in the coordination platform. This allowed us to reduce memory space in the Raspberry Pi version. Similarly, we have disabled the quality-of-service assessment functionality, which is based on reinforcement learning to help assess the usefulness of different services created on the fly. This functionality is not used in the Lasagne project.
+
+Results:
+
+As shown in table 73, tests on a 4-nodes configuration have confirmed a significant reduction in the amount of memory used after the application of updates on the coordination platform.
+
+
+Comparison of memory usage and heap size (in megabytes), before and after corrections, running 4 instances of the coordination platform in a 4-node chain topology. These simulations were carried out with the prediction feature disabled.:
+
+
+
+
+
+
+
+Monitoring of memory leaks after corrections. :
+
+As part of the "Energy Data Hack Day 2023" challenge (Foot note: https://energydatahackdays.ch/english), we have developed a version of the coordination platform that can run on an environment similar to that of a raspberry3 and that can communicate with the forecasting service to retrieve the results of energy production and consumption predictions. We generated a Docker image of the coordination platform and deployed and ran the platform on a VM environment with characteristics similar to that of a Raspberry Pi3.
+
+
+
+
+
+
+
+
+
+
+
+
+Design and Implementation of Gossip coordination mechanisms to ensure
+Decentralised Learning through the coordination platform:
+Integration of the Gossip mechanism into the coordination middleware:
+
+Implementation of the aggregation mechanism.:
+
+We were inspired by a previous implementation of the coordination law of aggregation, which applied an aggregation on an LSA directly and not on a particular property of the LSA (therefore, all the LSAs to be aggregated were deleted and replaced by the LSA resulting from the aggregation, which had the result of deleting all prosumer agents concerned.
+Furthermore, it was not possible to define the aggregator outside the middleware library and the aggregation functions only applied to simple objects like numbers, strings or dates. These are "standard" aggregators, like the min/max or average function.
+In addition to this, the need arose to have to perform aggregations on several different properties of the same LSA (i.e. several different aggregators attached to the LSA).
+The aggregation mechanism has therefore been completely overhauled, so that it can be applied to any LSA properties and provide a degree of flexibility.
+
+Definition of the synthetic property of aggregation
+
+-  the LSA property on which the aggregation is based
+-  the name of the aggregator, knowing that several possible aggregation operators can be defined in the class of the object to aggregate.
+-  the type of aggregator: standard or custom. Standard aggregators are defined "hard" in the middleware library code (those that were previously defined and apply to elementary types), while the custom aggregator must be defined in the class of the object to be aggregated: the class in question must then implement the $IAggregateable$ interface and in particular the method that performs the aggregation. This last method also takes the name of aggregator, which gives the possibility of defining several variants of an aggregator applied to a class. In this way, we can define any particular aggregator outside the coordination middleware library: the aggregation eco-law is limited to applying the aggregation method on all the properties to be aggregated.
+
+Modelling and implementation of a generic aggregator:
+
+We created a new aggregator template called a "customised" aggregator that can be applied to a specific class that is defined in the upper layer (the coordination platformed service). We use polymorphism to move the definition of the aggregator code into the upper-level class, which must implement the IAggregatable interface. The general principle is to make the general aggregation mechanism (defined in the coordination model middleware) independent of the definition of the aggregation function, located in the calling code, i.e. in the class of objects that we wish to aggregate, with the possibility of defining several different variants (one for each operator to be defined in the calling code).
+
+The general aggregation mechanism:
+
+The aggregation eco-law receives as a parameter the list of LSAs whose properties are to be aggregated (or not, depending on the content of the â€œAGGREGATIONâ€� synthetic property).
+-  it retrieves the objects to be aggregated: these are the values of the LSA property corresponding to the specified property name (we check that each object has not already been aggregated)
+-  if the â€œall nodesâ€� option is enabled, it checks that the list of objects is received from all neighbouring nodes (direct and indirect neighbours).
+-  it invokes the aggregator of the highest-level class, sending as arguments the objects to be aggregated and the name of the aggregator
+-  it then retrieves the object resulting from the aggregation and updates the result in the new LSA property, whose name corresponds to the property of the object to be aggregated, followed by a suffix (\_AGGR): this ensures that the initial object is not overwritten. The date of aggregation is recorded in the result object, so that future aggregations can be delayed if necessary.
+
+This mechanism therefore allows to apply aggregation on any object class, and on several different properties of an LSA. In the context of this contribution on Gossip learning, it will be a question of aggregating objects comprising all the weights of a learning model as well as objects grouping the different data of the state of the node.
+
+Using of Gossip for Decentralised Federated Learning:
+Template of a generic learning model that can be aggregated
+
+Definition of several aggregation functions
+
+Implementation of a compression mechanisms to reduce memory used by model data in tuple space
+
+Implementation for two specific learning models : Markov Chains and LSTM
+
+
+Using of Gossip for Decentralised Ensemble Learning:
+Design and Implementation of a prediction data structure that can be aggregated
+
+Implementation for Markov Chains and LSTM
+
+
+Results:
+
+Design and implementation of algorithms to integrate social acceptance by design:
+
+Protection of personal data:
+
+To meet social acceptance criteria, we apply confidentiality rules to the data exchanged in the tuple space: personal information about a digital twin cannot be visible to its peers. For example, the different supplies made by a producer number A are not visible from another producer number B.
+
+These confidentiality rules apply to the various data exchanged such as requests, offers, contracts or producer confirmations: they consist in protecting each data submitted through a LSA individually. Access to "personal" properties is only permitted for the concerned digital twins.
+
+We use the notion of "wrapper" to protect access to sensitive objects (see figure 74). We therefore declare the sensitive object as a private attribute in a wrapper class which contains it, and which only manages access. More precisely, access is managed in a method of type "accessor" from the wrapper class, which requires the authentication of the requesting digital twin as a parameter.
+In this way, the access method checks whether the digital twin has correctly authenticated to the micro-grid and, if so, it determines the extent of visibility the digital twin has on the requested data.
+The method restricts the data to return, according to the obtained visibility and it sends a security exception if the digital twin has no access rights to the data.
+
+Protection of a "sensitive" object located in a LSA property:
+
+
+
+Tragedy of the common:
+
+The "tragedy of the commons" scenario corresponds to the case where the best individual decision for a given digital twin turns out to be the worst-case scenario for them as a group [84]. As an example, let's consider the charging of electrical vehicles (EV) at night when energy prices are less expensive, for instance between 11pm and 5am. Individually, it is a good policy to start charging the EV from 11pm onward. However, if everybody in a neighbourhood takes this same decision, this leads to a peak of energy consumption at 11pm.
+
+To experiment with such a scenario, we have defined a policy that encourages all digital twins to request electricity at the same time slot. In this way, we test the resilience of the digital twins by straining the available electricity resources. As an example, we have defined a pricing table with a minimum price set at the current time plus 1 minute, which encourages all digital twins to request a supply during the time window corresponding to the cheapest price (see the red box in figure 75). In our simulation, there are 10 consumers and a single producer, which can supply only 3 digital twins at the same time. As a result, 7 demands for electricity will remain unmet (see figure 76).
+
+Rates of electricity in kWh set by a producer. This staggered tariff is non-dynamic and identical for all consumers. It therefore encourages consumers to choose the same moment (t = 1 minute) when the energy rate is most attractive. The simulation of this tariff grid has made it possible to reproduce the scenario of the tragedy of the commons.:
+
+
+10 demands at the same time (10 x 10 Watts): the producer can meet only 3/10 of them.:
+
+
+To address this supply gap, a first alternative is to modify the pricing policy to consider the real-time demand. To do so, we have defined a price escalation factor that is a function of the remaining availability of the producer in watts (see figure 77). If the producer's availability decreases, the price increases in real time and the unserved consumers will then review their demand time slot. In this way, we can spread the demand of different consumers over time.
+
+Increase factor depending on the producer's remaining capacity. This factor makes pricing dynamic, considering the current increase in demand. The resulting rating encourages unserved consumers to defer their energy requests.:
+
+As shown in figure 78, when applying this indexed pricing policy to the previous example, the 7 unsatisfied digital twins then defer their requests to the next time slot. Of the remaining 7 requests, only 3 will become satisfied in the second slot, and similarly the 4 remaining unfulfilled digital twins will defer their requests to the next slot. Thus, the next 3 requests will become satisfied in the third time slot, and the last one will become satisfied in the fourth time slot.
+
+Historical view of the alternative scenario: staggered requests over time.:
+
+
+We should note that, at present, digital twins are not yet able to reduce the power demand when the overall supply is insufficient at time $t$. This last solution would be preferable to cater for all digital twins in a more equitable manner.
+
+
+Tracking of Free-riding behaviours:
+
+redTODO : to be completed/corrected
+
+Evaluation of prosumer behaviour:
+
+We have identified the different criteria that allow us to identify the relevant behaviours at the scale of a micro-grid. To do this, we will define different metrics to evaluate the degree of contribution of participants in a smart grid community --all prosumers shall consider this degree in the decision-making process to prioritise the energy distribution. We will align our algorithms on sociological studies made in the framework of the LASAGNE project [85]. For example, if a prosumer digital twin has an individualistic behaviour, such as profiting from other digital twins without contributing to the community, all other digital twins of the micro-grid will rate that digital twin with a low score. As a result, the "profiting" digital twin will penalised : according to the policy applied, it will be either excluded as a requester of energy, or its have to face ton an import rise in price per KWH, or it become less of a priority as a potential consumer.
+This modelling draws inspiration from work on the detection and treatment of "free riding" behaviours in peer-to-peer file exchange networks [86].
+
+redTODO: the award score of a prosumer with has been evaluated by the regulator twin.
+
+Different criteria of evaluation:
+-  Ability to save energy : avoid excessive consumption in relation to current availability at the node level.
+-  Level of altruism: distribution of energy surplus to prosumers in the community, when the surplus exceeds a certain threshold
+-  Equity in distribution (for the same level of award):
+disparity in requests responding by â€œclientâ€� prosumers ratio of served request response time
+-  Ratio of "green energy" consumption
+
+
+Setting up decision criteria at microgrid community level:
+
+redTODO : to be completed. the aim is to prevent free-riding behavior in the community, by discriminating or disadvantaging prosumers with penalties (e.g. negative rewards) in the decision-making process.
+
+Setting up decision criteria specific to each prosumer:
+
+redTODO : We have therefore defined a utility function that can appreciate a demand according to the different components. Each prosumer twin will thus consider the computed rating in decision-making algorithms, as, to rank the requests to serve first or the offers to process first.
+
+
+
+Results:
+
+
+To complete .....:
+
+
+Results:
+
+
+
+
+Exchange of electricity:
 
 Conclusion:
 
-In this paper, we have reviewed three areas of research that we consider essential to the design of a smart grid infrastructure based on coordination models. We therefore focused on the following 3 areas: coordination models, Multi-agents systems and machine learning applied to energy. Coordination models have reached an advanced level of maturity in terms of research and use interesting concepts borrowed from biology, chemistry and physics. To date, even if some power-grid applications use bio-inspired coordination model, no bio-chemical model has yet been used in smart grid infrastructure.
-Multi-agents systems have reached a more advanced level of maturity, and Multi-agents Systems applications in the smart grids field have developed considerably since the 2000s: there is a wide variety of architectures, and some applications use frameworks such as JADE to facilitate agent integration. Few applications use the much more recent concept of Digital Twin.
-As far as automatic learning techniques are concerned, a number of algorithms have been explored for predicting electrical behaviours. Depending on the specific use, the most popular models seem to vary, but they are all well suited to highly volatile time series.
-A number of approaches use frameworks to distribute the model calculations performed by the various nodes. The vast majority of applications use 'centralised' federated learning, and the decentralised 'gossip' approach is still marginal in the field of smart grids, although some applications of gossip learning are beginning to appear for the management of electric vehicles.
-This review of the state of the art suggests that the different areas of research we are exploring correspond to contrasting levels of maturity in the implementation of smart grids. Multi-agents systems as well as Machine Learning techniques are used almost systematically, and coordination models as well as collaborative and decentralised ML frameworks are still in their infancy in the fields of smart grids, although they are used for other areas of application.
-According to the general overview of selected smart grid implementations, no approach has yet combined coordination models, Multi-agents systems, digital twins, machine learning techniques and machine learning distribution frameworks. Therefore, it would be interesting to experiment with a smart grid implementation combining these different domains. Each of these research areas could bring a potential gain.
+Appendix:
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+Tables:
+
+
+Definition of Markov states:
+
+Definition of Markov states for the node prediction model. This division into states includes 5 steps of 20% from 0 to the maximum power threshold, noted "THRESHOLD". We also define 2 additional states: one for value 0 Watts and one for values beyond the threshold. For example, it can be set to 10,000 Watts for one node and 50,000 Watts for another node.:
+
+
+
+Formulas:
+Maximal response over the total duration of a test:
+
+
+The maximum response time is the maximum of the maximum response rates obtained on all requests for electricity (computed in79).
+
+
+Maximal response time for a given request:
+
+
+For each request, the requestResponseTime function evaluates the maximum response time for a given request: it corresponds to the time elapsed at the first moment when the request started to be satisfied.
+
+
+
+
+
+Failure rate:
+
+
+The failure rate is the total energy requested and not provided divided by the total energy requested. To compute the total energy, we decompose the total period into elementary time slots in which we retrieve all corresponding requests statuses (see historyEvent element called $hReq$ in the formula). On each elementary request, the energy requested is equal to the power requested multiplied by the elementary duration.
+
+algorithms:
+Treatment of the consumer digital twin:
+
+
+
+
 
