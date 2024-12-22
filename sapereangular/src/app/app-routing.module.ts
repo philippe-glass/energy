@@ -6,7 +6,6 @@ import { AboutComponent } from './about/about.component';
 import { AddserviceComponent } from './addservice/addservice.component';
 import { LoginComponent } from './login/login.component';
 import { LocalservicesComponent } from './localservices/localservices.component';
-import { OldConfigComponent } from './oldconfig/oldconfig.component';
 import { ConfigComponent } from './config/config.component';
 import { LsasComponent } from './lsas/lsas.component';
 import { SimulationComponent } from './simulation/simulation.component';
@@ -26,7 +25,6 @@ const routes: Routes = [
     { path: 'localservices', component: LocalservicesComponent },
     { path: 'logout', component: LoginComponent},
     { path: 'lsas', component: LsasComponent},
-    { path: 'oldconfig', component: OldConfigComponent},
     { path: 'config', component: ConfigComponent},
     { path: 'simulation', component: SimulationComponent},
     { path: 'sgcurrent', component: SGCurrentComponent},

@@ -138,15 +138,21 @@ export function formatDate(date) {
       return result;
   }
 
-  export function formatTimeWindow(nodeTransitionMatrices) {
-    var timeWindow = nodeTransitionMatrices.timeWindow;
+  export function aux_formatTimeWindow(timeWindow) {
     //console.log("formatTimeWindow : timeWindow = ", timeWindow);
     var startDate = new Date(timeWindow.startDate);
     var endDate =  new Date(timeWindow.endDate);
     //console.log("formatTimeWindow : startHour = ", timeWindow.startHour);
-    var sTimeWindow = formatTime(startDate) + "-" + formatTime(endDate);
-    sTimeWindow = timeWindow.startHour + "-" + timeWindow.endHour;
+    var sTimeWindow = ""+ formatTime(startDate) + "-" + formatTime(endDate);
+    sTimeWindow = (timeWindow.startHour < 10 ? "0" : "") + timeWindow.startHour
+      + "-"+ (timeWindow.endHour < 10 ? "0" : "") + timeWindow.endHour;
     return sTimeWindow;
+  }
+
+
+  export function formatTimeWindow(nodeTransitionMatrices) {
+    var timeWindow = nodeTransitionMatrices.featuresKey.timeWindow;
+    return aux_formatTimeWindow(timeWindow);
   }
 
   export function getDefaultTime() {

@@ -48,7 +48,23 @@
         </fieldset>
     </form>
 
+<div *ngIf="nodeContent.nodeContext !=null">
+    <label>Node: <b>{{this.nodeContent.nodeContext.nodeLocation.name}}</b></label>
+    <label>, Scenario: <b>{{this.nodeContent.nodeContext.scenario}}</b></label>
+    <label>, Time shift (day): <b>{{fnum2(this.nodeContent.nodeContext.timeShiftMS/(1000*3600*24))}}</b></label>
+    <label>, Max Power: <b>{{this.nodeContent.nodeContext.maxTotalPower}} W</b></label>
+    <label>, Aaggregations activated: <b>{{this.nodeContent.nodeContext.aggregationsActivated?"yes":"no"}}</b></label>
+    <br/>Current date: <b>{{this.nodeContent.currentDate.substring(0,10)}}</b>, time : <b>{{this.nodeContent.currentDate.substring(11,19)}}</b>
+    <!-- 
+    <br/>
+    <label>direct neighbours:</label>
+    <label *ngFor="let nodeLocation of nodeContent.nodeContext.neighbourNodeLocations"> {{nodeLocation.name}}</label>
+    -->
+    <br>
+    <label>neighbours:</label>
+    <label *ngFor="let key_val of nodeContent.mapNodeDistance | keyvalue">{{key_val.key}} (distance:{{key_val.value}}),&nbsp;</label>
 
+</div>
 
 <table class="table table-hover">
     <thead>
@@ -109,7 +125,7 @@
         <ng-container *ngIf="this.filter.multiNodes">
             <td class="">{{consumer.location==null? "null" : consumer.location.name}}</td>
         </ng-container>
-        <td class="{{(consumer.priorityLevel=='High' && !consumer.hasExpired)?'warning_medium':'' }}">{{consumer.priorityLevel}}</td>
+        <td class="{{(consumer.priorityLevel=='HIGH' && !consumer.hasExpired)?'warning_medium':'' }}">{{auxGetLabel(consumer.priorityLevel, listPriorityLevel)}}</td>
         <td>
             <span id="txt_beginTime_{{consumer.agentName}}">{{consumer.beginDate| date:'HH:mm:ss'}}</span>
             <input size="3" type="text"  class="form-text hide" id="beginTime_{{consumer.agentName}}"  name="beginTime_{{consumer.agentName}}"  [(ngModel)]="tab_agents.beginTime[consumer.agentName]">
@@ -136,7 +152,7 @@
             <input size="5" type="text"  class="form-text hide" id="sensorNumber{{consumer.agentName}}"  name="sensorNumber_{{consumer.agentName}}"  [(ngModel)]="tab_agents.sensorNumber[consumer.agentName]">
         </td>
         <td>
-            <span id="txt_deviceCategory_{{consumer.agentName}}">{{consumer.deviceCategory.label}}</span>
+            <span id="txt_deviceCategory_{{consumer.agentName}}">{{auxGetLabel(consumer.deviceCategory, listDeviceCategoryConsumer)}}</span>
             <input size="5" type="text"  class="form-text hide" id="deviceCategory_{{consumer.agentName}}"  name="deviceCategory_{{consumer.agentName}}"  [(ngModel)]="tab_agents.deviceCategory[consumer.agentName]">
         </td>
         <td  class="num">
@@ -246,7 +262,7 @@
             <input size="5" type="text"  class="form-text hide" id="sensorNumber{{producer.agentName}}"  name="sensorNumber_{{producer.agentName}}"  [(ngModel)]="tab_agents.sensorNumber[producer.agentName]">
         </td>
         <td>
-            <span id="txt_deviceCategory_{{producer.agentName}}">{{producer.deviceCategory.label}}</span>
+            <span id="txt_deviceCategory_{{producer.agentName}}">{{auxGetLabel(producer.deviceCategory, listDeviceCategoryProducer)}}</span>
             <input size="5" type="text"  class="form-text hide" id="txt_deviceCategory_{{producer.agentName}}"  name="deviceCategory_{{producer.agentName}}"  [(ngModel)]="tab_agents.deviceName[producer.agentName]">
         </td>
         <td  class="num">
@@ -285,9 +301,9 @@
         <legend>Add agent</legend>
         <div class="form-group">
             <label>Type :
-                <select [(ngModel)]="agentInputForm.agentType.value"  name="agentInputForm.agentType.value"   (ngModelChange)="changeAgentType($event);"
+                <select [(ngModel)]="agentInputForm.prosumerRole"  name="agentInputForm.prosumerRole"   (ngModelChange)="changeProsumerRole($event);"
                     (_ngOnChanges2)="toogleDisplay('span_listDeviceCategoryConsumer');" >
-                    <option *ngFor="let agentType of listAgentType" [value]="agentType.value">{{agentType.label}}</option>
+                    <option *ngFor="let item of listProsumerRole" [value]="item.value">{{item.label}}</option>
                 </select>
             </label>
             <label>Start time:<input size="5" type="text"  class="form-text" name="agentInputForm.beginTime"  [(ngModel)]="agentInputForm.beginTime"></label>
@@ -308,7 +324,7 @@
             <!-- categories of consumers -->
             <span id="span_listDeviceCategoryConsumer" class="display_none" >
                 <label> (Category) :
-                    <select [(ngModel)]="agentInputForm.deviceCategory.value"  name="agentInputForm.deviceCategory.value"    >
+                    <select [(ngModel)]="agentInputForm.deviceCategory"  name="agentInputForm.deviceCategory"    >
                         <option *ngFor="let category of listDeviceCategoryConsumer" [value]="category.value">{{category.label}}</option>
                     </select>
                 </label>
@@ -316,7 +332,7 @@
             <!-- categories of producers -->
             <span id="span_llistDeviceCategoryProducer" class="display_none" >
                 <label> (Category) :
-                    <select [(ngModel)]="agentInputForm.deviceCategory.value"  name="agentInputForm.deviceCategory.value"    >
+                    <select [(ngModel)]="agentInputForm.deviceCategory"  name="agentInputForm.deviceCategory"    >
                         <option *ngFor="let category of listDeviceCategoryProducer" [value]="category.value">{{category.label}}</option>
                     </select>
                 </label>
@@ -324,9 +340,9 @@
             <span id="span_priority" class="display_none" >
                 <label>Priority :
                     <select [(ngModel)]="agentInputForm.priorityLevel"  name="agentInputForm.priorityLevel"     >
-                        <option value="Low">Low</option>
-                        <option value="Medium">Medium</option>
-                        <option value="High">High </option>
+                        <option value="LOW">Low</option>
+                        <option value="MEDIUM">Medium</option>
+                        <option value="HIGH">High </option>
                     </select>
                 </label>
             </span>

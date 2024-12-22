@@ -16,7 +16,6 @@ import { ConstantsService } from './common/services/constants.service';
 import { LoginComponent } from './login/login.component';
 import { HeaderComponent } from './header/header.component';
 import { LocalservicesComponent } from './localservices/localservices.component';
-import { OldConfigComponent } from './oldconfig/oldconfig.component';
 import { ConfigComponent } from './config/config.component';
 import { LsasComponent } from './lsas/lsas.component';
 import { SimulationComponent } from './simulation/simulation.component';
@@ -37,7 +36,6 @@ import { ForcastingComponent } from './forcasting/forcasting.component';
     LoginComponent,
     HeaderComponent,
     LocalservicesComponent,
-    OldConfigComponent,
     ConfigComponent,
     LsasComponent,
     SimulationComponent,

@@ -32,9 +32,9 @@ export class SGCurrentComponent implements OnInit {
     }
   // Form of consumer/producer creation
   agentInputForm = {
-      "beginDate" :new Date(),"beginTime" :getDefaultTime() ,"endDate" :new Date() ,"endTime" :getDefaultTime()
-      ,"power" :0  ,"duration" :0  ,"delayToleranceMinutes" :0 , "delayToleranceRatio":0  ,"priorityLevel" :"Low"   ,"deviceName" :""  ,"deviceCategory" :{"value":null}
-      ,"agentType":{"value":null},  "environmentalImpact": 3
+      "beginDate" :"","beginTime" :getDefaultTime() ,"endDate" :"" ,"endTime" :getDefaultTime()
+      ,"power" :0  ,"duration" :0  ,"delayToleranceMinutes" :0 , "delayToleranceRatio":0  ,"priorityLevel" :"LOW"   ,"deviceName" :""  ,"deviceCategory" :null
+      ,"prosumerRole":"",  "environmentalImpact": "MEDIUM"
     };
 
   tab_agents = {
@@ -49,7 +49,7 @@ export class SGCurrentComponent implements OnInit {
     ,"delayToleranceRatio":{}
   }
 
-  listAgentType = [];
+  listProsumerRole = [];
   listPriorityLevel = [];
   listDeviceCategoryProducer = [];
   listDeviceCategoryConsumer = [];
@@ -89,8 +89,8 @@ export class SGCurrentComponent implements OnInit {
         this.listPriorityLevel = this.nodeContent['listPriorityLevel'];
         this.listDeviceCategoryProducer = this.nodeContent['listDeviceCategoryProducer'];
         this.listDeviceCategoryConsumer = this.nodeContent['listDeviceCategoryConsumer'];
-        this.listAgentType = this.nodeContent['listAgentType'];
-        this.defaultNodeLocation = this.nodeContent['nodeConfig'];
+        this.listProsumerRole = this.nodeContent['listProsumerRole'];
+        this.defaultNodeLocation = this.nodeContent['nodeContext']['nodeLocation'];
         this.mapNeighborNodes = this.nodeContent['mapNeighborNodes'];
         console.log("refreshNodeContent : mapNeighborNodes = ", this.mapNeighborNodes);
         console.log('refreshNodeContent : listDeviceCategoryProducer:', this.listDeviceCategoryProducer, serviceUrl);
@@ -172,10 +172,16 @@ export class SGCurrentComponent implements OnInit {
     if(consumer.hasExpired || consumer.isDisabled)  {
       return "";
     } else if(consumer.missingPower > 0.001) {
+        var demandedPower = (consumer.energyRequest == null) ? 0.0 : consumer.energyRequest.power;
+        console.log("getTxtClassConsumer demandedPower = ", demandedPower)
+        if(consumer.missingPower < 0.25 * demandedPower) {
+          return 'txt_warning_medium';
+        }
         return 'txt_warning_high';
-    } else {
+    } else if(consumer.power > 0.001) {
       return 'txt_ok';
     }
+    return "";
   }
 
   getClassMissing(consumer, available) {
@@ -244,11 +250,16 @@ export class SGCurrentComponent implements OnInit {
   }
 
 addAgent() {
-  this.agentInputForm.beginDate = timeHMtoDate(this.agentInputForm.beginTime);
-  this.agentInputForm.endDate = timeHMtoDate(this.agentInputForm.endTime);
-  this.agentInputForm.environmentalImpact = 2;
+  console.log("addAgent : beginDate1 = " + this.agentInputForm.beginDate);
+  //this.agentInputForm.beginDate = timeHMtoDate(this.agentInputForm.beginTime);
+  //this.agentInputForm.endDate = timeHMtoDate(this.agentInputForm.endTime);
+
+  this.agentInputForm["beginDate"] = this.generate_json_date(this.agentInputForm.beginTime);
+  this.agentInputForm["endDate"] = this.generate_json_date(this.agentInputForm.endTime);
+  console.log("addAgent : endDate = " + this.agentInputForm["endDate"]);
+  this.agentInputForm.environmentalImpact = "LOW";
   if(this.agentInputForm.deviceCategory.value == 'EXTERNAL_ENG') {
-    this.agentInputForm.environmentalImpact = 3;
+    this.agentInputForm.environmentalImpact = "MEDIUM";
   }
   console.log("addAgent", this.agentInputForm.beginTime, this.agentInputForm.beginDate);
   console.log("addAgent : agentInputForm=",  this.agentInputForm );
@@ -368,12 +379,9 @@ save_agent(agent) {
     agent.delayToleranceRatio = 0;
   }
 
-  var agentType = agent.agentType;
-  if (typeof agentType === 'string') {
-    agent.agentType = {"value":agentType}
-  }
+  var prosumerRole = agent.prosumerRole;
   if(agent.power>0)  {
-    console.log("save_agent : targetAction = ", this.targetAction, "endDate=", agent.endDate, "agentType = ", agent.agentType);
+    console.log("save_agent : targetAction = ", this.targetAction, "endDate=", agent.endDate, "prosumerRole = ", agent.prosumerRole);
     if(this.targetAction == 'restartAgent') {
       this.httpClient.post(this._constant.baseAppUrl+'energy/restartAgent', agent , { responseType: 'text' }).
         subscribe(res => {
@@ -418,13 +426,13 @@ stop_agent(agent) {
   }
 
 setAgentEndTime(event) {
-    console.log("set_consumer_endTime", event, event.target.power);
-    this.agentInputForm.beginDate = timeHMtoDate(this.agentInputForm.beginTime);
-    this.agentInputForm.endDate = this.agentInputForm.beginDate;
-    this.agentInputForm.endDate.setTime(this.agentInputForm.beginDate.getTime() + 60 * this.agentInputForm.duration * 1000 );
-    this.agentInputForm.endTime = formatTime(this.agentInputForm.endDate);
+    console.log("setAgentEndTime", event, event.target.power, this.agentInputForm.beginTime);
+    var endDate = timeHMtoDate(this.agentInputForm.beginTime);
+    console.log("setAgentEndTime endDate = ", endDate);
+    endDate.setTime(endDate.getTime() + 60 * this.agentInputForm.duration * 1000 );
+    this.agentInputForm.endTime = formatTime(endDate);
     this.agentInputForm.delayToleranceMinutes = this.agentInputForm.duration;
-    console.log("set_consumer_endTime", this.agentInputForm.beginDate.getTime(), this.agentInputForm.beginTime, this.agentInputForm.duration, this.agentInputForm.endTime);
+    //console.log("set_consumer_endTime", this.agentInputForm.beginDate.getTime(), this.agentInputForm.beginTime, this.agentInputForm.duration, this.agentInputForm.endTime);
   }
 
   toogleDisplay(spanId) {
@@ -432,19 +440,42 @@ setAgentEndTime(event) {
   }
 
   getNodeLocationLabel(nodeLocation) {
-    var prefix = "neighbor"
+    var prefix = "neighbor";
     if(this.defaultNodeLocation["name"] == nodeLocation.name) {
       prefix = "home";
     }
     return prefix+" " + nodeLocation.name;
   }
 
-  changeAgentType(agentType) {
-    console.log("changeAgentType : agentType = ", agentType);
-    this.agentInputForm["deviceCategory"]["value"] = null;
+  auxGetLabel(value, listOptionItems) {
+    for (const optionItem of listOptionItems) {
+      if(optionItem["value"] == value) {
+        return optionItem["label"];
+      }
+    }
+    return value;
+  }
+
+  getDeviceCategoryLabel(deviceCategory) {
+    for (const categoryItem of this.listDeviceCategoryProducer) {
+      if(categoryItem["value"] == deviceCategory) {
+        return categoryItem["label"];
+      }
+    }
+    for (const categoryItem of this.listDeviceCategoryConsumer) {
+      if(categoryItem["value"] == deviceCategory) {
+        return categoryItem["label"];
+      }
+    }
+    return deviceCategory;
+  }
+
+  changeProsumerRole(prosumerRole) {
+    console.log("changeProsumerRole : prosumerRole = ", prosumerRole);
+    this.agentInputForm["deviceCategory"] = null;
     console.log(this.agentInputForm["deviceCategory"]);
-    var isProducer = (agentType=='PRODUCER');
-    var isComsumer = (agentType=='CONSUMER');
+    var isProducer = (prosumerRole=='PRODUCER');
+    var isComsumer = (prosumerRole=='CONSUMER');
     var oListDeviceCategoryConsumer = document.getElementById("span_listDeviceCategoryConsumer");
     if(oListDeviceCategoryConsumer != null) {
       oListDeviceCategoryConsumer.className = isComsumer ? "display_yes" : "display_none";

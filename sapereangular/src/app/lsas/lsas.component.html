@@ -16,13 +16,32 @@
                     <ul>
                         <li *ngFor="let property of lsaForm.propertyList">
                                <span class='data_label'> {{property.name}} : </span>
-                               <span class='data'> {{property.valueLine1}}
-                                    <DD *ngFor="let line of property.valueFollowingLines">{{line}}</DD>
+                               <span class='data'>
+                                    <span *ngFor="let line of property.valueLines; let idx = index">
+                                        <ng-container *ngIf="idx == 0">{{line}}</ng-container>
+                                        <ng-container *ngIf="idx > 0"><DD>{{line}}</DD></ng-container>
+                                    </span>
                                 </span>
-                                <span class='caption2'>#B:</span><span class='data'>{{property.bond}}  </span>
-                                <span class='caption2'>#Q:</span><span class='data'>{{property.query}}  </span>
-                                <span class='caption2'>#S:</span><span class='data'>{{property.state}}  </span>
-                                <span class='caption2'>#</span><span class='data'>{{property.chosen}} </span>
+                                <ng-container *ngIf="property.aggregatedValue != ''">
+                                    <span class='caption2'>#aggr:</span>
+                                    <span *ngFor="let line of property.aggregatedValueLines; let idx = index">
+                                        <ng-container *ngIf="idx == 0">{{line}}</ng-container>
+                                        <ng-container *ngIf="idx > 0"><DD>{{line}}</DD></ng-container>
+                                    </span>
+                                </ng-container>
+
+                                <ng-container *ngIf="property.bond != ''">
+                                    <span class='caption2'>#B:</span><span class='data'>{{property.bond}}</span>
+                                </ng-container>
+                                <ng-container *ngIf="property.query != ''">
+                                    <span class='caption2'>#Q:</span><span class='data'>{{property.query}}</span>
+                                </ng-container>
+                                <ng-container *ngIf="property.state != ''">
+                                    <span class='caption2'>#S:</span><span class='data'>{{property.state}}  </span>
+                                </ng-container>
+                                <ng-container *ngIf="property.chosen != false">
+                                    <span class='caption2'>#</span><span class='data'>{{property.chosen}} </span>
+                                </ng-container>
                         </li>
                     </ul>
                 </li>

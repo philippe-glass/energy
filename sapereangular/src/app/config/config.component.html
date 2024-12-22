@@ -2,22 +2,28 @@
 <div class="content">
     <form (ngSubmit)="updateNeighbours()">
         <div class="form-group">
-            <label>Name:<input class="form-text disabled" name="nodeConfig.name" [(ngModel)]="nodeConfig.name" size="4"></label>
+            <label>Name:<input class="form-text disabled" name="nodeLocation.name" [(ngModel)]="nodeLocation.name" size="4"></label>
             &nbsp;
-            <label>Host:<input class="form-text disabled" name="nodeConfig.host" [(ngModel)]="nodeConfig.host" size="10"></label>
+            <label>Host:<input class="form-text disabled" name="nodeLocation.host" [(ngModel)]="nodeLocation.host" size="10"></label>
             &nbsp;
-            <label>Main Port:<input class="form-text disabled" name="nodeConfig.mainPort" [(ngModel)]="nodeConfig.mainPort" size="4"></label>
+            <label>Main Port:<input class="form-text disabled" name="nodeLocation.mainPort" [(ngModel)]="nodeLocation.mainPort" size="4"></label>
             &nbsp;
-            <label>Rest Port:<input class="form-text disabled" name="nodeConfig.restPort" [(ngModel)]="nodeConfig.restPort" size="4"></label>
+            <label>Rest Port:<input class="form-text disabled" name="nodeLocation.restPort" [(ngModel)]="nodeLocation.restPort" size="4"></label>
             &nbsp;
-            <label>Neighbours:<input class="form-text disabled" name="neighbourNames" [(ngModel)]="neighbourNames" size="10"></label><br />
+            <label>Neighbours:<input class="form-text disabled" name="neighbourNodes" [(ngModel)]="neighbourNodes" size="10"></label><br />
         </div>
         <div class="form-group">
-            <label for="neighboursUpdateRequest.neighboursConfigId">update neighbours: </label>&nbsp;
-            <select [(ngModel)]="neighboursUpdateRequest.neighboursConfigId"  name="neighboursUpdateRequest.neighboursConfigId" multiple="true">
+            <label for="neighboursUpdateRequest.neighbourNodes">update neighbours: </label>&nbsp;
+            <select [(ngModel)]="neighboursUpdateRequest.neighbourNodes"  name="neighboursUpdateRequest.neighbourNodes" multiple="true">
                 <option  [value]=""> </option>
-                <option *ngFor="let nodeConfig of allNodeConfigs" [value]="nodeConfig.id">{{nodeConfig.name}} ({{nodeConfig.host}}:{{nodeConfig.mainPort}})</option>
+                <option *ngFor="let nodeLocation of allNodeLocations" [value]="nodeLocation.name">{{nodeLocation.name}} ({{nodeLocation.host}}:{{nodeLocation.mainPort}})</option>
             </select>
+            <!--
+            <select [(ngModel)]="test_list"  name="test_list" multiple="true">
+                <option  [value]=""> </option>
+                <option *ngFor="let nodeLocation of allNodeLocations" [value]="nodeLocation.name">{{nodeLocation.name}} ({{nodeLocation.host}}:{{nodeLocation.mainPort}})</option>
+            </select>
+            -->
         </div>
         <button class="btn btn-success" type="submit">Update</button>
     </form>
@@ -28,13 +34,13 @@
 <div class="content">
     <form (ngSubmit)="addConfig()">
         <div class="form-group">
-            <label>Name:<input class="form-text " name="nodeConfigToAdd.name" [(ngModel)]="nodeConfigToAdd.name" size="4"></label>
+            <label>Name:<input class="form-text " name="nodeLocationToAdd.name" [(ngModel)]="nodeLocationToAdd.name" size="4"></label>
             &nbsp;
-            <label>Host:<input class="form-text " name="nodeConfigToAdd.host" [(ngModel)]="nodeConfigToAdd.host" size="10"></label>
+            <label>Host:<input class="form-text " name="nodeLocationToAdd.host" [(ngModel)]="nodeLocationToAdd.host" size="10"></label>
             &nbsp;
-            <label>Main Port:<input class="form-text " name="nodeConfigToAdd.mainPort" [(ngModel)]="nodeConfigToAdd.mainPort" size="4"></label>
+            <label>Main Port:<input class="form-text " name="nodeLocationToAdd.mainPort" [(ngModel)]="nodeLocationToAdd.mainPort" size="4"></label>
             &nbsp;
-            <label>Rest Port:<input class="form-text " name="nodeConfigToAdd.restPort" [(ngModel)]="nodeConfigToAdd.restPort" size="4"></label>
+            <label>Rest Port:<input class="form-text " name="nodeLocationToAdd.restPort" [(ngModel)]="nodeLocationToAdd.restPort" size="4"></label>
             &nbsp;
             <button class="btn btn-success" type="submit">Create</button>
         </div>

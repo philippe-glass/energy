@@ -5,8 +5,16 @@
     <app-barchart *ngIf="chartData" [data]="chartData"></app-barchart>
     <div class="d3-chart" id="chart">
     </div>
-
 <br>
+<form (ngSubmit)="applyFilter()">
+  <label>Agent filter:
+    <select [(ngModel)]="filter.agentName"  name="filter.agentName">
+        <option  [value]=""> </option>
+        <option *ngFor="let agent of listAgents" [value]="agent">{{agent}}</option>
+    </select>
+  </label>
+  <button class="btn btn-success" type="submit">Reload</button>
+</form>
 <table class="table table-hover">
     <thead>
         <tr>
@@ -19,6 +27,7 @@
             <th>Variation</th>
             <th>(min)</th>
             <th>(max)</th>
+            <th>Rate</th>
             <th class=" next_bloc">Requested(W)</th>
             <th>Produced(W)</th>
             <th>Provided(W)</th>
@@ -56,7 +65,8 @@
           <td class="num">{{nodeTotal.event == null ? "" : fnum3(nodeTotal.event.power)}}</td>
           <td class="num">{{nodeTotal.event == null ? "" : fnum3_minus_plus(nodeTotal.event.powerUpdate)}}</td>
           <td class="num">{{nodeTotal.event == null ? "" : (nodeTotal.event.type == 'CONTRACT_UPDATE' ? fnum3_minus_plus(nodeTotal.event.powerMinUpdate) : "")}}</td>
-          <td class="num ">{{nodeTotal.event == null ? "" : (nodeTotal.event.type == 'CONTRACT_UPDATE' ? fnum3_minus_plus(nodeTotal.event.powerMaxUpdate) : "")}}</td>
+          <td class="num">{{nodeTotal.event == null ? "" : (nodeTotal.event.type == 'CONTRACT_UPDATE' ? fnum3_minus_plus(nodeTotal.event.powerMaxUpdate) : "")}}</td>
+          <td class="num">{{nodeTotal.event == null ? "" : fnum3(nodeTotal.event.firstRate)}}</td>
           <td *ngIf= "nodeTotal.rowspan > 0" [attr.rowspan]="nodeTotal.rowspan" class="num txt_requested next_bloc">{{fnum3(nodeTotal.requested)}}</td>
           <td *ngIf= "nodeTotal.rowspan > 0" [attr.rowspan]="nodeTotal.rowspan" class="num txt_produced">{{fnum3(nodeTotal.produced)}}</td>
           <td *ngIf= "nodeTotal.rowspan > 0" [attr.rowspan]="nodeTotal.rowspan" class="num txt_provided">{{fnum3(nodeTotal.provided)}}</td>

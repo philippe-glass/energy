@@ -1,5 +1,6 @@
 import { Component, OnInit, OnChanges, ViewChild, ElementRef, Input, ViewEncapsulation } from '@angular/core';
-import { HttpClient } from '@angular/common/http';
+import { HttpClient, HttpParams } from '@angular/common/http';
+
 import { ConstantsService } from '../common/services/constants.service';
 import * as shape from 'd3-shape';
 import * as d3 from 'd3';
@@ -59,9 +60,24 @@ export class SGHistoryComponent implements OnInit {
   private nbTicks = 100;
   maxDisplayTime = new Date();
   private captionYPos = [];
+  private listAgents = [];
+  private filter = {"agentName":""}
 
   constructor(private httpClient: HttpClient,private _constant: ConstantsService, public _chartElem: ElementRef) {
-    this.httpClient.get(this._constant.baseAppUrl+'energy/nodeTotalHistory').
+    this.chartContainer = _chartElem;
+    this.refreshHistory(true);
+    }
+
+  refreshHistory(isFirstLoad) {
+    //this.chartContainer.destroy();
+    //this.chartContainer.nativeElement.remove();
+    var serviceUrl = this._constant.baseAppUrl+'energy/nodeTotalHistory'
+    let filterParams = new HttpParams();
+    Object.entries(this.filter).forEach(([key, value]) => {
+      filterParams = filterParams.append(key,""+value);
+    });
+    console.log("refreshHistory : filterParams = ", filterParams);
+    this.httpClient.get(serviceUrl, { params: filterParams }).
       subscribe((res :any[])=> {
         this.nodeTotalHistory=res;
         console.log("this.httpClient.get : nodeTotalHistory = ", this.nodeTotalHistory );
@@ -72,6 +88,9 @@ export class SGHistoryComponent implements OnInit {
         this.dataProvided = [];
         this.dataConsumed = [];
         this.dataAvailable = [];
+        if(this.filter.agentName == "") {
+          this.listAgents = [];
+        }
         this.dataMinMissingRequest = [];
         this.minDate = null;
         this.maxWarningDuration = 0;
@@ -91,8 +110,16 @@ export class SGHistoryComponent implements OnInit {
               var rowspan = nbEvents;
               for(var idxEvent = 0; idxEvent < obj.linkedEvents.length; idxEvent++) {
                   var event =  obj.linkedEvents[idxEvent];
-                  //console.log("step1111 event = ", event, event.type);
+                  //console.log("step1111 event = ", event);
                   //var nextRow = copyNodeTotal(obj);
+                  if(this.filter.agentName == "") {
+                    //console.log("agentFilter=", this.filter.agentName)
+                    var agentName = event.issuer;
+                    if(!this.listAgents.includes(agentName)) {
+                      this.listAgents.push(agentName);
+                      //console.log("agentName = ", agentName, "listAgents = ", this.listAgents);
+                    }
+                  }
                   var nextRow = JSON.parse(JSON.stringify(obj));
                   nextRow['linkedEvents'] = null;
                   nextRow['event'] = event;
@@ -134,6 +161,9 @@ export class SGHistoryComponent implements OnInit {
           this.dataConsumed.push([date, obj.consumed]);
           var minRequestMissing = 0;
           if(obj.available > obj.minRequestMissing && obj.minRequestMissing > 0) {
+            minRequestMissing = obj.minRequestMissing;
+          }
+          if(this.filter.agentName != "" && obj.maxWarningDuration > 0 ) {
             minRequestMissing = obj.minRequestMissing;
           }
           this.dataMinMissingRequest.push([date, minRequestMissing]);
@@ -178,7 +208,9 @@ export class SGHistoryComponent implements OnInit {
           this.cumulativeWarningDuration+=listWarningDuration[i];
         }
         console.log("minDate", this.minDate, "maxDate", this.maxDate, this.maxDate.getTime(), "maxWarningDuration", this.maxWarningDuration);
-        this.deltaTime = this.maxDate.getTime() - this.minDate.getTime();
+        if(this.minDate != null) {
+          this.deltaTime = this.maxDate.getTime() - this.minDate.getTime();
+        }
         var deltaTimeTotalSec = this.deltaTime/1000;
         var deltaTimeSec = deltaTimeTotalSec % 60;
         var deltaTimeMin = (deltaTimeSec/ 60) % 60;
@@ -186,9 +218,12 @@ export class SGHistoryComponent implements OnInit {
         console.log("deltaTime = " + this.deltaTime);
 
         console.log("this.dataMax", this.dataMax);
-        this.chartContainer = _chartElem;
         console.log("this.chartContainer", this.chartContainer);
-        this.createChart();
+        if(isFirstLoad) {
+          this.createChart();
+        } else {
+          this.emptyChart();
+        }
         if (this.dataMax) {
           this.updateChart();
         }
@@ -200,8 +235,12 @@ export class SGHistoryComponent implements OnInit {
       this.maxDisplayTime.setMilliseconds(0);
       this.maxDisplayTime.setTime(this.maxDisplayTime.getTime() + 60 * 24*60 * 1000 );
       console.log("maxDisplayTime", this.maxDisplayTime);
-    }
+  }
 
+  applyFilter() {
+      console.log("applyFilter : agentFilter = ", this.filter.agentName);
+      this.refreshHistory(false);
+    }
 
   getTxtClassConsumer(consumer) {
     if(consumer.hasExpired)  {
@@ -282,12 +321,20 @@ export class SGHistoryComponent implements OnInit {
 
   setDimensions() {
     this.totalWidth = Math.max(1800,5*this.deltaTime/1000);
+    console.log("setDimensions : totalWidth = " , this.totalWidth);
+    var maxTotalWdth = 5*1000;
+    if(this.totalWidth > maxTotalWdth && true) {
+      this.totalWidth = maxTotalWdth;
+      console.log("setDimensions : totalWidth[2] = " , this.totalWidth);
+    }
     this.totalHeight = 700;
     this.nbTicks =  Math.max(10,this.totalWidth/100);
     this.width = this.totalWidth - this.margin.left - this.margin.right;
     this.height = this.totalHeight - this.margin.top - this.margin.bottom;
     this.yMinPos = this.height;
   }
+
+
   createChart() {
     console.log("createChart2 deltaTime = ", this.deltaTime);
     let element = this.chartContainer.nativeElement;
@@ -349,6 +396,11 @@ export class SGHistoryComponent implements OnInit {
       .call(d3.axisLeft(this.yScale));
   }
 
+  emptyChart() {
+    d3.select("svg").selectAll("rect").remove();
+    d3.select("svg").selectAll("line").remove();
+    d3.select("svg").selectAll("text").remove();
+  }
 
   updateChart() {
     console.log("updateChart begin_", this.dataMax, this.dataMissing , this.xScale);
@@ -370,7 +422,9 @@ export class SGHistoryComponent implements OnInit {
     console.log("updateChart step1");
     //this.displayLine2(this.dataMinMissingRequest, "black", "Min Missing");
     this.displayBar2(this.dataMinMissingRequest, "rgb(252, 133, 133)", "Min Missing");
-
+    if(this.filter.agentName != "") {
+      this.displayBar2(this.dataConsumed, "rgb(138,247,253)", "Consumed");
+    }
     this.displayLine2(this.dataRequested, "rgba(9, 53, 175, 0.712)", "Requested");
     this.displayLine2(this.dataMissing, "rgb(252, 0, 0)", "Missing");
     this.displayLine2(this.dataAvailable, "rgb(76, 248, 142)", "Available");
@@ -559,8 +613,10 @@ getClassBorderTop(nodeTotal) {
   }
 
   offerToStr(nextOffer)  {
-    var sOffer = "(" + nextOffer.id + ") " + nextOffer.issuer + "->" + nextOffer.request.issuer
-     + (nextOffer.isComplementary?" [COMPLEMENTARY] ": "")
+    var provider = nextOffer.issuer;
+    var consumer = nextOffer.request.issuer;
+    var sOffer = "(" + nextOffer.id + ") " + provider + "->" + consumer
+      + (nextOffer.isComplementary?" [COMPLEMENTARY] ": "")
       + " W=" + nextOffer.power
       + " [" +  this.disaplyTime(nextOffer.creationTime) + " to " +  this.disaplyTime(nextOffer.deadline) + "]";
     if(nextOffer.acquitted>0) {
