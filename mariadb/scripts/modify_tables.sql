@@ -255,5 +255,26 @@ alter table state_history ADD constraint UNIQUE KEY `unicity_date_variable_name`
 
 -- 16/02/2023
 
-alter table link_event_agent add `power_min` 		DECIMAL(15,3) NOT NULL DEFAULT 0.00;
-alter table link_event_agent add `power_max` 		DECIMAL(15,3) NOT NULL DEFAULT 0.00;
+ALTER TABLE link_event_agent add `power_min` 		DECIMAL(15,3) NOT NULL DEFAULT 0.00;
+ALTER TABLE link_event_agent add `power_max` 		DECIMAL(15,3) NOT NULL DEFAULT 0.00;
+
+-- 19/04/2023
+-- create table node_config
+
+ALTER TABLE history ADD id_node_config INT(11) unsigned COMMENT 'Node config' after id_session;
+ALTER TABLE event ADD id_node_config INT(11) unsigned COMMENT 'Node config' after id_session;
+ALTER TABLE link_event_agent add agent_id_node_config INT(11) unsigned COMMENT 'Node config' after agent_location;
+
+-- 24/04/2023 :
+ALTER TABLE history add CONSTRAINT `_histo_node_config` FOREIGN KEY (`id_node_config`) REFERENCES `node_config` (`id`);
+ALTER TABLE event add CONSTRAINT `_event_node_config` FOREIGN KEY (`id_node_config`) REFERENCES `node_config` (`id`);
+ALTER TABLE link_event_agent add CONSTRAINT `_link_event_agent_node_config` FOREIGN KEY (`agent_id_node_config`) REFERENCES `node_config` (`id`);
+
+-- TODO : link_history_active_event, scenario, transition_matrix, prediction, state_history
+
+-- 01/05/2023
+-- create table context_neighbour
+
+-- use energy4;
+ALTER TABLE context ADD id_node_config  INT(11) UNSIGNED COMMENT 'Node config' after location;
+ALTER TABLE context ADD CONSTRAINT `_context_node_config` FOREIGN KEY (`id_node_config`) REFERENCES `node_config` (`id`);

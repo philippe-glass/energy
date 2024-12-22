@@ -1,5 +1,106 @@
+use energy1
+use energy2
+use energy3
+use energy4
 
 
+select  id_node_config , location, distance, count(*) from event h group by id_node_config , location, distance
+
+
+select * from node_config nc where not host='localhost'
+
+select * from context c 
+
+select * from event h
+
+select * from context c 
+
+select count(*) from history
+
+select * from link_history_active_event lhae
+
+use energy1
+
+select * from prediction p order by id desc
+
+select * from state_history sh WHERE sh.location = 'localhost:10001' AND sh.scenario = 'MeyrinSimulator' AND sh.variable_name = 'requested'order by id desc
+GRANT SELECT, INSERT, UPDATE, DELETE, REFERENCES, INDEX, CREATE TEMPORARY TABLES, LOCK TABLES, EXECUTE, SHOW VIEW, CREATE ROUTINE, ALTER ROUTINE   ON clemap_data_light.* TO 'learning_agent'@'%';
+
+
+SET @ut_date = UNIX_TIMESTAMP('2022-12-15 19:35:00')
+;
+SELECT sh.date 
+FROM state_history sh 
+JOIN state_history AS last ON last.id = sh.id_last
+WHERE sh.location = 'localhost:10001' AND sh.scenario = 'MeyrinSimulator' AND sh.variable_name = 'requested'
+	AND UNIX_TIMESTAMP(sh.date) >= @ut_date - 300
+ AND UNIX_TIMESTAMP(sh.date) <= @ut_date + 300
+ORDER BY ABS(@ut_date - UNIX_TIMESTAMP(sh.date)), sh.date LIMIT 0,1
+
+
+use energy4
+
+select * from node_config nc 
+
+select * from context_neighbour
+
+DELETE context_neighbour WHERE id_context = 294
+;
+INSERT INTO context_neighbour(id_context, id_node_config) VALUES
+(294,2),(294,153)
+
+
+
+use energy1
+
+select * from node_config nc 
+select * from context c order by last_id_session desc
+
+
+
+
+select * from node_config nc 
+
+select * from single_offer so where id=14306
+
+select * from single_offer so  where consumer_agent like '%Consumer_N1_4%'
+
+
+select * from transition_matrix tm2  where id in (473494, 482644)
+
+select * from transition_matrix where not location = 'localhost:10001'  and id_context = 290
+DELETE transition_matrix from transition_matrix where not location = 'localhost:10001'  and id_context = 290
+
+
+
+SELECT variable_name, compute_day, target_day
+	,GROUP_CONCAT(DISTINCT time_slot ORDER BY time_slot) AS time_slot
+	,GROUP_CONCAT(DISTINCT horizon ORDER BY horizon) AS horizon
+	,GROUP_CONCAT(DISTINCT If(use_corrections, 'True', 'False') ORDER BY use_corrections) AS use_corrections
+	,DATE_ADD(target_day, INTERVAL (MIN(time_slot)+0) HOUR) AS date_begin
+	,DATE_ADD(target_day, INTERVAL (MAX(time_slot)+1) HOUR) AS date_end
+	,AVG(rate_ok1)  AS rate_ok1
+	,AVG(rate_ok2)  AS rate_ok2
+	,AVG(vector_differential) AS vector_differential
+	,SUM(nb_ok2)  AS nb_ok2
+   ,SUM(nb_total) AS nb_total
+   ,SUM(corrections_number) AS corrections_number
+	,AVG(proba1)  AS proba_avg1
+	,AVG(proba2)  AS proba_avg2
+	,AVG(gini_index) AS gini_index
+	,AVG(shannon_entropie) AS shannon_entropie
+	,Count(*) as nb_results
+	,(SELECT ID FROM transition_matrix tm WHERE tm.variable_name = TmpPredictionStatistic.variable_name 
+				AND tm.id_time_window = TmpPredictionStatistic.id_initial_time_window 
+				AND tm.id_context = TmpPredictionStatistic.id_context) AS id_tm
+	FROM TmpPredictionStatistic
+	GROUP BY compute_day, target_day, variable_name,use_corrections,time_slot
+	ORDER BY date_begin, variable_name, horizon 
+
+	
+	
+	
+	
 CREATE TEMPORARY TABLE TmpCleanHisto 
 AS SELECT h.id FROM history h WHERE h.date > '2022-10-18 17:30:52' AND h.id_session = '20221018_173052_3728' AND NOT EXISTS (SELECT 1 FROM Event e WHERE e.id_histo = h.id)
 ;
@@ -9,8 +110,9 @@ DELETE h FROM history h WHERE id IN (SELECT id FROM TmpCleanHisto)
 
 
 DELETE h FROM history h WHERE h.date > '2022-10-18 16:08:53' AND h.id_session = '20221018_160853_2355' AND NOT EXISTS (SELECT 1 FROM Event e WHERE e.id_histo = h.id)
+use energy1
 
-select * from history h  order by date
+select * from history h where not location  like 'localhost:10001' order by date DESC
 
 select history.*  from history where id = 1594411
 
@@ -32,7 +134,20 @@ select * from time_window tw
 
 select * from transition_matrix tm where scenario = 'MeyrinSimulator' and variable_name = 'requested' and id_time_window  = 9
 
-select * from context c 
+select * from node_config
+
+use Energy1
+CREATE TABLE `node_config` (
+	`id` 					INT(11) UNSIGNED NOT NULL AUTO_INCREMENT,
+	`creation_date` 		DATETIME NOT NULL DEFAULT current_timestamp(),
+	`name` 					VARCHAR(16) NOT NULL DEFAULT '',
+	`host`					VARCHAR(32) NOT NULL DEFAULT '',
+	`main_port`				INT(11) UNSIGNED NULL,
+	`rest_port`				INT(11) UNSIGNED NULL,
+	PRIMARY KEY (`id`),
+	UNIQUE KEY `unicity_node_locationt` (`name`, `host`, `main_port`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8
+
 
 delete transition_matrix_cell_iteration from transition_matrix_cell_iteration where id_transition_matrix IN
 (select id from transition_matrix where location like 'localhost:10001')
@@ -54,6 +169,9 @@ delete transition_matrix_iteration from transition_matrix_iteration where id_tra
 delete transition_matrix from transition_matrix where  location like 'localhost:10001'
 ;
 
+use clemap_data_light
+
+select * from sensor_input si where device_category like '%ENG%'
 
 
 select * from transition_matrix tm where location = 'localhost:10001'
@@ -66,9 +184,41 @@ select * from context c
 
 
 
+SELECT distinct measure_record.timestamp
+,TIMESTAMPADD(MINUTE,
+    TIMESTAMPDIFF(MINUTE,DATE(timestamp),timestamp),
+    DATE(timestamp)) AS timestamp3
+,sensor.serial_number AS sensor_number
+,sensor.location
+,sensor_input.device_category
+,sensor_input.description  AS device_name
+,phase_mr.phase
+,ABS(phase_mr.power_p) AS power_p
+,ABS(phase_mr.power_q) AS power_q
+,ABS(phase_mr.power_s) AS power_s
+FROM clemap_data_light.measure_record
+JOIN clemap_data_light.sensor on sensor.serial_number = measure_record.sensor_number
+JOIN clemap_data_light.phase_measure_record AS phase_mr ON phase_mr.id_measure_record = measure_record.id
+JOIN clemap_data_light.sensor_input ON  sensor_input.id_sensor = sensor.id AND sensor_input.phase=phase_mr.phase
+WHERE  measure_record.timeStamp >='2022-12-15 11:16:50' AND measure_record.timeStamp <'2022-12-15 13:16:50' AND 1 AND feature_type='15_MN' AND NOT sensor_input.is_disabled
+	ORDER BY measure_record.timestamp
+
+
 select * from event e where location='localhost:10001'
 left join history h ON h.id = e.id_histo 
 where e.agent like '%N3%'
+
+
+select * from measure_record mr where feature_type = '15MM'
+
+select * from link_history_active_event lhae where warning_duration  > 5
+
+select * from event order by id desc
+
+select * from history h 
+
+select * from single_offer so  where log like '%[%' order by id desc
+
 
 select h.* 
 ,(select COunt(*) from event where event.id_histo = h.id) as nbEvebts
@@ -2260,7 +2410,7 @@ SELECT TmpTrMatrix.*
 select * from link_event_agent lea where id_event = '428277' -- //agent_name = 'Consumer_N1_27'
  
  SELECT ctr.*  ,(SELECT IFNULL(sum(link2.power),0) FROM link_event_agent AS link2 		
- 	WHERE link2.id_event = ctr.id_contract_evt and link2.agent_type = 'Producer') AS provided FROM TmpEvent AS ctr  WHERE ctr.is_selected_local AND ctr.is_contract
+ 	WHERE link2.id_event = ctr.id_contract_evt and link2.prosumer_role = 'PRODUCER') AS provided FROM TmpEvent AS ctr  WHERE ctr.is_selected_local AND ctr.is_contract
  
  
 
@@ -2269,24 +2419,24 @@ select * from link_event_agent
 	where id_event=427788
 	
 	
-	select id_event, agent_type , group_concat(agent_name), SUM(power) from link_event_agent group by id_event , agent_type 
+	select id_event, prosumer_role , group_concat(agent_name), SUM(power) from link_event_agent group by id_event , prosumer_role 
 
 	SELECT FOO.* from (
-		select id_event, agent_type , agent_name, power as consumed
-		, (select sum(link2.power) from link_event_agent as link2 where link2.id_event = link_event_agent.id_event and link2.agent_type = 'Producer') as provided
+		select id_event, prosumer_role , agent_name, power as consumed
+		, (select sum(link2.power) from link_event_agent as link2 where link2.id_event = link_event_agent.id_event and link2.prosumer_role = 'PRODUCER') as provided
 		from link_event_agent 
-		where agent_type = 'Consumer'
+		where prosumer_role = 'CONSUMER'
 		) as FOO 
 		WHERE not consumed = provided 
 		
 		SELECT ctr.*  
 			,(SELECT sum(link2.power) FROM link_event_agent AS link2 		
-			 WHERE link2.id_event = ctr.id_event and link2.agent_type = 'Producer') AS provided 
+			 WHERE link2.id_event = ctr.id_event and link2.prosumer_role = 'PRODUCER') AS provided 
 		FROM TmpEvent AS ctr  WHERE ctr.is_selected_local AND ctr.is_contract
 	
 agent_name='Contract_N1_22'
 
-SELECT IFNULL(SUM(lea.power),0) AS provided FROM link_event_agent AS lea WHERE lea.id_event = '428441' AND lea.agent_type = 'Producer' 
+SELECT IFNULL(SUM(lea.power),0) AS provided FROM link_event_agent AS lea WHERE lea.id_event = '428441' AND lea.prosumer_role = 'PRODUCER' 
 
 
 select * from event e 
@@ -2386,6 +2536,7 @@ WHERE sh.location = '192.168.1.79:10001' AND sh.scenario = 'MeyrinSimulator' AND
 ORDER BY ABS(@ut_date - UNIX_TIMESTAMP(sh.date)), sh.date 
 LIMIT 0,1
 
+SELECT NOW()
 
 SELECT sh.variable_name, sh.value, last.value AS value_last 
 FROM state_history sh 
@@ -2393,3 +2544,100 @@ JOIN state_history AS last ON last.id = sh.id_last
 WHERE sh.location = '192.168.1.79:10001' AND sh.scenario = 'MeyrinSimulator'
  AND sh.date = '2022-07-23 19:00:19'
  AND sh.variable_name IN ('requested','produced','consumed','provided','available','missing')
+ 
+ 
+ select * from event 
+ 
+ 
+ 
+ 
+ -- TEST 25/05
+ use energy1
+ 
+ 
+DELIMITER §
+
+ 
+SET @histo_date = '2023-05-25 12:31:35'
+§
+SET @id_last = (SELECT ID FROM history WHERE date < @histo_date AND location = 'localhost:10001'
+ ORDER BY date DESC LIMIT 0,1)
+§
+§INSERT INTO history SET
+ date = @histo_date
+, distance = '0'
+, total_provided = '0.0'
+, id_session = '20230525_123129_8581'
+, id_node_config = 1
+, total_missing = '43.1'
+, min_request_missing = '43.1'
+, total_requested = '43.1'
+, total_available = '175.0'
+, total_margin = '0.0'
+, learning_agent = 'Learning_agent_N1'
+, id_last = @id_last
+, location = 'localhost:10001'
+, total_consumed = '0.0'
+, total_produced = '175.0'
+, time_shift_ms = '0'
+ ON DUPLICATE KEY UPDATE 
+ total_requested = '43.1'
+§
+SET @new_id_histo = (SELECT MAX(ID) FROM history WHERE date = @histo_date AND location = 'localhost:10001')
+§
+UPDATE event SET id_histo=@new_id_histo WHERE id = '1610318'
+§
+SET @date_last = (SELECT date FROM history WHERE id=@id_last)
+§UPDATE history h 
+ SET id_next = (SELECT h2.ID FROM history h2 WHERE h2.date > h.date AND h2.location = h.location ORDER BY h2.date LIMIT 0,1)
+ WHERE h.date >= @date_last
+ AND location = 'localhost:10001'
+ AND id_session = '20230525_123129_8581'
+ AND IFNULL(id_next,0) <> (SELECT h2.ID FROM history h2 WHERE h2.date > h.date AND h2.location = h.location ORDER BY h2.date LIMIT 0,1)
+§
+DROP TEMPORARY TABLE IF EXISTS TmpCorrectIdLast
+§CREATE TEMPORARY TABLE TmpCorrectIdLast AS
+SELECT id, id_last, id_last_toset FROM
+	( SELECT id, id_last,
+		 	(SELECT h2.ID FROM history h2 WHERE h2.date < h.date AND h2.location = h.location
+				ORDER BY h2.date DESC LIMIT 0,1) AS id_last_toset
+ 			FROM history h
+			WHERE h.date > @histo_date AND location = 'localhost:10001' AND id_session = '20230525_123129_8581'
+ 		) AS TmpRecentHistory
+	WHERE NOT TmpRecentHistory.id_last = TmpRecentHistory.id_last_toset
+§UPDATE TmpCorrectIdLast
+	JOIN history ON history.id = TmpCorrectIdLast.id
+	SET history.id_last = TmpCorrectIdLast.id_last_toset
+§
+UPDATE TmpCorrectIdLast
+	JOIN link_history_active_event AS current ON current.id_history = TmpCorrectIdLast.id
+	SET current.id_last = (SELECT (last.id) FROM link_history_active_event AS last 
+			WHERE last.id_history=TmpCorrectIdLast.id_last_toset AND last.id_event = current.id_event)
+§
+UPDATE TmpCorrectIdLast
+	JOIN link_history_active_event AS current ON current.id_history = TmpCorrectIdLast.id
+	SET current.id_last = (SELECT (last.id) FROM link_history_active_event AS last 
+			WHERE last.id_history=TmpCorrectIdLast.id_last_toset AND last.id_event = current.id_event_origin)
+	WHERE current.id_last IS NULL
+§
+UPDATE single_offer SET id_history=(SELECT h.ID FROM history h WHERE h.date <= single_offer.date ORDER BY h.date DESC LIMIT 0,1)
+ WHERE single_offer.date >= (SELECT IFNULL(@date_last,'2000-01-01'))
+ 
+ 
+ 
+ 
+  select * from link_history_active_event where warning_duration  > 20
+ 
+ select * from link_history_active_event where missing > 0 and missing < 0.01
+ 
+ 
+  
+ 
+ 
+ 
+ 
+ select * from history h 
+
+ 
+ 
+ 

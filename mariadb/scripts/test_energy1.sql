@@ -52,8 +52,8 @@ DROP TEMPORARY TABLE IF EXISTS TmpContractEvent
 CREATE TEMPORARY TABLE TmpContractEvent AS
  	SELECT TmpEvent.id, consumer.agent_name AS consumer, TmpEvent.is_location_ok
  	FROM TmpEvent 
- 	JOIN link_event_agent AS consumer ON consumer.id_event = TmpEvent.id AND consumer.agent_type='Consumer'
-    JOIN TmpRequestEvent ON TmpRequestEvent.consumer = consumer.agent_name  
+ 	JOIN link_event_agent AS consumer ON consumer.id_event = TmpEvent.id AND consumer.prosumer_role='CONSUMER
+ 	JOIN TmpRequestEvent ON TmpRequestEvent.consumer = consumer.agent_name
   	WHERE is_selected AND is_contract
 §
 update tmpevent 

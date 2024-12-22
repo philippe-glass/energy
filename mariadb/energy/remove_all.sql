@@ -8,9 +8,9 @@ DROP TABLE IF EXISTS `link_history_active_event`
 §
 DROP TABLE IF EXISTS `event` 
 §
-DROP TABLE IF EXISTS `history`
+DROP TABLE IF EXISTS `node_history`
 §
-DROP TABLE IF EXISTS transition_matrix_cell_iteration
+DROP TABLE IF EXISTS mc_transition_matrix_cell_iteration
 §
 DROP TABLE IF EXISTS transition_matrix_iteration
 §

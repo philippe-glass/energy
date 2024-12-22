@@ -560,9 +560,16 @@ select * from clemap_data_light.sensor
 
 use clemap_data_light
 ;
+
 select * from sensor s 
 	JOIN sensor_input si ON si.id_sensor = s.id
 	where not si.is_disabled
+
+select s.*, si.description,  si.device_category , count(*), GROUP_CONCAT(si.phase)  
+	from sensor s 
+	JOIN sensor_input si ON si.id_sensor = s.id
+	where not si.is_disabled
+	GROUP by si.description
 ;
 
 -- nb records per day and sensor 60 * 3 * 24 * IF(is_light, 1, 7)
@@ -571,7 +578,7 @@ select  mr.`timestamp` , mr.feature_type , mr.blob_name , s.*, si.*
 	-- , mr.*
 	,pmr.voltage	AS voltage
 	,pmr.intensity 	AS current
-	,pmr.power_s	AS power -- apparent power
+	,pmr.power_s	AS apparent_power -- apparent power
 	,pmr.power_p	AS active_power
 	,pmr.power_q	AS reactive_power
 	,pmr.power_factor AS power_factor
@@ -585,9 +592,24 @@ select  mr.`timestamp` , mr.feature_type , mr.blob_name , s.*, si.*
 		and not si.is_disabled 
 		-- and s.serial_number  = 'SE05000159'
 		-- and pmr.phase = 'l1'
+		# and not sensor_number  LIKE 'SE%'
+		-- AND feature_type = '15_MN'
+		and pmr.power_p < -50
 		order by timestamp, serial_number, pmr.phase
-		
 ;
+
+select * from phase_measure_record pmr where power_p < 0 GROUP by 
+
+
+SELECT * FROM measure_record mr
+JOIN phase_measure_record pmr on pmr.id_measure_record  = mr.id
+LEFT JOIN sensor s on s.serial_number = mr.sensor_number
+JOIN sensor_input si ON si.id_sensor = s.id and si.phase = pmr.phase 
+WHERE feature_type = '15_MN'
+
+
+
+
 -- 135564
 
 
