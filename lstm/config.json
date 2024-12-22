@@ -1,0 +1,8 @@
+{
+    "host":"localhost",
+    "port":3306,
+    "user":"learning_agent",
+    "password":"sql2537",
+    "database":"clemap_data_light",
+    "autocommit":true
+}
