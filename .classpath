@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<classpath>
+	<classpathentry kind="con" path="org.eclipse.jdt.launching.JRE_CONTAINER"/>
+	<classpathentry kind="src" path="docs/latex2doc/src"/>
+	<classpathentry kind="src" path="docs/src"/>
+	<classpathentry kind="src" path="mariadb/migration/src"/>
+	<classpathentry kind="src" path="sapereapi/.mvn/wrapper"/>
+	<classpathentry kind="src" path="sapereapi/src/main/java"/>
+	<classpathentry kind="src" path="sapereapi/src/test/java"/>
+	<classpathentry kind="src" path="SapereMiddlewareStandalone/src"/>
+	<classpathentry kind="lib" path="sapereapi/light_sapereapi.jar"/>
+	<classpathentry kind="lib" path="sapereapi/sapereV1.jar"/>
+	<classpathentry kind="lib" path="sapereapi/target/sapereapi-0.0.1-SNAPSHOT.jar"/>
+	<classpathentry kind="lib" path="SapereMiddlewareStandalone/build/libs/middleware-standalone-1.0-all.jar"/>
+	<classpathentry kind="lib" path="SapereMiddlewareStandalone/build/libs/middleware-standalone-1.0.jar"/>
+	<classpathentry kind="output" path="SapereMiddlewareStandalone/bin"/>
+</classpath>

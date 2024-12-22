@@ -20,4 +20,16 @@
 /docs/latex2doc/report.doc
 bin
 /docs/latex2doc/*.docx
-/SapereMiddlewareStandalone/doc
+*.lck
+*.log
+/sapereapi/db/*.db
+/docs/latex2doc/*.png
+/docs/latex2doc/*.txt
+/sapereapi/run_configs/*.csv
+/sapereangular/Dockerfile1
+/sapereangular/Dockerfile2
+/sapereapi/coordination_platform.jar
+/saperetest/meyrin_simulator.jar
+/download_gcp_file/__pycache__
+/mariadb/*.sql
+/lstm/history
