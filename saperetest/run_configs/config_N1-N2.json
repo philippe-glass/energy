@@ -1,0 +1,6 @@
+{"mapNodeByLocation":{"":"N2","Gymnase":"N2","Sous-sol":"N2","Ecole primaire":"N1","Parascolaire":"N2"}
+,"mapNodes":
+	{"N1":{"name":"N1","host":"localhost","started":false,"restPort":"9191","url":"http://localhost:9191/energy/"}
+	,"N2":{"name":"N2","host":"localhost","started":false,"restPort":"9292","url":"http://localhost:9292/energy/"}
+	}
+}

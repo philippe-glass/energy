@@ -1,0 +1,4 @@
+{"mapNodeByLocation":{"":"N1","Gymnase":"N1","Sous-sol":"N1","Ecole primaire":"N1","Parascolaire":"N1"}
+,"mapNodes":
+	{"N1":{"name":"N1","host":"localhost"}}
+}

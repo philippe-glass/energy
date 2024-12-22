@@ -1,0 +1,6 @@
+{"mapNodeByLocation":{"":"N2","Gymnase":"N2","Sous-sol":"N2","Ecole primaire":"N1","Parascolaire":"N2"}
+,"mapNodes":
+	{"N1":{"name":"N1","host":"ec2-52-59-160-203.eu-central-1.compute.amazonaws.com","restPort":"9191"}
+	,"N2":{"name":"N2","host":"ec2-52-59-160-203.eu-central-1.compute.amazonaws.com","restPort":"9292"}
+	}
+}

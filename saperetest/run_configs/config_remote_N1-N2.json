@@ -1,0 +1,6 @@
+{"mapNodeByLocation":{"":"N2","Gymnase":"N2","Sous-sol":"N2","Ecole primaire":"N1","Parascolaire":"N2"}
+,"mapNodes":
+	{"N1":{"name":"N1","host":"129.194.10.168","restPort":"9191"}
+	,"N2":{"name":"N2","host":"129.194.10.168","restPort":"9292"}
+	}
+}

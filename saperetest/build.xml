@@ -1,0 +1,68 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<project default="create_run_jar" name="Create Runnable Jar for Project sapereapi with Jar-in-Jar Loader">
+    <!--this file was created by Eclipse Runnable JAR file Export Wizard-->
+    <!--ANT 1.7 is required-->
+    <!--define folder properties-->
+    <property name="dir.buildfile" value="."/>
+	<property name="dir.workspace" value="../"/>
+	<property name="dir.src" value="./src"/>
+    <property name="dir.jarfile" value="${dir.buildfile}"/>
+	<property name="dir.lib"  value="${user.home}/.m2/repository/"/>
+
+ 	<path id="project-classpath">
+	    <fileset dir="../sapereapi/" includes="sapereV1.jar"/>
+		<fileset dir="../sapereapi/" includes="coordination_platform.jar"/>
+	    <fileset dir="${dir.lib}org/json/json/20210307" includes="json-20210307.jar"/>
+	    <fileset dir="${dir.lib}org/xerial/sqlite-jdbc/3.41.2.1" includes="sqlite-jdbc-3.41.2.1.jar"/>
+	    <fileset dir="${dir.lib}org/mariadb/jdbc/mariadb-java-client/2.4.0" includes="mariadb-java-client-2.4.0.jar"/>
+  	 	<fileset dir="${dir.lib}gov/nist/math/jama/1.0.3" includes="jama-1.0.3.jar"/>
+    </path>
+
+	 <!-- set the operating system test properties -->
+	<target name="check_os">
+		<condition property="isWindows" value="True" else="False">
+			<os family="windows" />
+		</condition>
+		<condition property="isLinux" value="True" else="False">
+			<os family="unix" />
+		</condition>
+		<echo message="isWindows = ${isWindows}"/>
+		<echo message="isLinux = ${isLinux}"/>
+		<echo message="dir.lib = ${dir.lib}"/>
+		<echo message="dir.jarfile = ${dir.jarfile}"/>
+    </target>
+
+    <target name="compile" depends="check_os"  description="compile the source">
+	    <!-- Compile the Java code from ${src} into ${build} -->
+	    <javac srcdir="${dir.src}" destdir="${dir.jarfile}/target/classes">
+	  		<classpath refid="project-classpath" />
+	    </javac>
+    </target>
+
+    <target name="create_run_jar" depends = "compile" >
+        <jar destfile="${dir.jarfile}/meyrin_simulator.jar" basedir="target/classes" >
+        	<manifest>
+                <attribute name="Main-Class" value="com.saperetest.MeyrinSimulator"/>
+            </manifest>
+        	<!--
+        	<manifest>
+	            <attribute name="Main-Class" value="org.eclipse.jdt.internal.jarinjarloader.JarRsrcLoader"/>
+	            <attribute name="Rsrc-Main-Class" value="com.saperetest.MeyrinSimulator"/>
+	            <attribute name="Class-Path" value="."/>
+	            <attribute name="Rsrc-Class-Path" value="./
+	            	sapereV1.jar
+	                coordination_platform.jar
+	                mariadb-java-client-2.4.0.jar
+	                json-20210307.jar "/>
+	        </manifest>
+	        -->
+            <!-- <zipfileset src="jar-in-jar-loader.zip"/>-->
+            <!-- <fileset dir="${dir.jarfile}/target/classes"/>-->
+            <zipfileset dir="../sapereapi/" includes="sapereV1.jar"/>
+            <zipfileset dir="../sapereapi/" includes="coordination_platform.jar"/>
+            <zipfileset dir="${dir.lib}org/json/json/20210307" includes="json-20210307.jar"/>
+            <zipfileset dir="${dir.lib}org/xerial/sqlite-jdbc/3.41.2.1" includes="sqlite-jdbc-3.41.2.1.jar"/>
+            <zipfileset dir="${dir.lib}org/mariadb/jdbc/mariadb-java-client/2.4.0" includes="mariadb-java-client-2.4.0.jar"/>
+        </jar>
+    </target>
+</project>
