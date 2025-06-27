@@ -16,9 +16,10 @@ import java.util.Map;
 
 /**
  * Execution procedure:
- * - configure settings object
+ * - configure the ExtractorSettings instance (by updating the attribute "settings".) 
+ * 		The variable chosenDiagram help to load some existing configurations. 
  * - launch the this executable class
- * - copy the content of the generated .gv file (test.gv) and paste it to https://dreampuf.github.io/GraphvizOnline
+ * - copy the content of the generated energy2/class_diagram.gv file (class_diagram.gv) and paste it to https://dreampuf.github.io/GraphvizOnline
  * - download the generated svg file and display it on a web browser
  */
 
@@ -31,7 +32,8 @@ public class ClassDiagramExtractor {
 	private final static int DIAG_ENERGY_AGENT= 2;
 	private final static int DIAG_PREDICTION = 3;
 	private final static int DIAG_LEARNING_MODEL = 4;
-	private final static int DIAG_PROSUMER = 4;
+	private final static int DIAG_PROSUMER = 5;
+	private final static int DIAG_ENERGY_OBJECT_STORAGE = 51;
 	private final static int DIAG_LIGHT_SERVER = 11;
 	private final static int DIAG_MDW_ECOLAWS = 101;
 	private final static int DIAG_MDW_AGENTS = 102;
@@ -47,7 +49,7 @@ public class ClassDiagramExtractor {
 				);
 		settings.setGraphvizFilename(root + "class_diagram.gv");
 		settings.setPackageColors(Arrays.asList("#000000", "#696969", "#808080", "#A9A9A9", "#C0C0C0"));
-		int chosenDiagram = DIAG_LIGHT_SERVER;
+		int chosenDiagram = DIAG_TEST_SIMULATORS;
 
 		//settings.setFilterPackage(Arrays.asList("com.sapereapi", "eu.sapere.middleware"));
 		//settings.setFilterPackage(Arrays.asList("com.sapereapi.model.learning"));
@@ -60,8 +62,20 @@ public class ClassDiagramExtractor {
 					));
 			settings.setFilterPackageStrict(true);
 			settings.setExcludedClasses(
-					Arrays.asList("_RescheduleItem", "_RescheduleTable", "AgentForm", "EnergyStorage", "ExtraSupply"
+					Arrays.asList("_RescheduleItem", "_RescheduleTable", "AgentForm", "EnergyStorage", "StorageSupply"
 							, ".Device", "ProsumerItem", "ReducedContract", "ExtendedEnergyEvent"));
+		}
+		if (chosenDiagram == DIAG_ENERGY_OBJECT_STORAGE) {
+			settings.setFilterPackage(Arrays.asList("com.sapereapi.model.energy"
+					, "com.sapereapi.model.energy.prosumerflow"
+					//, "com.sapereapi.model.energy.award"
+					//, "com.sapereapi.model.energy.reschedule"
+					));
+			settings.setFilterPackageStrict(true);
+			settings.setExcludedClasses(
+					Arrays.asList("_RescheduleItem", "_RescheduleTable", "AgentForm"
+							, ".Device", "ProsumerItem", "ReducedContract", "ExtendedEnergyEvent", "EnergyEvent", "ChangeRequest", "Contract", "CompositeOffer"
+							, "ConfirmationItem", "SingleOffer", "SingleContribution", ".EnergyRequest", ".EnergySupply", ".EnergyFlow"));
 		}
 		// Diagram for energy agents
 		if (chosenDiagram == DIAG_ENERGY_AGENT) {
@@ -69,7 +83,7 @@ public class ClassDiagramExtractor {
 			settings.setFilterPackage(Arrays.asList("com.sapereapi.agent.energy", "eu.sapere.middleware.agent"));
 			settings.setFilterPackageStrict(true);
 			settings.setExcludedClasses(
-					Arrays.asList("OldProducer", "OldConsumer", "AgentLearningData", "BasicSapereAgent"));
+					Arrays.asList("AgentLearningData", "BasicSapereAgent"));
 		}
 		if(chosenDiagram == DIAG_LIGHT_SERVER) {
 			// Diagram for energy agents

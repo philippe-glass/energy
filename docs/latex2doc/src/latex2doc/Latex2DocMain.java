@@ -2,10 +2,12 @@ package latex2doc;
 
 import java.io.BufferedReader;
 import java.io.BufferedWriter;
+import java.io.File;
 import java.io.FileOutputStream;
 import java.io.FileReader;
 import java.io.IOException;
 import java.io.OutputStreamWriter;
+import java.io.UnsupportedEncodingException;
 import java.io.Writer;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -15,6 +17,10 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 public class Latex2DocMain {
+	private static boolean readThesisResport = true;
+	private static boolean useChapters = readThesisResport ? true : false;// true;
+	private static String sourceTexDir =readThesisResport ? "PhD-PhilippeGlass/chapters" : null;
+	private static boolean activateDebug = false;// true;
 
 	final static String[] tagsIgnoreLine = new String[] { "\\maketitle", "\\usepackage", "{document}", "{itemize}",
 			"{enumerate}", "{description}", "{definition}", "\\addbibresource", "\\documentclass", "\\renewcommand",
@@ -24,9 +30,11 @@ public class Latex2DocMain {
 			"\\hreflink", "\\newcommand", "\\corres", "\\includegraphics", "\\TitleCitation", "\\Author",
 			"\\AuthorNames", "\\AuthorCitation", "\\address", "\\authorcontributions", "\\vspace", "\\quad", "\\corres",
 			"\\bibliography", "\\PublishersNote", "adjustwidth", "\\appendix", "\\appendixtitles", "\\reftitle",
-			"\\FloatBarrier", "\\providecommand", "\\setalgorithmicfont", "\\pagestyle", "\\setlength", "\\pagebreak" };
-	final static String[] tagsIgnoreBloc = new String[] { "{algorithm}", "{figure}", "{table}", "{equation}",
-			"{comment}" };
+			"\\FloatBarrier", "\\providecommand", "\\setalgorithmicfont", "\\pagestyle", "\\setlength", "\\pagebreak",
+			"\\tableofcontents", "\\today", "\\geometry", "\\hspace", "a4paper", "\\titleformat", "\\titlespacing", "\\normalfont"
+			, "\\rlap", "\\chaptertitlename", "\\MakeUppercase" , "\\addcontentsline", "\\horrule{2pt}", "0pt3.25ex"
+			};
+	final static String[] tagsIgnoreBloc = new String[] { "{algorithm}", "{figure}", "{table}", "{equation}", "{equation}", "{comment}"};
 	final static String[] tagStartIgnoreBloc = addPrefix(tagsIgnoreBloc, "\\begin");
 	final static String[] tagEndIgnoreBloc = addPrefix(tagsIgnoreBloc, "\\end");
 	final static Map<String, String> tagsSimpleReplace = new HashMap<>();
@@ -38,35 +46,73 @@ public class Latex2DocMain {
 		tagsSimpleReplace.put("\\textcolor{blue}", "");
 		tagsSimpleReplace.put("\\textcolor{black}", "");
 		tagsSimpleReplace.put("\\textcolor{red}", "");
+		tagsSimpleReplace.put("\\textcolor{orange}", "");
+		tagsSimpleReplace.put("\\textcolor{Green}", "");
+		tagsSimpleReplace.put("\\textcolor{OliveGreen}", "");
 		tagsSimpleReplace.put("\\textcolor{cyan}", "");
 		tagsSimpleReplace.put("\\textcolor{gray}", "");
 		tagsSimpleReplace.put("\\begin{scriptsize}", "");
 		tagsSimpleReplace.put("\\end{scriptsize}", "");
 		tagsSimpleReplace.put("\\begin{abstract}", "");
 		tagsSimpleReplace.put("\\end{abstract}", "");
+		tagsSimpleReplace.put("\\small", "");
+		tagsSimpleReplace.put("\\centering", "");
+		tagsSimpleReplace.put("\\Large", "");
+		tagsSimpleReplace.put("\\Huge", "");
+		tagsSimpleReplace.put("\\huge", "");
+		tagsSimpleReplace.put("\\normalsize", "");
+		//tagsSimpleReplace.put("\\caption{", "");
 	}
 	final static Map<String, Object> tagsReplaceBraceBlocs = new HashMap<>();
+	static String varNumChampter = useChapters ? "#num_chapter#." : "";
 	static {
 		tagsReplaceBraceBlocs.put("\\label", "");
-		tagsReplaceBraceBlocs.put("\\abstract", "Abstract:" + lineSep + "%");
-		tagsReplaceBraceBlocs.put("\\section", "%:");
-		tagsReplaceBraceBlocs.put("\\subsection", "%:");
-		tagsReplaceBraceBlocs.put("\\subsubsection", "%:");
+		tagsReplaceBraceBlocs.put("\\abstract", "Abstract:" + lineSep + "%:");
+		if(useChapters) {
+			tagsReplaceBraceBlocs.put("\\chapter"	, "Chapter #num_chapter++##num_section=0##num_subsection=0##num_subsubsection=0##num_ref=0#) %:");
+		}
+		tagsReplaceBraceBlocs.put("\\section"		, varNumChampter + "#num_section++##num_subsection=0##num_subsubsection=0#) %:");
+		tagsReplaceBraceBlocs.put("\\subsection"	, varNumChampter + "#num_section#.#num_subsection++##num_subsubsection=0#) %:");
+		tagsReplaceBraceBlocs.put("\\subsubsection"	, varNumChampter + "#num_section#.#num_subsection#.#num_subsubsection++##num_subsubsubsection=0#) %:");
+		tagsReplaceBraceBlocs.put("\\subsubsubsection"
+													, varNumChampter + "#num_section#.#num_subsection#.#num_subsubsection#.#num_subsubsubsection++#) %:");
 		tagsReplaceBraceBlocs.put("\\title", "%:");
 		tagsReplaceBraceBlocs.put("\\Title", "%:");
+		tagsReplaceBraceBlocs.put("\\large", "%");
+		tagsReplaceBraceBlocs.put("\\Large", "%");
+		tagsReplaceBraceBlocs.put("\\huge", "%");
+		tagsReplaceBraceBlocs.put("\\Huge", "%");
+		tagsReplaceBraceBlocs.put("\\textit", "%");
+		tagsReplaceBraceBlocs.put("\\textsc", "%");
 		tagsReplaceBraceBlocs.put("\\caption", "%:");
-		tagsReplaceBraceBlocs.put("\\footnote", "(Foot note: %)");
+		tagsReplaceBraceBlocs.put("\\math", "%:");
+		tagsReplaceBraceBlocs.put("\\footnote", "(Footnote: %)");
 		tagsReplaceBraceBlocs.put("\\color", "");
 		tagsReplaceBraceBlocs.put("\\href", "");
 		tagsReplaceBraceBlocs.put("\\hspace", "");
-		tagsReplaceBraceBlocs.put("\\ref", "#num_ref#");
-		tagsReplaceBraceBlocs.put("\\cite", "[#num_citation#]");
+		if(useChapters) {
+			tagsReplaceBraceBlocs.put("\\ref", "#num_chapter#.#num_ref++#");
+		} else {
+			tagsReplaceBraceBlocs.put("\\ref", "#num_ref++#");
+		}
+		tagsReplaceBraceBlocs.put("\\cite", "[#num_citation++#]");
 	}
+
+	static Map<String, String> mapEndReplacements = new HashMap<String, String>();
+	static {
+		mapEndReplacements.put("\\caption{", "");
+		mapEndReplacements.put("\\\\", lineSep);
+		mapEndReplacements.put("\\_", "_");
+		mapEndReplacements.put("\\&", "&");
+		mapEndReplacements.put("\\%", "%");
+		mapEndReplacements.put("\\#", "%");
+	}
+
+	private static Pattern commentPattern1 = Pattern.compile("^(?<blank>[\s\t]*)%"); // notons le ?
 
 	private static Map<String, Integer> mapCounters = new HashMap<>();
 	private static BraceBlock retainedBraceBlock = null;
 	private static List<String> retainedLines = new ArrayList<>();
-	private static boolean activateDebug = true;
 
 	private static String[] addPrefix(String[] tagList, String prefix) {
 		String[] result = new String[tagList.length];
@@ -85,10 +131,14 @@ public class Latex2DocMain {
 		}
 		return false;
 	}
-
 	private static boolean toIgnore(String line) {
-		return line.startsWith("%") || line.startsWith(" %") || line.startsWith("   %")
-				|| containsTag(line, tagsIgnoreLine);
+		if(line.contains("%")) {
+			Matcher matcher = commentPattern1.matcher(line);
+			if(matcher.find()) {
+				return true;
+			}
+		}
+		return containsTag(line, tagsIgnoreLine);
 	}
 
 	private static boolean startsIgnoreBloc(String line) {
@@ -114,32 +164,30 @@ public class Latex2DocMain {
 
 	private static String replaceVariables(String input) {
 		String newContent = input;
-		if (newContent.contains("#")) {
+		List<LtxVariableInstruction> listFoundVariables = LtxVariableInstruction.findVariables(input);
+		for (LtxVariableInstruction foundVariable : listFoundVariables) {
 			if (activateDebug && input.contains("__cite") && activateDebug) {
 				System.out.println("replaceVariables : for debug");
 			}
-			Pattern pattern = Pattern.compile("[#](?<variable>[a-zA-Z_]+)[#]"); // notons le ? supplémentaire
-			Matcher matcher = pattern.matcher(newContent);
-			if (matcher.find()) {
-				// int groupCouht = matcher.groupCount();
-				String varname = matcher.group("variable");
-				Integer value = 1;
-				if (mapCounters.containsKey(varname)) {
-					value = 1 + mapCounters.get(varname);
+			String varname = foundVariable.getVariable();
+			Integer value = foundVariable.getIncrement();
+			if (mapCounters.containsKey(varname)) {
+				value = foundVariable.getIncrement() + mapCounters.get(varname);
+				if (foundVariable.isReset()) {
+					value = 0;
 				}
-				String toReplace = "#" + varname + "#";
-				String replacement = "" + value;
-				if (newContent.contains("~#")) {
-					toReplace = "~" + toReplace;
-					replacement = " " + value;
-				} else if (newContent.contains("~[#")) {
-					toReplace = "~[" + toReplace + "]";
-					replacement = " [" + value + "]";
-				}
-				mapCounters.put(varname, value);
-				newContent = newContent.replace(toReplace, replacement);
-
 			}
+			String toReplace = foundVariable.getContent();
+			String replacement = "" + (foundVariable.isReset() ? "" : value);
+			if (newContent.contains("~#")) {
+				toReplace = "~" + toReplace;
+				replacement = " " + value;
+			} else if (newContent.contains("~[#")) {
+				toReplace = "~[" + toReplace + "]";
+				replacement = " [" + value + "]";
+			}
+			mapCounters.put(varname, value);
+			newContent = newContent.replace(toReplace, replacement);
 		}
 		return newContent;
 	}
@@ -256,7 +304,7 @@ public class Latex2DocMain {
 	}
 
 	private static String generateOutputLine(String inputLine, boolean inIgnoredBloc) {
-		if (activateDebug && inputLine.indexOf("summarises the evaluation of some use of coordination") > 0) {
+		if (activateDebug && inputLine.indexOf("_MakeUppercase") > 0) {
 			System.out.println("generateOutputLine_NEW for debug");
 		}
 		String outputLine = inputLine;
@@ -268,7 +316,7 @@ public class Latex2DocMain {
 		}
 		List<BraceBlock> listBraceBlocks = auxFindBraceBlocks(outputLine);
 		List<BraceBlock> listClosedBraceBlocks = getClosedBraceBlocks(listBraceBlocks);
-		if (activateDebug && inputLine.contains("") && inputLine.contains("esh of the remaining balance in wa")) {
+		if (activateDebug && inputLine.contains("") && inputLine.contains("Review of coordination models:")) {
 			System.out.println("generateOutputLine : for debug");
 		}
 		while (listClosedBraceBlocks.size() > 0) {
@@ -280,10 +328,27 @@ public class Latex2DocMain {
 			outputLine = replaceVariables(outputLine);
 			listClosedBraceBlocks = getClosedBraceBlocks(auxFindBraceBlocks(outputLine));
 		}
-		// outputLine = replaceVariables(outputLine);
-		if (outputLine.contains("\\\\")) {
-			outputLine = outputLine.replaceAll("\\\\", lineSep);
+		for(String toReplace: mapEndReplacements.keySet()) {
+			String remplacement = mapEndReplacements.get(toReplace);
+			boolean continueReplacement = outputLine.contains(toReplace);
+			while (continueReplacement) {
+				int sizeBefore = outputLine.length();
+				outputLine = outputLine.replace(toReplace, remplacement);
+				int sizeAfter = outputLine.length();
+				continueReplacement = outputLine.contains(toReplace) && (sizeBefore != sizeAfter);
+			}
 		}
+		/*
+		if (outputLine.contains("caption{")) {
+			outputLine = outputLine.replace("caption{", "");
+		}
+		while (outputLine.contains("\\_")) {
+			outputLine = outputLine.replace("\\_", "_");
+		}
+		while (outputLine.contains("\\\\")) {
+			outputLine = outputLine.replace("\\\\", lineSep);
+		}*/
+		// \&
 		if (inIgnoredBloc && outputLine.trim().startsWith("\\State $")) {
 			int commentIdx = 2 + outputLine.lastIndexOf('$');
 			if (commentIdx > 20) {
@@ -318,6 +383,101 @@ public class Latex2DocMain {
 		return outputLine;
 	}
 
+	public static String cleanLine(String input) {
+		String output = input;
+		Map<String, String> replaceTable = new HashMap<String, String>();
+		replaceTable.put("\u00e2" + "\u20ac" + "\u02dc", "'"); // opening quote
+		replaceTable.put("\u00e2" + "\u20ac" + "\u2122", "'"); // closing quote
+		replaceTable.put("\u00e2" + "\u20ac" + "\u0153", "\""); // opening double-quote
+		replaceTable.put("\u00e2" + "\u20ac" + "\ufffd", "\""); // closing double-quote
+		replaceTable.put("\u00c3" + "\u00a8", "ê");
+		replaceTable.put("\u00c3" + "\u00aa", "è");
+		replaceTable.put("\u00c3" + "\u00a9", "é");
+		replaceTable.put("\u00c3" + "\u00a0", "à");
+		replaceTable.put("\u00c3" + "\u00a2", "â");
+		replaceTable.put("\u00c3" + "\u00b4", "ô");
+		replaceTable.put("\u00c3" + "\u00a7", "ç");
+		replaceTable.put("\u00c5" + "\u201c", "oe");
+		for (String toReplace : replaceTable.keySet()) {
+			if (output.contains(toReplace)) {
+				String replacement = replaceTable.get(toReplace);
+				output = output.replace(toReplace, replacement);
+			}
+		}
+
+		String sequence1 = "\u00e2" + "\u20ac" + "\u02dc";
+		String sequence2 = "\u00e2" + "\u20ac" + "\u2122";
+
+		if (output.contains(sequence1)) {
+			output = output.replace(sequence1, "'");
+			if (activateDebug) {
+				System.out.println("cleanLine: output = " + output);
+			}
+		}
+		if (output.contains(sequence2)) {
+			output = output.replace(sequence2, "'");
+			if (activateDebug) {
+				System.out.println("cleanLine: output = " + output);
+			}
+		}
+		String toFind = "In the Gamma coordination model, ";
+		if (activateDebug && output.indexOf(toFind) >= 0) {
+			String strLocation = toFind;
+			System.out.println("test for debug : output = " + output);
+			int idx = output.indexOf(strLocation);
+			if (idx >= 0) {
+				String test = "" + output.substring(idx + strLocation.length());
+				String seq = "\u00c3" + "\u00a8";
+				System.out.println("find " + "sequence " + " = " + test.contains(seq));
+				System.out.println("test = " + test);
+				for (int charIdx = 0; charIdx < Math.min(25, test.length()); charIdx++) {
+					char nextChar = test.charAt(charIdx);
+					System.out.println("nextChar = " + nextChar + " asccii = " + (int) nextChar + " hex = "
+							+ String.format("%04x", (int) nextChar));
+				}
+			}
+		}
+		return output;
+	}
+
+	private static void generateMainTex(String sourceTexDir)  {
+		File sourceDirectory = new File(sourceTexDir);
+		File[] files = sourceDirectory.listFiles();
+		// Print name of the all files present in that path
+		if (files != null) {
+			Writer mainTexWriter = null;
+			try {
+				mainTexWriter = new BufferedWriter(new OutputStreamWriter(new FileOutputStream("main.tex"), "UTF8"));
+				for (File file : files) {
+					String fileName = file.getName();
+					if(fileName.endsWith(".tex")) {
+						System.out.println(fileName);
+						BufferedReader reader = new BufferedReader(new FileReader(sourceTexDir + "/" + fileName));
+						String inputLine = null;
+						while ((inputLine = reader.readLine()) != null) {
+							if(!toIgnore(inputLine)) {
+								inputLine = cleanLine(inputLine);
+								mainTexWriter.append(lineSep).append(inputLine);
+							}
+						}
+						reader.close();
+					}
+				}
+			} catch (UnsupportedEncodingException e) {
+				// TODO Auto-generated catch block
+				e.printStackTrace();
+			} catch (Exception e) {
+				// TODO Auto-generated catch block
+				e.printStackTrace();
+			} finally {
+				try {
+					mainTexWriter.close();
+				} catch (Exception ex) {
+					/* ignore */}
+			}
+		}
+	}
+
 	public static void main(String[] args) {
 		Writer writer = null;
 		BufferedReader reader;
@@ -326,14 +486,18 @@ public class Latex2DocMain {
 		try {
 			// String currentDir = System.getProperty("user.dir");
 			// System.out.println("Current dir using System:" + currentDir);
+			if(sourceTexDir != null) {
+				generateMainTex(sourceTexDir);
+			}
 			reader = new BufferedReader(new FileReader("main.tex"));
-			writer = new BufferedWriter(new OutputStreamWriter(new FileOutputStream("report.txt"), "utf-8"));
+			writer = new BufferedWriter(new OutputStreamWriter(new FileOutputStream("report.txt"), "UTF8"));
 			String inputLine = null;
 			boolean inIgnoredBloc = false;
 			mapCounters = new HashMap<>();
 			while ((inputLine = reader.readLine()) != null) {
 				// read next line
-				if (activateDebug && inputLine.contains("Smart grid system with an energy provider and $M$ ")
+				inputLine = cleanLine(inputLine);
+				if (activateDebug && inputLine.contains("caption{")
 				// || inputLine.contains("when applying this indexed pricing policy to the
 				// previous example, the 7 unsatisfied agents then defer thei"))
 				) {
@@ -350,7 +514,7 @@ public class Latex2DocMain {
 						;
 						if (skipIgnore) {
 							if (activateDebug && retainedBraceBlock != null) {
-								System.out.println("For debug");
+								System.out.println("For debug : skipIgnore");
 							}
 							// Dynamic representation of a consumer.
 							handleLine(inputLine, nbBlanks, writer, inIgnoredBloc);
