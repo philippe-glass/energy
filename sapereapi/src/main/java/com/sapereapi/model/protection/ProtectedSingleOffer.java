@@ -24,41 +24,34 @@ public class ProtectedSingleOffer extends ProtectedObject {
 		this.singleOffer = offer;
 	}
 
-	public boolean hasAccesAsConsumer(SapereAgent consumerAgent) {
-		return checkAccessAsConsumer(consumerAgent.getAuthentication());
-	}
-
-	public boolean hasAccesAsProducer(SapereAgent prodAgent) {
-		return checkAccessAsProducer(prodAgent.getAuthentication());
-	}
-
 	@Override
-	boolean checkAccessAsProducer(AgentAuthentication authentication) {
-		boolean hasTypeProducer = AgentType.PROSUMER.name().equals(authentication.getAgentType());
-		if (hasTypeProducer && singleOffer.getProducerAgent().equals((authentication.getAgentName()))) {
+	boolean checkAccessAsIssuer(AgentAuthentication authentication) {
+		boolean hasTypeProsuer = AgentType.PROSUMER.name().equals(authentication.getAgentType());
+		if (hasTypeProsuer && singleOffer.getProducerAgent().equals((authentication.getAgentName()))) {
 			return checkAuthentication(authentication);
 		}
 		return false;
 	}
 
 	@Override
-	boolean checkAccessAsConsumer(AgentAuthentication authentication) {
-		boolean hasTypeConsumer = AgentType.PROSUMER.name().equals(authentication.getAgentType());
-		if (hasTypeConsumer && singleOffer.getConsumerAgent().equals((authentication.getAgentName()))) {
+	boolean checkAccessAsReceiver(AgentAuthentication authentication) {
+		boolean hasTypeProsumer = AgentType.PROSUMER.name().equals(authentication.getAgentType());
+		if (hasTypeProsumer && singleOffer.getConsumerAgent().equals((authentication.getAgentName()))) {
 			return checkAuthentication(authentication);
 		}
 		return false;
 	}
 
-	public String getConsumerAgent(SapereAgent producerAgent) throws PermissionException {
-		if (!hasAccesAsProducer(producerAgent)) {
-			throw new PermissionException("Access denied for agent " + producerAgent.getAgentName());
+	public String getConsumerAgent(SapereAgent agent) throws PermissionException {
+		boolean hasAccess = hasAccessAsIssuer(agent) || hasAccessAsReceiver(agent);
+		if (!hasAccess) {
+			throw new PermissionException("Access denied for agent " + agent.getAgentName());
 		}
 		return singleOffer.getConsumerAgent();
 	}
 
 	public SingleOffer getSingleOffer(SapereAgent agent) throws PermissionException {
-		boolean hasAccess = hasAccesAsProducer(agent) || hasAccesAsConsumer(agent);
+		boolean hasAccess = hasAccessAsIssuer(agent) || hasAccessAsReceiver(agent);
 		if (!hasAccess) {
 			throw new PermissionException("Access denied for agent " + agent.getAgentName());
 		}

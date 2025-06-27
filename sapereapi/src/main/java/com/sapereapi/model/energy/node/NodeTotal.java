@@ -34,6 +34,7 @@ public class NodeTotal extends AbstractAggregatable implements Cloneable, IAggre
 	protected Double requested;
 	protected Double produced;
 	protected Double consumed;
+	protected Double consumedMargin;
 	protected Double consumedLocally;
 	protected Double provided;
 	protected Double providedLocally;
@@ -43,6 +44,10 @@ public class NodeTotal extends AbstractAggregatable implements Cloneable, IAggre
 	protected Double providedMargin;
 	protected Double sentOffersTotal;
 	protected Double receivedOffersTotal;
+	protected Double storageUsedForNeed;
+	protected Double storageUsedForProd;
+	protected Double storedProducersWH;
+	protected Double storedConsumersWH;
 	protected Date date;
 	protected Long timeShiftMS;
 	protected List<EnergyEvent> linkedEvents;
@@ -79,8 +84,13 @@ public class NodeTotal extends AbstractAggregatable implements Cloneable, IAggre
 		provided = 0.0;
 		providedLocally = 0.0;
 		providedMargin = 0.0;
+		consumedMargin = 0.0;
 		sentOffersTotal = 0.0;
 		receivedOffersTotal = 0.0;
+		storageUsedForNeed = 0.0;
+		storageUsedForProd = 0.0;
+		storedProducersWH = 0.0;
+		storedConsumersWH = 0.0;
 		maxWarningDuration = (long) 0;
 		linkedEvents = new ArrayList<EnergyEvent>();
 		receivedOffersRepartition = new HashMap<String, Double>();
@@ -94,7 +104,7 @@ public class NodeTotal extends AbstractAggregatable implements Cloneable, IAggre
 	}
 
 	public boolean hasActivity() {
-		return requested>0 || produced>0;
+		return requested>0 || produced>0 || storageUsedForNeed > 0 || storageUsedForProd > 0;
 	}
 
 	public Long getId() {
@@ -193,6 +203,14 @@ public class NodeTotal extends AbstractAggregatable implements Cloneable, IAggre
 		this.providedMargin = _providedMargin;
 	}
 
+	public Double getConsumedMargin() {
+		return consumedMargin;
+	}
+
+	public void setConsumedMargin(Double consumedMargin) {
+		this.consumedMargin = consumedMargin;
+	}
+
 	public Double getSentOffersTotal() {
 		return sentOffersTotal;
 	}
@@ -207,6 +225,54 @@ public class NodeTotal extends AbstractAggregatable implements Cloneable, IAggre
 
 	public void setReceivedOffersTotal(Double receivedOffersTotal) {
 		this.receivedOffersTotal = receivedOffersTotal;
+	}
+
+	public Double getStorageUsed() {
+		return storageUsedForNeed + storageUsedForProd;
+	}
+
+	public Double getStorageUsedForNeed() {
+		return storageUsedForNeed;
+	}
+
+	public void setStorageUsedForNeed(Double storageUsedForNeed) {
+		this.storageUsedForNeed = storageUsedForNeed;
+	}
+
+	public Double getStorageUsedForProd() {
+		return storageUsedForProd;
+	}
+
+	public void setStorageUsedForProd(Double storageUsedForProd) {
+		this.storageUsedForProd = storageUsedForProd;
+	}
+
+	public Double getStoredProducersWH() {
+		return storedProducersWH;
+	}
+
+	public void setStoredProducersWH(Double storedProducersWH) {
+		this.storedProducersWH = storedProducersWH;
+	}
+
+	public Double getStoredConsumersWH() {
+		return storedConsumersWH;
+	}
+
+	public void setStoredConsumersWH(Double storedConsumersWH) {
+		this.storedConsumersWH = storedConsumersWH;
+	}
+
+	public Double getStoredWH() {
+		return storedConsumersWH + storedProducersWH;
+	}
+
+	public double getMinRequestMissingRequest() {
+		return minRequestMissingRequest;
+	}
+
+	public void setMinRequestMissingRequest(double minRequestMissingRequest) {
+		this.minRequestMissingRequest = minRequestMissingRequest;
 	}
 
 	public Map<String, Double> getReceivedOffersRepartition() {
@@ -359,6 +425,12 @@ public class NodeTotal extends AbstractAggregatable implements Cloneable, IAggre
 				.append(" consumed:").append(UtilDates.df3.format(this.consumed))
 				.append(" available:").append(UtilDates.df3.format(this.available))
 				.append(" missing:").append(UtilDates.df3.format(this.missing));
+		if(storageUsedForNeed > 0) {
+			result.append(" storageUsedForNeed:").append(UtilDates.df3.format(this.storageUsedForNeed));
+		}
+		if(storageUsedForProd > 0) {
+			result.append(" storageUsedForProd:").append(UtilDates.df3.format(this.storageUsedForProd));
+		}
 		return result.toString();
 	}
 
@@ -382,10 +454,15 @@ public class NodeTotal extends AbstractAggregatable implements Cloneable, IAggre
 		result.setProvided(provided);
 		result.setProvidedLocally(providedLocally);
 		result.setProvidedMargin(providedMargin);
+		result.setConsumedMargin(consumedMargin);
 		result.setAvailable(available);
 		result.setMissing(missing);
 		result.setSentOffersTotal(sentOffersTotal);
 		result.setReceivedOffersTotal(receivedOffersTotal);
+		result.setStorageUsedForNeed(storageUsedForNeed);
+		result.setStorageUsedForProd(storageUsedForProd);
+		result.setStoredConsumersWH(storedConsumersWH);
+		result.setStoredProducersWH(storedProducersWH);
 		result.setMaxWarningDuration(maxWarningDuration);
 		result.setMaxWarningConsumer(maxWarningConsumer);
 		result.setTimeShiftMS(timeShiftMS);
@@ -441,8 +518,15 @@ public class NodeTotal extends AbstractAggregatable implements Cloneable, IAggre
 		if(other.getProvidedMargin() != null) {
 			providedMargin+=other.getProvidedMargin();
 		}
+		if(other.getConsumedMargin() != null) {
+			consumedMargin+=other.getConsumedMargin();
+		}
 		sentOffersTotal+=other.getSentOffersTotal();
 		receivedOffersTotal+=other.getReceivedOffersTotal();
+		storageUsedForNeed+=other.getStorageUsedForNeed();
+		storageUsedForProd+=other.getStorageUsedForProd();
+		storedProducersWH+=other.getStoredProducersWH();
+		storedConsumersWH+=other.getStoredConsumersWH();
 		//protected Date date;
 		linkedEvents.addAll(other.getLinkedEvents());
 		for(String agentName : other.getReceivedOffersRepartition().keySet()) {
@@ -608,6 +692,8 @@ public class NodeTotal extends AbstractAggregatable implements Cloneable, IAggre
 		} else if (Math.abs(this.available - lastTotal.getAvailable()) > 0.0001) {
 			return true;
 		} else if (Math.abs(this.providedMargin - lastTotal.getProvidedMargin()) > 0.0001) {
+			return true;
+		} else if (Math.abs(this.consumedMargin - lastTotal.getConsumedMargin()) > 0.0001) {
 			return true;
 		} else if (Math.abs(this.providedLocally - lastTotal.getProvidedLocally()) > 0.0001) {
 			return true;

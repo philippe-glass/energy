@@ -7,6 +7,7 @@ import com.sapereapi.exception.PermissionException;
 import com.sapereapi.model.energy.ConfirmationItem;
 import com.sapereapi.model.energy.ConfirmationTable;
 import com.sapereapi.model.referential.AgentType;
+import com.sapereapi.model.referential.ProsumerRole;
 
 import eu.sapere.middleware.agent.AgentAuthentication;
 import eu.sapere.middleware.agent.SapereAgent;
@@ -24,17 +25,7 @@ public class ProtectedConfirmationTable extends ProtectedObject {
 	}
 
 	@Override
-	public boolean hasAccesAsConsumer(SapereAgent consumerAgent) {
-		return checkAccessAsConsumer(consumerAgent.getAuthentication());
-	}
-
-	@Override
-	public boolean hasAccesAsProducer(SapereAgent prodAgent) {
-		return checkAccessAsProducer(prodAgent.getAuthentication());
-	}
-
-	@Override
-	boolean checkAccessAsProducer(AgentAuthentication authentication) {
+	boolean checkAccessAsIssuer(AgentAuthentication authentication) {
 		boolean agentTypeOK = AgentType.PROSUMER.name().equals(authentication.getAgentType());
 		if (agentTypeOK && confirmationTable.hasIssuer(authentication.getAgentName())) {
 			return checkAuthentication(authentication);
@@ -43,7 +34,7 @@ public class ProtectedConfirmationTable extends ProtectedObject {
 	}
 
 	@Override
-	boolean checkAccessAsConsumer(AgentAuthentication authentication) {
+	boolean checkAccessAsReceiver(AgentAuthentication authentication) {
 		boolean agentTypeOK = AgentType.PROSUMER.name().equals(authentication.getAgentType());
 		if (agentTypeOK && confirmationTable.hasReceiver(authentication.getAgentName())) {
 			return checkAuthentication(authentication);
@@ -52,54 +43,94 @@ public class ProtectedConfirmationTable extends ProtectedObject {
 	}
 
 	public ConfirmationTable getConfirmationTable(SapereAgent producerAgent) throws PermissionException {
-		if (!hasAccesAsProducer(producerAgent)) {
+		if (!hasAccessAsIssuer(producerAgent)) {
 			throw new PermissionException("Access denied for agent " + producerAgent.getAgentName());
 		}
 		return confirmationTable;
 	}
 
+	public String getIssuer(SapereAgent producerAgent) throws PermissionException {
+		if(!hasAccessAsStackholder(producerAgent)) {
+			throw new PermissionException("Access denied for agent " + producerAgent.getAgentName());
+		}
+		return confirmationTable.getIssuer();
+	}
+
 	public boolean hasExpiredItem(SapereAgent producerAgent) throws PermissionException {
-		if (!hasAccesAsProducer(producerAgent)) {
+		String agentName = producerAgent.getAgentName();
+		if (!hasAccessAsIssuer(producerAgent) && confirmationTable.getIssuer().equals(agentName)) {
 			throw new PermissionException("Access denied for agent " + producerAgent.getAgentName());
 		}
 		return confirmationTable.hasExpiredItem();
 	}
 
 	public void cleanExpiredDate(SapereAgent producerAgent) throws PermissionException {
-		if (!hasAccesAsProducer(producerAgent)) {
+		if (!hasAccessAsIssuer(producerAgent)) {
 			throw new PermissionException("Access denied for agent " + producerAgent.getAgentName());
 		}
 		confirmationTable.cleanExpiredDate();
 	}
 
-	public void removeConfirmation(SapereAgent producerAgent, String receiver, boolean isComplementary) throws PermissionException {
-		if (!hasAccesAsProducer(producerAgent)) {
+	public boolean hasConfirmationItem(SapereAgent producerAgent, String receiver, boolean isComplementary, ProsumerRole role) throws PermissionException {
+		if (!hasAccessAsIssuer(producerAgent)) {
 			throw new PermissionException("Access denied for agent " + producerAgent.getAgentName());
 		}
-		confirmationTable.removeConfirmation(receiver, isComplementary);
+		return confirmationTable.hasConfirmationItem(receiver, isComplementary, role);
 	}
 
-	public void confirm(SapereAgent producerAgent, String receiver, boolean isComplementary,  Boolean value, String comment, long timeShiftMS)
-			throws PermissionException {
-		if (!hasAccesAsProducer(producerAgent)) {
+	public void removeConfirmation(SapereAgent producerAgent, String receiver, boolean isComplementary, ProsumerRole role) throws PermissionException {
+		if (!hasAccessAsIssuer(producerAgent)) {
 			throw new PermissionException("Access denied for agent " + producerAgent.getAgentName());
 		}
-		confirmationTable.confirm(receiver, isComplementary, value, comment, timeShiftMS);
+		confirmationTable.removeConfirmation(receiver, isComplementary, role);
 	}
+
+	public void confirmAsProducer(SapereAgent producerAgent, String receiver, boolean isComplementary, Boolean value,
+			String comment, int nbOfRenewals) throws PermissionException {
+		this.confirm(producerAgent, receiver, isComplementary, ProsumerRole.PRODUCER, value, comment, nbOfRenewals);
+	}
+
+	public void confirmAsConsumer(SapereAgent producerAgent, String receiver, boolean isComplementary, Boolean value,
+			String comment, int nbOfRenewals) throws PermissionException {
+		this.confirm(producerAgent, receiver, isComplementary, ProsumerRole.CONSUMER, value, comment, nbOfRenewals);
+	}
+
+	private void confirm(SapereAgent producerAgent, String receiver, boolean isComplementary, ProsumerRole role,  Boolean value, String comment, int nbOfRenewals)
+			throws PermissionException {
+		if (!hasAccessAsIssuer(producerAgent)) {
+			throw new PermissionException("Access denied for agent " + producerAgent.getAgentName());
+		}
+		confirmationTable.confirm(receiver, isComplementary, role, value, comment, nbOfRenewals);
+	}
+
+	public boolean renewConfirmations(SapereAgent producerAgent) throws PermissionException {
+		if (!hasAccessAsIssuer(producerAgent)) {
+			throw new PermissionException("Access denied for agent " + producerAgent.getAgentName());
+		}
+		return confirmationTable.renewConfirmations();
+	}
+
 /*
 	public Boolean getConfirmation(SapereAgent consumerAgent) throws PermissionException {
-		if (!this.hasAccesAsConsumer(consumerAgent)) {
+		if (!this.hasAccesAssConsumer(consumerAgent)) {
 			throw new PermissionException("Access denied for agent " + consumerAgent.getAgentName());
 		}
 		return confirmationTable.getConfirmation(consumerAgent.getAgentName());
 	}
 */
 
-	public ConfirmationItem getConfirmationItem(SapereAgent consumerAgent, boolean isComplementary) throws PermissionException {
-		if (!hasAccesAsConsumer(consumerAgent)) {
+	public ConfirmationItem getConfirmationItem(SapereAgent consumerAgent, boolean isComplementary, ProsumerRole role) throws PermissionException {
+		if (!hasAccessAsStackholder(consumerAgent)) {
 			throw new PermissionException("Access denied for agent " + consumerAgent.getAgentName());
 		}
-		return confirmationTable.getConfirmationItem(consumerAgent.getAgentName(), isComplementary);
+		return confirmationTable.getConfirmationItem(consumerAgent.getAgentName(), isComplementary, role);
+	}
+
+	public ConfirmationItem getConfirmationItem2(SapereAgent consumerAgent, String agentName, boolean isComplementary, ProsumerRole role) throws PermissionException {
+		if (!hasAccessAsStackholder(consumerAgent)) {
+			throw new PermissionException("Access denied for agent " + consumerAgent.getAgentName());
+		}
+		return confirmationTable.getConfirmationItem(agentName, isComplementary, role);
 	}
 
 	/* */
@@ -115,7 +146,7 @@ public class ProtectedConfirmationTable extends ProtectedObject {
 
 	@Override
 	public String toString() {
-		return "ProtectedConfirmationTable " + confirmationTable ;
+		return " " + confirmationTable ;
 	}
 
 	@Override

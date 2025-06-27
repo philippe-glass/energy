@@ -295,7 +295,7 @@ public class VariableMarkovModel implements Serializable {
 		int nbStates = NodeStates.getNbOfStates();
 		DoubleMatrix predictionRow = new DoubleMatrix(1, nbStates);
 		predictionRow.set(0, stateIdx, 1);
-		long timeShiftMS = prediction.getContext().getTimeShiftMS();
+		long timeShiftMS = prediction.getPredictionContext().getTimeShiftMS();
 		double checkSum = predictionRow.getSum();
 		// logger.info("prediction testSum=" + checkSum);
 		for (PredictionStep nextStep : prediction.getListSteps()) {

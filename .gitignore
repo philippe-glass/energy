@@ -33,3 +33,17 @@ bin
 /download_gcp_file/__pycache__
 /mariadb/*.sql
 /lstm/history
+/*.gv
+/docs/latex2doc/PhD-PhilippeGlass
+list_free_rider1_files
+/tests/list_free_rider2.htm
+/tests/storage_private1_10_200_70WH.htm
+/tests/storage_private1_100WH.htm
+/tests/storage_private1_30WH.htm
+/tests/storage_private1_20WH.htm
+/tests/storage_comon1_100WH.htm
+/tests/storage_comon1_200WH.htm
+/tests/storage_comon1_200WH B.htm
+/tests/storage_comon1.htm
+/tests/storage_no.htm
+/tests/storage_comon1_200WH C.htm

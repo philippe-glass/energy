@@ -104,7 +104,7 @@ public class ClusterTotal {
 			}
 		}
 	}
-
+/*
 	public void simulateTransactionsOld() {
 		for (String nextNode : mapAvailable.keySet()) {
 			double available = mapAvailable.get(nextNode);
@@ -147,6 +147,7 @@ public class ClusterTotal {
 			}
 		}
 	}
+*/
 
 	private List<TransactionItem> auxGenerateTransaction(DeviceItem producer,
 			List<DeviceItem> listUnsatisfiedRequests) {

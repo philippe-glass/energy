@@ -10,6 +10,7 @@ import java.util.List;
 import com.sapereapi.agent.energy.EnergyAgent;
 import com.sapereapi.agent.energy.manager.RequestSelectionStrategy;
 import com.sapereapi.log.SapereLogger;
+import com.sapereapi.model.EnergyStorageSetting;
 import com.sapereapi.model.NodeContext;
 import com.sapereapi.model.energy.EnergyRequest;
 import com.sapereapi.model.energy.SingleOffer;
@@ -185,6 +186,15 @@ public class BasicProducerPolicy implements IProducerPolicy {
 		return true;
 	}
 
+	@Override
+	public boolean confirmDonationOfAvailableEnergy(EnergyAgent produserAgent, double availableWH) {
+		EnergyStorageSetting storageSetting = produserAgent.getStorageSetting();
+		if(storageSetting == null || !storageSetting.canSaveEnergy()) {
+			boolean isExternalSupply = produserAgent.getGlobalProduction().getIssuerProperties().getDeviceProperties().hasCategoryExternalSupply();
+			return !isExternalSupply;
+		}
+		return false;
+	}
 
 	@Override
 	public SingleOffer priceOffer(EnergyAgent producerAgent, SingleOffer offer) {

@@ -15,17 +15,17 @@ public class EnergyRequest extends EnergyFlow implements IEnergyRequest {
 	protected Long eventId;
 	private PriorityLevel priorityLevel;
 	private Double delayToleranceMinutes;
-	private Date aux_expiryDate = null;
+	//private Date aux_expiryDate = null;
 	private Date warningDate = null;
 	private Date refreshDate = null;
 	private double awardsCredit = 0.0;
 
 	public EnergyRequest(ProsumerProperties issuerProperties, Boolean isComplementary, PowerSlot powerSlot
-			, Date beginDate, Date endDate, Double delayToleranceMinutes, PriorityLevel priority) {
-		super(issuerProperties, isComplementary, powerSlot, beginDate, endDate);
+			, Date beginDate, Date endDate, Double delayToleranceMinutes, PriorityLevel priority, Boolean disabled) {
+		super(issuerProperties, isComplementary, powerSlot, beginDate, endDate, disabled);
 		this.delayToleranceMinutes = delayToleranceMinutes;
 		this.priorityLevel = priority;
-		this.aux_expiryDate = getCurrentDate();
+		//this.aux_expiryDate = getCurrentDate();
 		this.refreshDate = getCurrentDate();
 		this.awardsCredit = 0.0;
 	}
@@ -58,7 +58,7 @@ public class EnergyRequest extends EnergyFlow implements IEnergyRequest {
 		Date maxBeginDate = UtilDates.shiftDateMinutes(this.beginDate, delayToleranceMinutes);
 		return maxBeginDate;
 	}
-
+/*
 	public Date getAux_expiryDate() {
 		return aux_expiryDate;
 	}
@@ -66,7 +66,7 @@ public class EnergyRequest extends EnergyFlow implements IEnergyRequest {
 	public void setAux_expiryDate(Date aux_expiryDate) {
 		this.aux_expiryDate = aux_expiryDate;
 	}
-
+*/
 	public double getAwardsCredit() {
 		return awardsCredit;
 	}
@@ -188,7 +188,7 @@ public class EnergyRequest extends EnergyFlow implements IEnergyRequest {
 		EnergyRequest copy = new EnergyRequest(cloneIssuerProperties, isComplementary, getPowerSlot(),
 				beginDate == null ? null : new Date(beginDate.getTime()),
 				endDate == null ? null : new Date(endDate.getTime())
-				,this.delayToleranceMinutes, this.priorityLevel);
+				,this.delayToleranceMinutes, this.priorityLevel, this.disabled);
 		if(addIds) {
 			copy.setEventId(eventId);
 		}
@@ -213,7 +213,7 @@ public class EnergyRequest extends EnergyFlow implements IEnergyRequest {
 	public EnergySupply generateSupply() {
 		PricingTable pricingTable = new PricingTable(issuerProperties.getTimeShiftMS());
 		ProsumerProperties cloneIssuerProperties = issuerProperties.copy(true);
-		EnergySupply result = new EnergySupply(cloneIssuerProperties, isComplementary, getPowerSlot(), beginDate,endDate, pricingTable);
+		EnergySupply result = new EnergySupply(cloneIssuerProperties, isComplementary, getPowerSlot(), beginDate,endDate, pricingTable, disabled);
 		result.setEventId(eventId);
 		return result;
 	}
@@ -221,7 +221,7 @@ public class EnergyRequest extends EnergyFlow implements IEnergyRequest {
 	public ProsumerEnergyRequest generateProsumerEnergyRequest() {
 		ProsumerProperties cloneIssuerProperties = issuerProperties == null ? null : issuerProperties.clone();
 		ProsumerEnergyRequest result = new ProsumerEnergyRequest(cloneIssuerProperties, isComplementary, getPowerSlot(),
-				beginDate, endDate, null, delayToleranceMinutes, priorityLevel);
+				beginDate, endDate, null, delayToleranceMinutes, priorityLevel, disabled);
 		result.setEventId(eventId);
 		result.setRefreshDate(refreshDate);
 		result.setWarningDate(warningDate);

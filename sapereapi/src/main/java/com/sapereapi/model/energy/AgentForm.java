@@ -14,6 +14,7 @@ import com.sapereapi.model.referential.DeviceCategory;
 import com.sapereapi.model.referential.EnvironmentalImpact;
 import com.sapereapi.model.referential.PriorityLevel;
 import com.sapereapi.model.referential.ProsumerRole;
+import com.sapereapi.util.SapereUtil;
 import com.sapereapi.util.UtilDates;
 
 import eu.sapere.middleware.node.NodeLocation;
@@ -29,6 +30,7 @@ public class AgentForm {
 	private int distance;
 	private DeviceCategory deviceCategory;
 	private EnvironmentalImpact environmentalImpact;
+	//private EnergyStorageSetting energyStorageSetting;
 	private String electricalPanel;
 	private String sensorNumber;
 	private String deviceLocation;
@@ -57,6 +59,9 @@ public class AgentForm {
 	private Boolean isInSpace;
 	private Boolean isDisabled;
 	private int warningDurationSec;
+	private Double storedWH;
+	private Double storageUsedForNeed;
+	private Double storageUsedForProd;
 	//private Map<Long, Double> mapPrices;
 	private Double price;
 	private long timeShiftMS;
@@ -76,6 +81,9 @@ public class AgentForm {
 		this.missingPower =  0.0;
 		this.availablePower =  0.0;
 		this.missingPower =  0.0;
+		this.storedWH = 0.0;
+		this.storageUsedForNeed = 0.0;
+		this.storageUsedForProd = 0.0;
 		this.waitingContractsPower =  new PowerSlot();
 		this.hasExpired = false;
 		this.isDisabled = false;
@@ -112,6 +120,22 @@ public class AgentForm {
 		this.ongoingContractsTotalLocal = contractsTotalLocal;
 	}
 
+	public Double getStorageUsedForNeed() {
+		return storageUsedForNeed;
+	}
+
+	public void setStorageUsedForNeed(Double storageUsedForNeed) {
+		this.storageUsedForNeed = storageUsedForNeed;
+	}
+
+	public Double getStorageUsedForProd() {
+		return storageUsedForProd;
+	}
+
+	public void setStorageUsedForProd(Double storageUsedForProd) {
+		this.storageUsedForProd = storageUsedForProd;
+	}
+
 	public ProsumerRole getProsumerRole() {
 		return prosumerRole;
 	}
@@ -127,15 +151,7 @@ public class AgentForm {
 	public void setLocation(NodeLocation location) {
 		this.location = location;
 	}
-/*
-	public String getNodeName() {
-		return nodeName;
-	}
 
-	public void setNodeName(String nodeName) {
-		this.nodeName = nodeName;
-	}
-*/
 	public boolean isLocal() {
 		return distance == 0;
 	}
@@ -188,10 +204,10 @@ public class AgentForm {
 		this.powerMax = powerMax;
 	}
 
-	public void setPowers(Double _power, Double _powerMin, Double _powerMax) {
-		this.power = _power;
-		this.powerMin = _powerMin;
-		this.powerMax = _powerMax;
+	public void setPowers(PowerSlot powerSlot) {
+		this.power = powerSlot.getCurrent();
+		this.powerMin = powerSlot.getMin();
+		this.powerMax = powerSlot.getMax();
 	}
 
 	public Date getBeginDate() {
@@ -224,6 +240,14 @@ public class AgentForm {
 
 	public void setLinkedAgents(String[] linkedAgents) {
 		this.linkedAgents = linkedAgents;
+	}
+
+	public Double getStoredWH() {
+		return storedWH;
+	}
+
+	public void setStoredWH(Double storedWH) {
+		this.storedWH = storedWH;
 	}
 
 	public Boolean getHasExpired() {
@@ -374,7 +398,7 @@ public class AgentForm {
 	public EnergySupply getEnergySupply() {
 		ProsumerProperties issuerProperties = retrieveProsumerProperties();
 		return new EnergySupply(issuerProperties, false, generatePowerSlot(), this.beginDate,
-				this.endDate, generatePricingTable());
+				this.endDate, generatePricingTable(), disabledPower > 0);
 	}
 
 	public EnergyRequest getEnergyRequest() {
@@ -390,7 +414,7 @@ public class AgentForm {
 		}
 		ProsumerProperties issuerProperties = retrieveProsumerProperties();
 		return new EnergyRequest(issuerProperties, false, generatePowerSlot(), this.beginDate, this.endDate, this.delayToleranceMinutes,
-				this.priorityLevel);
+				this.priorityLevel, false);
 	}
 
 	public PowerSlot getWaitingContractsPower() {
@@ -646,6 +670,9 @@ public class AgentForm {
 		if(this.prosumerRole == null) {
 			System.err.println("AgentForm constructor : prosumerRole is null");
 		}
+		this.storedWH = agent.getStoredWH();
+		this.storageUsedForNeed = agent.getStorageUsedForNeed();
+		this.storageUsedForProd = agent.getStorageUsedForProd();
 	}
 
 

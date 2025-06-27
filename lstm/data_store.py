@@ -112,6 +112,7 @@ class DataStore():
                         list_matrix_ids.append(matrix_id)
                     except Exception as err:
                         print("Exception", err)
+                        logging.error("Thrown exception:" + str(err))
                         replacement_ok = False
                 else:
                     replacement_ok = False

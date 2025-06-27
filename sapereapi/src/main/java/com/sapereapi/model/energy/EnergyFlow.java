@@ -52,6 +52,11 @@ public abstract class EnergyFlow extends AbstractEnergyFlow implements IEnergyOb
 		return (durationHours * powerSlot.getCurrent());
 	}
 
+	public Double getRemainWH() {
+		Double durationHours = UtilDates.computeDurationHours(getCurrentDate(), endDate);
+		return (durationHours * powerSlot.getCurrent());
+	}
+
 	public PowerSlot getPowerSlot() {
 		return powerSlot;// new PowerSlot(this.power, this.powerMin, this.powerMax);
 	}
@@ -64,13 +69,14 @@ public abstract class EnergyFlow extends AbstractEnergyFlow implements IEnergyOb
 	}
 
 	public EnergyFlow(ProsumerProperties _issuerProperties, Boolean _isComplementary, PowerSlot powerSlot,
-			Date beginDate, Date endDate) {
+			Date beginDate, Date endDate, Boolean disabled) {
 		super();
 		this.issuerProperties = _issuerProperties;
 		this.powerSlot = powerSlot;
 		this.beginDate = beginDate;
 		this.endDate = endDate;
 		this.isComplementary = _isComplementary;
+		this.disabled = disabled;
 		try {
 			checkPowers();
 		} catch (Exception e) {
@@ -143,7 +149,7 @@ public abstract class EnergyFlow extends AbstractEnergyFlow implements IEnergyOb
 		ProsumerProperties cloneIssuerProperties = issuerProperties.copy(true);
 		EnergySupply result = new EnergySupply(cloneIssuerProperties
 				, isComplementary, getPowerSlot()
-				,beginDate,endDate, pricingTable);
+				,beginDate,endDate, pricingTable, disabled);
 		return result;
 	}
 
@@ -152,7 +158,7 @@ public abstract class EnergyFlow extends AbstractEnergyFlow implements IEnergyOb
 		double delayToleranceMinutes = UtilDates.computeDurationMinutes(getBeginDate(), getEndDate());
 		//PricingTable pricingTable = new PricingTable(issuerProperties.getTimeShiftMS());
 		EnergyRequest request = new EnergyRequest(issuerProperties, isComplementary, getPowerSlot(), beginDate, endDate
-				, delayToleranceMinutes, PriorityLevel.LOW);
+				, delayToleranceMinutes, PriorityLevel.LOW, disabled);
 		return request;
 	}
 }

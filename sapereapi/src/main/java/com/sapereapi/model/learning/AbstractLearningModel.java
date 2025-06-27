@@ -321,6 +321,7 @@ public abstract class AbstractLearningModel extends AbstractAggregatable impleme
 				// Retrieve needed transtition matrices
 				for (String variable : variables) {
 					prediction = computeVariablePrediction(nodeStateTransitions, prediction, variable, logger);
+					prediction.setSamplingNb(variable, this.getSamplingNb(variable));
 				}
 				// Generate random prediction
 				prediction.generateRandomState();
@@ -448,8 +449,10 @@ public abstract class AbstractLearningModel extends AbstractAggregatable impleme
 							predictionResult.setActualTargetValue(targetStateItem.getValue(variable));
 							predictionResult
 									.setActualTargetState(NodeStates.getById(targetStateItem.getStateId(variable)));
-							logger.info("AbstractLearningModel.evaluateModelsCrossEntropy " + variable + " " + nextNode
-									+ ": predictionResult = " + predictionResult);
+							if("produced".equals(variable)) {
+								logger.info("AbstractLearningModel.evaluateModelsCrossEntropy " + variable + " " + nextNode
+										+ ": predictionResult = " + predictionResult);
+							}
 							// get state distribution
 							StatesStatistic statesStatistic = mapStatesStatistics.get(targetFeaturesKey);
 							predictionResult.setActualStatesStatistic(statesStatistic);
@@ -537,7 +540,7 @@ public abstract class AbstractLearningModel extends AbstractAggregatable impleme
 				Map<String, Double> variableWeightTable = new HashMap<String, Double>();
 				for (String nextNode : mapLearningModels.keySet()) {
 					ILearningModel nodeModel = mapLearningModels.get(nextNode);
-					double samplingNb = nodeModel.getNbOfObservations(variable);
+					double samplingNb = nodeModel.getSamplingNb(variable);
 					// boolean isLocal = localNode.equals(nextNode);
 					// double weight = isLocal ? 10. : 1.0;
 					variableWeightTable.put(nextNode, samplingNb);

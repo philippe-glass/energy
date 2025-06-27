@@ -325,7 +325,6 @@ public class AwardsComputingData implements Serializable {
 				}
 				double notGivenPower = 0;
 				// Compute not given power to generate penalities : correspond to saved energy of prosumers which don't provide pending requests 
-				//double totalMissingOld = Math.max(0, totalRequested - totalProvided);
 				double totalMissing = Math.max(0, totalRequestedWithNoPenality - totalProvided);
 				if(totalMissing > 0) {
 					double availablePower = Math.max(0., producedPower - providedPower - proposedPower);

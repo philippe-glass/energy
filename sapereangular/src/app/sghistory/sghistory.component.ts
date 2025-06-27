@@ -11,6 +11,7 @@ import { fnum2,fnum3, precise_round, formatTime, formatDate, formatTime2, timeYY
   , getDefaultInitTime, getDefaultHour, getDefaulInitDay, getDefaultTargetTime, getDefaultTargetDay
   , getDefaultTime, getDefaultTime2, timeHMtoDate, toogleDisplay, format2D
  } from '../common/util.js';
+import { isDefined } from '@angular/compiler/src/util';
 
 @Component({
   selector: 'app-sghistory',
@@ -20,29 +21,14 @@ import { fnum2,fnum3, precise_round, formatTime, formatDate, formatTime2, timeYY
 })
 
 export class SGHistoryComponent implements OnInit {
-  @Input() private dataMax : Array<any>;
-  @Input() private dataRequested : Array<any>;
-  @Input() private dataProduced : Array<any>;
-  @Input() private dataProvided : Array<any>;
-  @Input() private dataConsumed : Array<any>;
-  @Input() private dataAvailable : Array<any>;
-  @Input() private dataMissing : Array<any>;
-  @Input() private dataMinMissingRequest : Array<any>;
-  @Input() private chartData: Array<any>;
   @ViewChild('myModal') myModal;
-
-
-  private minDate = new Date();
-  private maxDate = new Date();
-  private deltaTime = 0;
+  private chartData = {};
+  //private minDate = new Date();
+  //private maxDate = new Date();
+  //private deltaTime = 0;
   private nodeTotalHistory = [];
   private nodeTotalHistoryDisplay = [];
-  private maxWarningDuration = 0;
-  private cumulativeWarningDuration = 0;
-  private cumulativeWarningEnergy = 0;
-  private cumulativeProducedEnergy = 0;
-  private cumulativeDuration = "";
-  private maxWarningDurationDate = null;
+  private total = {};
   private chartContainer: ElementRef;
   private totalWidth = 0;
   private totalHeight = 0;
@@ -58,10 +44,15 @@ export class SGHistoryComponent implements OnInit {
   private xAxisPos = 0;
   private yMinPos = 0;
   private nbTicks = 100;
-  maxDisplayTime = new Date();
+  private maxDisplayTime = new Date();
   private captionYPos = [];
   private listAgents = [];
-  private filter = {"agentName":""}
+  private filter = {"agentName":"", "processingTimeToleranceSec":0};
+  private chartVariables = ["missing",  "requested", "produced", "provided", "consumed", "available", "minMissingRequest", "max"];
+  private chartActivation = {};
+  //private chartActivation = {"requested":true, "missing":true, "produced":true, "provided":true, "available":true, "consumed":true};
+
+  private displayAdditionalPower = false;
 
   constructor(private httpClient: HttpClient,private _constant: ConstantsService, public _chartElem: ElementRef) {
     this.chartContainer = _chartElem;
@@ -81,30 +72,39 @@ export class SGHistoryComponent implements OnInit {
       subscribe((res :any[])=> {
         this.nodeTotalHistory=res;
         console.log("this.httpClient.get : nodeTotalHistory = ", this.nodeTotalHistory );
-        this.dataMax = [];
-        this.dataMissing = [];
-        this.dataRequested = [];
-        this.dataProduced = [];
-        this.dataProvided = [];
-        this.dataConsumed = [];
-        this.dataAvailable = [];
+        //this.dataMax = [];
+        this.chartData = {};
+        for(var i = 0; i < this.chartVariables.length; i++) {
+          var variable = this.chartVariables[i];
+          this.chartData[variable] = [];
+          if(!isDefined(this.chartActivation[variable])) {
+            this.chartActivation[variable] = (variable == "consumed")? false: true;
+          }
+        }
+        var listAgentNames = []
         if(this.filter.agentName == "") {
           this.listAgents = [];
         }
-        this.dataMinMissingRequest = [];
-        this.minDate = null;
-        this.maxWarningDuration = 0;
-        this.cumulativeWarningDuration = 0;
-        this.cumulativeWarningEnergy = 0;
-        this.cumulativeProducedEnergy = 0;
+        //this.minDate = null;
+        //this.maxWarningDuration = 0;
+        this.total = {"cumulativeWarningDuration":0
+           // , "warningWS":0, "producedWS":0, "missingWS":0, "requestedWS":0
+            , "warningWH":0, "producedWH":0, "missingWH":0, "requestedWH":0, "storageUsedForProdWH":0, "storageUsedForNeed":0
+            , "maxWarningDurationDate":null, "warningPercent":0, "maxWarningDuration":0
+            , "minDate" : null, "maxDate" : null, "deltaTime":0
+          };
         var currentWarningDuration = 0;
         var lastDate = null;
         var lastMaxWarningDuration = 0;
         var listWarningDuration = [];
         var date = null;
         this.nodeTotalHistoryDisplay = [];
+        this.displayAdditionalPower = false;
         for(var i = 0; i < this.nodeTotalHistory.length; i++) {
             var obj = this.nodeTotalHistory[i];
+            if(obj.storageUsed > 0) {
+              this.displayAdditionalPower = true;
+            }
             var nbEvents = obj.linkedEvents.length;
             if(nbEvents>0) {
               var rowspan = nbEvents;
@@ -115,10 +115,17 @@ export class SGHistoryComponent implements OnInit {
                   if(this.filter.agentName == "") {
                     //console.log("agentFilter=", this.filter.agentName)
                     var agentName = event.issuer;
-                    if(!this.listAgents.includes(agentName)) {
-                      this.listAgents.push(agentName);
-                      //console.log("agentName = ", agentName, "listAgents = ", this.listAgents);
+                    if(!listAgentNames.includes(agentName)) {
+                      listAgentNames.push(agentName);
+                      var deviceName = event.issuerProperties.deviceProperties.name;
+                      console.log("agentName = ", agentName, "listAgentNames = ", listAgentNames, ", deviceName = " + deviceName);
+                      var agentLabel = agentName + " (" + deviceName + ")";
+                      var agentItem = {"value":agentName, "label":agentLabel};
+                      this.listAgents.push(agentItem);
                     }
+                  }
+                  if(event.additionalPower > 0)  {
+                    this.displayAdditionalPower = true;
                   }
                   var nextRow = JSON.parse(JSON.stringify(obj));
                   nextRow['linkedEvents'] = null;
@@ -146,19 +153,20 @@ export class SGHistoryComponent implements OnInit {
           //var item = {"date":obj.date, "power": obj.requested};
           lastDate = date;
           date = new Date(obj.date);
-          if(this.minDate==null) {
-            this.minDate = date;
-          }
+          /*
+          if(this.total["minDate"]==null) {
+            this.total["minDate"] = date;
+          }*/
           //console.log("offers", obj.offers);
           //console.log("date=", date);
           var time = formatTime2(new Date(obj.date));
           var max = Math.max(obj.requested, obj.produced, obj.available);
-          this.dataMissing.push([date, obj.missing]);
-          this.dataRequested.push([date, obj.requested]);
-          this.dataProduced.push([date, obj.produced]);
-          this.dataProvided.push([date, obj.provided]);
-          this.dataAvailable.push([date, obj.available]);
-          this.dataConsumed.push([date, obj.consumed]);
+          this.chartData['missing'].push([date, obj.missing]);
+          this.chartData['requested'].push([date, obj.requested]);
+          this.chartData['produced'].push([date, obj.produced]);
+          this.chartData['available'].push([date, obj.available]);
+          this.chartData['provided'].push([date, obj.provided]);
+          this.chartData['consumed'].push([date, obj.consumed]);
           var minRequestMissing = 0;
           if(obj.available > obj.minRequestMissing && obj.minRequestMissing > 0) {
             minRequestMissing = obj.minRequestMissing;
@@ -166,23 +174,34 @@ export class SGHistoryComponent implements OnInit {
           if(this.filter.agentName != "" && obj.maxWarningDuration > 0 ) {
             minRequestMissing = obj.minRequestMissing;
           }
-          this.dataMinMissingRequest.push([date, minRequestMissing]);
-          this.dataMax.push([date, max]);
-          if(date.getTime() < this.minDate.getTime()) {
-            this.minDate = date;
+          this.chartData['minMissingRequest'].push([date, minRequestMissing]);
+          this.chartData['max'].push([date, max]);
+          if(this.total["minDate"] == null || date.getTime() < this.total["minDate"].getTime()) {
+            this.total["minDate"] = date;
           }
-          if(date.getTime() >  this.minDate.getTime()) {
-            this.maxDate = date;
+          if(this.total["maxDate"] == null || date.getTime() >  this.total["maxDate"].getTime()) {
+            this.total["maxDate"] = date;
           }
-          if(obj.maxWarningDuration > this.maxWarningDuration) {
-            this.maxWarningDuration = obj.maxWarningDuration;
-            this.maxWarningDurationDate = date;
+          if(obj.maxWarningDuration > this.total['maxWarningDuration']) {
+            this.total['maxWarningDuration'] = obj.maxWarningDuration;
+            this.total['maxWarningDurationDate'] = date;
           }
+          //console.log("TTTTTTTTTESST");
           if(lastDate != null && (date.getTime() > lastDate.getTime())) {
             var deltaSec =  (date.getTime() - lastDate.getTime())/1000;
-            this.cumulativeProducedEnergy+= deltaSec * obj.produced;
-            this.cumulativeWarningEnergy+= deltaSec * obj.sumWarningPower;
-            //console.log(this.cumulativeWarningEnergy, this.cumulativeProducedEnergy);
+            /*
+            this.total['producedWS']+= deltaSec * obj.produced;
+            this.total['missingWS']+= deltaSec * obj.missing;
+            this.total['requestedWS']+= deltaSec * obj.requested;
+            this.total['warningWS']+= deltaSec * obj.sumWarningPower;
+            */
+            this.total['producedWH']+= deltaSec * obj.produced / 3600;
+            this.total['missingWH']+= deltaSec * obj.missing / 3600;
+            this.total['requestedWH']+= deltaSec * obj.requested / 3600;
+            this.total['warningWH']+= deltaSec * obj.sumWarningPower / 3600;
+            this.total['storageUsedForNeed']+= deltaSec * obj.storageUsedForNeed / 3600;
+            this.total['storageUsedForProdWH']+= deltaSec * obj.storageUsedForProd / 3600;
+            console.log("storageUsedForProd = ", obj.storageUsedForProd);
             //console.log("deltaMS", deltaSec, lastMaxWarningDuration, obj.maxWarningDuration);
             if(obj.maxWarningDuration >= lastMaxWarningDuration + deltaSec) {
               //currentWarningDuration = obj.maxWarningDuration;
@@ -203,28 +222,28 @@ export class SGHistoryComponent implements OnInit {
           listWarningDuration.push(currentWarningDuration);
         }
         console.log("listWarningDuration", listWarningDuration);
-        this.cumulativeWarningDuration = 0;
+        this.total['cumulativeWarningDuration'] = 0;
         for(var i = 0; i < listWarningDuration.length; i++) {
-          this.cumulativeWarningDuration+=listWarningDuration[i];
+          this.total['cumulativeWarningDuration']+=listWarningDuration[i];
         }
-        console.log("minDate", this.minDate, "maxDate", this.maxDate, this.maxDate.getTime(), "maxWarningDuration", this.maxWarningDuration);
-        if(this.minDate != null) {
-          this.deltaTime = this.maxDate.getTime() - this.minDate.getTime();
+        console.log("minDate", this.total["minDate"], "maxDate", this.total["maxDate"], this.total["maxDate"].getTime(), "maxWarningDuration", this.total['maxWarningDuration']);
+        if(this.total["minDate"] != null) {
+          this.total["deltaTime"] = this.total["maxDate"].getTime() - this.total["minDate"].getTime();
+          this.total['warningPercent'] = 100*1000*this.total['cumulativeWarningDuration'] / this.total["deltaTime"];
         }
-        var deltaTimeTotalSec = this.deltaTime/1000;
+        var deltaTimeTotalSec = this.total["deltaTime"]/1000;
         var deltaTimeSec = deltaTimeTotalSec % 60;
         var deltaTimeMin = (deltaTimeSec/ 60) % 60;
         //var testDate = timeHMtoDate();
-        console.log("deltaTime = " + this.deltaTime);
-
-        console.log("this.dataMax", this.dataMax);
+        console.log("deltaTime = " + this.total["deltaTime"]);
+        //console.log("this.dataMax", this.dataMax);
         console.log("this.chartContainer", this.chartContainer);
-        if(isFirstLoad) {
+        if (isFirstLoad) {
           this.createChart();
         } else {
           this.emptyChart();
         }
-        if (this.dataMax) {
+        if (this.chartData['max']) {
           this.updateChart();
         }
       });
@@ -235,6 +254,12 @@ export class SGHistoryComponent implements OnInit {
       this.maxDisplayTime.setMilliseconds(0);
       this.maxDisplayTime.setTime(this.maxDisplayTime.getTime() + 60 * 24*60 * 1000 );
       console.log("maxDisplayTime", this.maxDisplayTime);
+  }
+
+  changeAgentFilter(event) {
+    var isAgentFilterSet = (event != "");
+    console.log("changeAgentFilter", event, "isAgentFilterSet", isAgentFilterSet);
+    this.chartActivation["consumed"] = isAgentFilterSet;
   }
 
   applyFilter() {
@@ -320,7 +345,7 @@ export class SGHistoryComponent implements OnInit {
 
 
   setDimensions() {
-    this.totalWidth = Math.max(1800,5*this.deltaTime/1000);
+    this.totalWidth = Math.max(1800,5*this.total["deltaTime"]/1000);
     console.log("setDimensions : totalWidth = " , this.totalWidth);
     var maxTotalWdth = 5*1000;
     if(this.totalWidth > maxTotalWdth && true) {
@@ -336,7 +361,7 @@ export class SGHistoryComponent implements OnInit {
 
 
   createChart() {
-    console.log("createChart2 deltaTime = ", this.deltaTime);
+    console.log("createChart2 deltaTime = ", this.total["deltaTime"]);
     let element = this.chartContainer.nativeElement;
     this.setDimensions();
     console.log("createChart", element, element.offsetWidth, element.offsetHeight);
@@ -357,17 +382,22 @@ export class SGHistoryComponent implements OnInit {
       .attr('transform', `translate(${this.margin.left}, ${this.margin.top})`);
 
     // define X & Y domains
-    let xDomain = this.dataMax.map(d => d[0]);
+    var dataMax : Array<any>;
+    dataMax = this.chartData['max'];
+    //var dataMax = this.dataMax;
+    console.log("dataMax = ", dataMax);
+    //console.log("dataMax2= ", dataMax2);
+    //let xDomain = this.dataMax.map(d => d[0]);
 
     //let xDomain = [this.minDate, this.maxDate];
     //console.log("xDomain", xDomain, this.minDate, this.maxDate);
 
-    let yDomain = [0, d3.max(this.dataMax, d => d[1])];
+    let yDomain = [0, d3.max(dataMax, d => d[1])];
 
     // create scales
     //this.xScale = d3.scaleBand().padding(0.1).domain(xDomain).rangeRound([0, this.width]);
     this.xScale = d3.scaleTime()
-      .domain( [this.minDate, this.maxDate])
+      .domain( [this.total["minDate"], this.total["maxDate"] ])
       .range([0, this.width]);
 
     //console.log("xScale minDate: ", this.xScale(this.minDate));
@@ -377,7 +407,7 @@ export class SGHistoryComponent implements OnInit {
     this.yScale = d3.scaleLinear().domain(yDomain).range([this.yMinPos, 0]);
 
     // bar colors
-    this.colors = d3.scaleLinear().domain([0, this.dataMax.length]).range(<any[]>['red', 'blue']);
+    this.colors = d3.scaleLinear().domain([0, dataMax.length]).range(<any[]>['red', 'blue']);
 
     this.xAxisPos = this.margin.top +0.1*this.margin.bottom + this.height;
 
@@ -403,57 +433,48 @@ export class SGHistoryComponent implements OnInit {
   }
 
   updateChart() {
-    console.log("updateChart begin_", this.dataMax, this.dataMissing , this.xScale);
-    console.log("test1", this.xScale(this.minDate),  this.xScale(this.maxDate));
+    var dataMax : Array<any>;
+    dataMax = this.chartData['max'];
+    //console.log("updateChart begin_", this.dataMax, this.dataMissing , this.xScale);
+    console.log("updateChart begin_", dataMax, this.chartData['missing'] , this.xScale);
+    console.log("test1", this.xScale(this.total["minDate"]),  this.xScale(this.total["maxDate"]));
 
     // update scales & axis
-    this.yScale.domain([0, d3.max(this.dataMax, d => d[1])]);
-    this.colors.domain([0, this.dataMax.length]);
+    this.yScale.domain([0, d3.max(dataMax, d => d[1])]);
+    this.colors.domain([0, dataMax.length]);
     this.yAxis.transition().call(d3.axisLeft(this.yScale));
 
-    let updateBar = this.chart.selectAll('.bar').data(this.dataMax);
+    //let updateBar = this.chart.selectAll('.bar').data(this.dataMax);
+    let updateBar = this.chart.selectAll('.bar').data(this.chartData['max']);
     updateBar.exit().remove();
 
-    let updateLine = this.chart.selectAll('.line').data(this.dataMax);
+    let updateLine = this.chart.selectAll('.line').data(this.chartData['max']);
     updateLine.exit().remove();
 
     // remove exiting bars
 
     console.log("updateChart step1");
     //this.displayLine2(this.dataMinMissingRequest, "black", "Min Missing");
-    this.displayBar2(this.dataMinMissingRequest, "rgb(252, 133, 133)", "Min Missing");
-    if(this.filter.agentName != "") {
-      this.displayBar2(this.dataConsumed, "rgb(138,247,253)", "Consumed");
+    //this.displayBar2(this.dataMinMissingRequest, "rgb(252, 133, 133)", "Min Missing");
+    this.displayBar2(this.chartData["minMissingRequest"], "rgb(252, 133, 133)", "Min Missing");
+    if(this.chartActivation["consumed"]) {
+        this.displayBar2(this.chartData["consumed"], "rgb(138,247,253)", "Consumed");
     }
-    this.displayLine2(this.dataRequested, "rgba(9, 53, 175, 0.712)", "Requested");
-    this.displayLine2(this.dataMissing, "rgb(252, 0, 0)", "Missing");
-    this.displayLine2(this.dataAvailable, "rgb(76, 248, 142)", "Available");
-    this.displayLine2(this.dataProduced, "darkgreen", "Produced");
+    if(this.chartActivation["requested"]) {
+      this.displayLine2(this.chartData["requested"], "rgba(9, 53, 175, 0.712)", "Requested");
+    }
+    if(this.chartActivation["missing"]) {
+      this.displayLine2(this.chartData['missing'] , "rgb(252, 0, 0)", "Missing");
+    }
+    if(this.chartActivation["available"]) {
+      this.displayLine2(this.chartData["available"], "rgb(76, 248, 142)", "Available");
+    }
+    if(this.chartActivation["produced"]) {
+      this.displayLine2(this.chartData["produced"], "darkgreen", "Produced");
+    }
     //this.displayLine(update, this.dataConsumed, "grey");
     // Display max warning duration
-    let warningPercent = 100*1000*this.cumulativeWarningDuration / this.deltaTime;
     let svg = d3.select("svg");
-    svg.append('text')
-      .attr("fill", "black")
-      .style("font-size", "12px")
-      .attr("x",10)
-      .attr("y", 10)
-      .text(""
-        + " Cumulative warning duration : " + this.formatDuration(1000*this.cumulativeWarningDuration) + "  / " + this.formatDuration(this.deltaTime)
-        + "  (" + this.fnum2(warningPercent) + " %)"
-        + " max = " + this.maxWarningDuration + " sec at " + this.disaplyTime(this.maxWarningDurationDate))
-    ;
-    svg.append('text')
-      .attr("fill", "black")
-      .style("font-size", "12px")
-      .attr("x",10)
-      .attr("y", 30)
-      .text(""
-          + " Cumulative warning energy " + this.fnum2(this.cumulativeWarningEnergy/3600 ) + " WH"
-          + " (" + this.fnum2(100* this.cumulativeWarningEnergy / this.cumulativeProducedEnergy) + " % )"
-          + "  Cumulative produced : " + this.fnum2(this.cumulativeProducedEnergy/ 3600000) + " KWH  "
-         )
-    ;
   }
 
   displayCaption(data, lineColor, caption) {
@@ -560,7 +581,7 @@ export class SGHistoryComponent implements OnInit {
     var ss = durationSec % 60;
     var mm = Math.floor((durationSec / 60) % 60);
     var hh = Math.floor((durationSec / 3600) % 24);
-    console.log("formatDuration ", ss, mm, hh);
+    //console.log("formatDuration ", ss, mm, hh);
     if(mm==0 && hh ==0) {
       return (ss + " sec.");
     }
@@ -617,7 +638,7 @@ getClassBorderTop(nodeTotal) {
     var consumer = nextOffer.request.issuer;
     var sOffer = "(" + nextOffer.id + ") " + provider + "->" + consumer
       + (nextOffer.isComplementary?" [COMPLEMENTARY] ": "")
-      + " W=" + nextOffer.power
+      + " W=" + fnum3(nextOffer.power)
       + " [" +  this.disaplyTime(nextOffer.creationTime) + " to " +  this.disaplyTime(nextOffer.deadline) + "]";
     if(nextOffer.acquitted>0) {
       sOffer = sOffer + " acquitted";

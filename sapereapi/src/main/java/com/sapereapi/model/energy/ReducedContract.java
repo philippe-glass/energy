@@ -142,7 +142,8 @@ public class ReducedContract extends EnergySupply implements IEnergyObject {
 	public ReducedContract(EnergyRequest request
 			, EnergySupply supply
 			, Date validationDeadline) {
-		super(supply.getIssuerProperties(), request.isComplementary(), supply.getPowerSlot(), supply.getBeginDate(), supply.getEndDate(), supply.getPricingTable());
+		super(supply.getIssuerProperties(), request.isComplementary(), supply.getPowerSlot(), supply.getBeginDate()
+				, supply.getEndDate(), supply.getPricingTable(), supply.getDisabled());
 		this.request = request;
 		this.validationDeadline = validationDeadline;
 	}
@@ -163,7 +164,7 @@ public class ReducedContract extends EnergySupply implements IEnergyObject {
 		PricingTable clonePricingTable = pricingTable == null ? null : pricingTable.clone();
 		ProsumerProperties cloneIssuerProperties = this.issuerProperties.copy(copyIds);
 		EnergySupply cloneSupply = new EnergySupply(cloneIssuerProperties, isComplementary, getPowerSlot(),
-				beginDate, endDate, clonePricingTable);
+				beginDate, endDate, clonePricingTable, disabled);
 		ReducedContract result = new ReducedContract(request.copy(copyIds), cloneSupply, validationDeadline);
 		result.setAgreements(SapereUtil.cloneSetStr(agreements));
 		result.setDisagreements(SapereUtil.cloneSetStr(disagreements));

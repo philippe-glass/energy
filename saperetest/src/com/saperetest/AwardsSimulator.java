@@ -6,8 +6,10 @@ import java.util.List;
 import java.util.TimeZone;
 import java.util.TreeMap;
 
+import com.sapereapi.model.EnergyStorageSetting;
 import com.sapereapi.model.PredictionSetting;
 import com.sapereapi.model.energy.AgentForm;
+import com.sapereapi.model.energy.StorageType;
 import com.sapereapi.model.energy.pricing.PricingTable;
 import com.sapereapi.model.energy.input.AgentInputForm;
 import com.sapereapi.model.energy.policy.PolicyFactory;
@@ -75,12 +77,13 @@ public class AwardsSimulator extends TestSimulator {
 		}
 		String scenario = AwardsSimulator.class.getSimpleName();
 		InitializationForm initForm = new InitializationForm();
+		EnergyStorageSetting globalEnergyStorageSetting = null; //new EnergyStorageSetting(true, true, StorageType.PRIVATE, 100);
 		initForm.setScenario(scenario);
 		initForm.setMaxTotalPower(maxTotalPower);
-		initForm.setNodePredicitonSetting(new PredictionSetting(false, null, LearningModelType.MARKOV_CHAINS));
-		initForm.setClusterPredictionSetting(new PredictionSetting(false, null, LearningModelType.MARKOV_CHAINS));
+		initForm.setNodePredicitonSetting(new PredictionSetting(false, null, LearningModelType.MARKOV_CHAINS, 1));
+		initForm.setClusterPredictionSetting(new PredictionSetting(false, null, LearningModelType.MARKOV_CHAINS, 1));
 		initForm.setActivateAwards(true);
-		initForm.setActivateEnergyStorage(false);
+		initForm.setEnergyStorageSetting(globalEnergyStorageSetting);
 		initEnergyService(defaultbaseUrl, initForm);
 		format_datetime.setTimeZone(TimeZone.getTimeZone("GMT"));
 		nodeContent = getNodeContent(defaultbaseUrl);
@@ -94,12 +97,13 @@ public class AwardsSimulator extends TestSimulator {
 			ProsumerRole prosumerRole = power > 0 ? ProsumerRole.PRODUCER : ProsumerRole.CONSUMER;
 			EnvironmentalImpact envImpact = isFreeRider ? EnvironmentalImpact.MEDIUM : EnvironmentalImpact.LOW;
 			DeviceCategory category = power > 0 ? DeviceCategory.BIOMASS_ENG : DeviceCategory.COOKING;
+			EnergyStorageSetting privateEnergyStorageSetting = new EnergyStorageSetting(true, true, StorageType.PRIVATE, 100, 0);
 			category = DeviceCategory.HYBRID;
 			double durantionMinutes = 60;
 			Date endDate = UtilDates.shiftDateMinutes(current, durantionMinutes);
 			AgentInputForm inputForm = new AgentInputForm(prosumerRole, "", agentName, category,
 					envImpact, pricingTable.getMapPrices(), Math.abs(power), current, endDate, PriorityLevel.MEDIUM,
-					durantionMinutes, timeShiftMS);
+					durantionMinutes, privateEnergyStorageSetting, timeShiftMS);
 			if (isFreeRider) {
 				inputForm.setProducerPolicyId(PolicyFactory.POLICY_FREE_RIDING);
 			} else {

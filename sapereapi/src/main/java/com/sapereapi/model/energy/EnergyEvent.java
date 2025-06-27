@@ -115,7 +115,7 @@ public class EnergyEvent extends EnergyFlow implements Cloneable, Serializable {
 			, PowerSlot powerSlot
 			, Date beginDate, Date endDate
 			, String comment, Double firstRate) {
-		super(prosumerProperties, isComplementary, powerSlot, beginDate, endDate);
+		super(prosumerProperties, isComplementary, powerSlot, beginDate, endDate, false);
 		this.type = type;
 		this.comment = comment;
 		this.firstRate = firstRate;

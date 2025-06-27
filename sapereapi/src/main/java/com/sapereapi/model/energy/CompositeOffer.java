@@ -799,5 +799,16 @@ public class CompositeOffer implements IEnergyObject, Cloneable {
 		return result;
 	}
 
+	public String generateShortLog() {
+		StringBuffer result = new StringBuffer("Supplied by ");
+		Map<String, Double> mapPower = getMapPower();
+		String sep="";
+		for (String producer : mapPower.keySet()) {
+			double provided = mapPower.get(producer);
+			result.append(sep).append(producer).append(" (").append(SapereUtil.roundPower(provided)).append(" W)");
+			sep=", ";
+		}
+		return result.toString();
+	}
 
 }

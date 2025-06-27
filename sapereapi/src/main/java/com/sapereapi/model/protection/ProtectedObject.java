@@ -4,6 +4,7 @@ import java.util.HashSet;
 import java.util.Set;
 
 import com.sapereapi.model.Sapere;
+import com.sapereapi.model.referential.AgentType;
 
 import eu.sapere.middleware.agent.AgentAuthentication;
 import eu.sapere.middleware.agent.SapereAgent;
@@ -25,14 +26,31 @@ public abstract class ProtectedObject implements IPropertyObject {
 		return authenticated;
 	}
 
+	public boolean hasAccessAsIssuer(SapereAgent agent) {
+		return checkAccessAsIssuer(agent.getAuthentication());
+	}
 
+	public boolean hasAccessAsReceiver(SapereAgent agent) {
+		return checkAccessAsReceiver(agent.getAuthentication());
+	}
 
-	abstract boolean hasAccesAsConsumer(SapereAgent consumerAgent);
+	public boolean hasAccessAsStackholder(SapereAgent agent) {
+		return checkAccessAsStackholder(agent.getAuthentication());
+	}
 
-	abstract boolean hasAccesAsProducer(SapereAgent prodAgent);
+	public boolean checkAccessAsStackholder(AgentAuthentication agentAuthentication) {
+		return checkAccessAsIssuer(agentAuthentication) || checkAccessAsReceiver(agentAuthentication);
+	}
 
-	abstract boolean checkAccessAsProducer(AgentAuthentication authentication);
+	protected boolean checkAccessAsLearningAgent(AgentAuthentication authentication) {
+		if (AgentType.LEARNING_AGENT.name().equals(authentication.getAgentType())) {
+			return checkAuthentication(authentication);
+		}
+		return false;
+	}
 
-	abstract boolean checkAccessAsConsumer(AgentAuthentication authentication);
+	abstract boolean checkAccessAsIssuer(AgentAuthentication agent);
+
+	abstract boolean checkAccessAsReceiver(AgentAuthentication agent);
 
 }

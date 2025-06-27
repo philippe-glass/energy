@@ -36,13 +36,15 @@ CREATE TABLE `node_history` (
   `distance` 			TINYINT  NOT NULL DEFAULT 0.0,
   `id_last` 			INTEGER  DEFAULT NULL,
   `id_next` 			INTEGER  DEFAULT NULL,
-  `total_produced` 		DECIMAL(15,3) NOT NULL DEFAULT 0.00 , -- total produced (KWH)
-  `total_provided` 		DECIMAL(15,3) NOT NULL DEFAULT 0.00 , -- total provided (KWH)
-  `total_requested` 	DECIMAL(15,3) NOT NULL DEFAULT 0.00 , -- total needed for consumption (KWH)
-  `total_consumed` 		DECIMAL(15,3) NOT NULL DEFAULT 0.00 , -- total consumed (KWH)
-  `total_margin`		DECIMAL(15,3) NOT NULL DEFAULT 0.00 , -- total used for contract margins (KWH)
-  `total_available` 	DECIMAL(15,3) NOT NULL DEFAULT 0.00 , -- total produced - total consumed (KWH)
-  `total_missing` 		DECIMAL(15,3) NOT NULL DEFAULT 0.00 , -- total requested and not provided (KWH)
+  `total_produced` 		DECIMAL(15,3) NOT NULL DEFAULT 0.00 , -- total produced (W)
+  `total_provided` 		DECIMAL(15,3) NOT NULL DEFAULT 0.00 , -- total provided (W)
+  `total_requested` 	DECIMAL(15,3) NOT NULL DEFAULT 0.00 , -- total needed for consumption (W)
+  `total_consumed` 		DECIMAL(15,3) NOT NULL DEFAULT 0.00 , -- total consumed (W)
+  `total_margin`		DECIMAL(15,3) NOT NULL DEFAULT 0.00 , -- total used for contract margins (W)
+  `total_available` 	DECIMAL(15,3) NOT NULL DEFAULT 0.00 , -- total produced - total consumed (W)
+  `total_missing` 		DECIMAL(15,3) NOT NULL DEFAULT 0.00 , -- total requested and not provided (W)
+  `storage_used_for_need`	DECIMAL(15,3) NOT NULL DEFAULT 0.00 , -- total storage used (W)
+  `storage_used_for_prod`	DECIMAL(15,3) NOT NULL DEFAULT 0.00 , -- total storage used (W)
   `min_request_missing` DECIMAL(15,3) NOT NULL DEFAULT 0.00 , -- min of non satisfied request in KWH
   `max_warning_duration` INTEGER  NOT NULL DEFAULT 0 , -- max warning duration of requests
   `max_warning_consumer`	VARCHAR(100) NULL,
@@ -159,6 +161,7 @@ CREATE TABLE `link_history_active_event` (
   `is_contract` 	BIT(1) NOT NULL DEFAULT 0,
   `id_last` 		INTEGER  NULL DEFAULT NULL,
   `warning_duration` INTEGER  NOT NULL DEFAULT 0,
+  `missing_duration` INTEGER  NOT NULL DEFAULT 0,
   `has_warning_req` BIT(1) NOT NULL DEFAULT 0,
 	FOREIGN KEY(id_event) REFERENCES event(id),
 	FOREIGN KEY(id_history) REFERENCES node_history(id),

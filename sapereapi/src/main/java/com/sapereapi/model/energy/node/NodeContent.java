@@ -442,10 +442,15 @@ public class NodeContent {
 		double consumedLocally = 0.0;
 		double provided = 0.0;
 		double providedMargin = 0.0;
+		double consumedMargin = 0.0;
 		double providedLocallyMargin = 0.0;
 		double providedLocally = 0.0;
 		double sentOffersTotal = 0.0;
 		double receivedOffersTotal = 0.0;
+		double storedConsumersWH = 0.0;
+		double storedProducersWH = 0.0;
+		double storageUsedForNeed = 0.0;
+		double storageUsedForProd = 0.0;
 		try {
 			Map<String, Double> receivedOffersRepartition = new HashMap<String, Double>(); // By Producers
 			for (AgentForm consumer : consumers) {
@@ -453,6 +458,9 @@ public class NodeContent {
 					requested += consumer.getPower();
 					consumed += consumer.getOngoingContractsTotal().getCurrent();
 					consumedLocally += consumer.getOngoingContractsTotalLocal().getCurrent();
+					consumedMargin += consumer.getOngoingContractsTotal().getMargin();
+					storedConsumersWH += consumer.getStoredWH();
+					storageUsedForNeed += consumer.getStorageUsedForNeed();
 					double testDelta = Math.abs(consumer.getOngoingContractsTotal().getCurrent() - consumer.getOngoingContractsTotalLocal().getCurrent());
 					if(testDelta > 0.01) {
 						SapereLogger.getInstance().info("NodeContent.computeTotal For debug : " + consumer.getAgentName() + " provided <> providedLocally : delta = " + testDelta);
@@ -483,6 +491,8 @@ public class NodeContent {
 					providedLocallyMargin +=  producer.getOngoingContractsTotalLocal().getMargin();
 					providedLocally += producer.getOngoingContractsTotalLocal().getCurrent();
 					sentOffersTotal += producer.getOffersTotal();
+					storedProducersWH += producer.getStoredWH();
+					storageUsedForProd += producer.getStorageUsedForProd();
 					// update sent offers repartition
 					for (String consumer : producer.getOffersRepartition().keySet()) {
 						if(noFilter || filteredConsumers.contains(consumer)) {
@@ -584,9 +594,14 @@ public class NodeContent {
 			total.setProvidedLocally(providedLocally);	// What is both locally produced and supplied
 			total.setProvidedLocallyMargin(providedLocallyMargin);
 			total.setProvidedMargin(providedMargin);
+			total.setConsumedMargin(consumedMargin);
 			total.setMissing(requested - consumed);
 			total.setSentOffersTotal(sentOffersTotal);
 			total.setReceivedOffersTotal(receivedOffersTotal);
+			total.setStoredConsumersWH(storedConsumersWH);
+			total.setStoredProducersWH(storedProducersWH);
+			total.setStorageUsedForNeed(storageUsedForNeed);
+			total.setStorageUsedForProd(storageUsedForProd);
 			if(noFilter) {
 				double delta = Math.abs(consumedLocally - providedLocally);
 				if (Math.abs(consumedLocally) >0 && Math.abs(providedLocally) > 0 && delta >= 0.01) {

@@ -5,6 +5,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
+import com.sapereapi.model.EnergyStorageSetting;
 import com.sapereapi.model.HandlingException;
 import com.sapereapi.model.NodeContext;
 import com.sapereapi.model.energy.EnergyEvent;
@@ -17,18 +18,17 @@ import com.sapereapi.model.energy.policy.IEnergyAgentPolicy;
 import com.sapereapi.model.energy.policy.IProducerPolicy;
 import com.sapereapi.model.energy.reschedule.RescheduleTable;
 import com.sapereapi.model.referential.EventType;
+import com.sapereapi.model.referential.ProsumerRole;
 import com.sapereapi.model.referential.WarningType;
 
 import eu.sapere.middleware.agent.AgentAuthentication;
 
 public interface IEnergyAgent {
-	//void initFields(EnergySupply _globalSupply, IEnergyAgentPolicy agentPolicy);
-	void initFields(EnergySupply _globalSupply, EnergyRequest _need, IEnergyAgentPolicy _producerPolicy, IEnergyAgentPolicy _consumerPolicy, NodeContext nodeContext);
+	void initFields(EnergySupply globalSupply, EnergyRequest need, EnergyStorageSetting energyStorageSetting, IEnergyAgentPolicy producerPolicy, IEnergyAgentPolicy consumerPolicy, NodeContext nodeContext);
 	boolean isProducer();
 	boolean isConsumer();
-	//void reinitialize(int _id, AgentAuthentication _authentication, EnergySupply _globalSupply, IEnergyAgentPolicy agentPolicy);
-	void reinitialize(int _id, AgentAuthentication _authentication, EnergySupply _globalSupply, EnergyRequest _need
-			, IEnergyAgentPolicy _consumerPolicy, IEnergyAgentPolicy _producerPolicy, NodeContext nodeContext);
+	void reinitialize(int id, AgentAuthentication authentication, EnergySupply globalSupply, EnergyRequest need, EnergyStorageSetting energyStorageSetting
+			, IEnergyAgentPolicy consumerPolicy, IEnergyAgentPolicy producerPolicy, NodeContext nodeContext);
 	boolean hasExpired();
 	boolean isDisabled();
 	boolean isActive();
@@ -38,7 +38,7 @@ public interface IEnergyAgent {
 	void disableAgent(RegulationWarning warning) throws HandlingException;
 	void postEvent(EnergyEvent eventToPost);
 	EnergyEvent generateStartEvent() throws HandlingException ;
-	EnergyEvent generateUpdateEvent(WarningType warningType) throws HandlingException;
+	EnergyEvent generateUpdateEvent(WarningType warningType, String comment) throws HandlingException;
 	EnergyEvent generateExpiryEvent() throws HandlingException;
 	EnergyEvent generateStopEvent(RegulationWarning warning, String comment) throws HandlingException;
 	EventType getStartEventType();
@@ -61,6 +61,9 @@ public interface IEnergyAgent {
 	List<String> getConsumersOfWaitingContrats();
 	Double computeAvailablePower();
 	Double computeMissingPower();
+	Double getStoredWH();
+	Double getStorageUsedForNeed();
+	Double getStorageUsedForProd();
 	void handleWarning(RegulationWarning warning) throws HandlingException;
 	void handleWarningOverConsumption(RegulationWarning warning) throws HandlingException;
 	void handleWarningOverProduction(RegulationWarning warning) throws HandlingException;
@@ -78,4 +81,6 @@ public interface IEnergyAgent {
 	void setEndDate(Date aDate);
 	void setDisabled(boolean bDisabled);
 	EnergyEvent generateEvent(EventType eventType, String log);
+	EnergyStorageSetting getStorageSetting();
+	ProsumerRole computeRole();
 }

@@ -4,6 +4,7 @@ import java.util.Calendar;
 import java.util.HashMap;
 import java.util.Map;
 
+import com.sapereapi.model.EnergyStorageSetting;
 import com.sapereapi.model.PredictionSetting;
 
 public class InitializationForm {
@@ -16,7 +17,7 @@ public class InitializationForm {
 	private Double maxTotalPower;
 	private Boolean disableSupervision = Boolean.FALSE;
 	private Boolean activateAwards = Boolean.FALSE;
-	private Boolean activateEnergyStorage = Boolean.FALSE;
+	private EnergyStorageSetting energyStorageSetting = new EnergyStorageSetting();
 	private PredictionSetting nodePredicitonSetting = new PredictionSetting();
 	private PredictionSetting clusterPredictionSetting = new PredictionSetting();
 
@@ -30,6 +31,7 @@ public class InitializationForm {
 	}
 
 	public InitializationForm(String scenario, Double maxTotalPower, Map<Integer, Integer> datetimeConstraints
+			,EnergyStorageSetting _energyStorageSetting
 			,PredictionSetting _nodePredicitonSetting, PredictionSetting _clusterPredictionSetting
 			) {
 		super();
@@ -39,7 +41,7 @@ public class InitializationForm {
 		this.nodePredicitonSetting = _nodePredicitonSetting;
 		this.clusterPredictionSetting = _clusterPredictionSetting;
 		this.activateAwards = false;
-		this.activateEnergyStorage = false;
+		this.energyStorageSetting = _energyStorageSetting;
 		setTimeConstraints(datetimeConstraints);
 	}
 
@@ -104,12 +106,12 @@ public class InitializationForm {
 		this.disableSupervision = disableSupervision;
 	}
 
-	public Boolean getActivateEnergyStorage() {
-		return activateEnergyStorage;
+	public EnergyStorageSetting getEnergyStorageSetting() {
+		return energyStorageSetting;
 	}
 
-	public void setActivateEnergyStorage(Boolean activateEnergyStorage) {
-		this.activateEnergyStorage = activateEnergyStorage;
+	public void setEnergyStorageSetting(EnergyStorageSetting energyStorageSetting) {
+		this.energyStorageSetting = energyStorageSetting;
 	}
 
 	public void setInitialState(String _initialStateVariable, Integer _initialStateId) {

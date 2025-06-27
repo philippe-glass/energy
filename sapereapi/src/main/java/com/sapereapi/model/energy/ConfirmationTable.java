@@ -7,6 +7,7 @@ import java.util.List;
 import java.util.Map;
 
 import com.sapereapi.log.SapereLogger;
+import com.sapereapi.model.referential.ProsumerRole;
 
 import eu.sapere.middleware.log.AbstractLogger;
 import eu.sapere.middleware.lsa.IPropertyObject;
@@ -16,15 +17,15 @@ import eu.sapere.middleware.node.NodeLocation;
 public class ConfirmationTable implements IPropertyObject {
 	private static final long serialVersionUID = 3L;
 	private String issuer = null;
+	private long timeShiftMS = 0;
 	//protected Boolean isComplementary = Boolean.FALSE;
-	private Map<String, Map<Boolean, ConfirmationItem>> table = new HashMap<>();
+	private Map<ProsumerRole, Map<String, Map<Boolean, ConfirmationItem>>> table = new HashMap<>();
 
-	public ConfirmationTable(String _issuer
-			//, Boolean _isComplementary
-			) {
+	public ConfirmationTable(String _issuer, long timeShiftMS) {
 		super();
 		this.issuer = _issuer;
-		this.table = new HashMap<String, Map<Boolean, ConfirmationItem>>();
+		this.timeShiftMS = timeShiftMS;
+		this.table = new HashMap<ProsumerRole, Map<String, Map<Boolean, ConfirmationItem>>>();
 		;
 	}
 
@@ -36,50 +37,88 @@ public class ConfirmationTable implements IPropertyObject {
 		this.issuer = _issuer;
 	}
 
-	public void removeConfirmation(String receiver, boolean isComplementary) {
-		if (table.containsKey(receiver)) {
-			Map<Boolean, ConfirmationItem> mapConfirmationItems =  table.get(receiver);
+	public void removeConfirmation(String receiver, boolean isComplementary, ProsumerRole issuerRole) {
+		if (table.containsKey(issuerRole)) {
+			Map<String, Map<Boolean, ConfirmationItem>> mapConfirmationItems1 =  table.get(issuerRole);
 			Boolean bIsComplementary = Boolean.valueOf(isComplementary);
-			if(mapConfirmationItems.containsKey(bIsComplementary)) {
-				mapConfirmationItems.remove(bIsComplementary);
+			if(mapConfirmationItems1.containsKey(receiver)) {
+				Map<Boolean, ConfirmationItem> mapConfirmationItems2 = mapConfirmationItems1.get(receiver);
+				if(mapConfirmationItems2.containsKey(bIsComplementary)) {
+					mapConfirmationItems2.remove(bIsComplementary);
+				}
+				if(mapConfirmationItems2.size() == 0) {
+					mapConfirmationItems1.remove(receiver);
+				}
 			}
-			if(mapConfirmationItems.size() == 0) {
-				this.table.remove(receiver);
+			if(mapConfirmationItems1.size() == 0) {
+				this.table.remove(issuerRole);
 			}
 		}
 	}
 
-	public void confirm(String receiver, boolean isComplementary, Boolean value, String comment, long timeShiftMS) {
-		putConfirmationItem(receiver, new ConfirmationItem(receiver, isComplementary, value, comment, timeShiftMS));
+	private Map<String, Map<Boolean, ConfirmationItem>> getConfirmationTableAs(ProsumerRole issuerRole) {
+		if(table.containsKey(issuerRole)) {
+			return table.get(issuerRole);
+		}
+		return new HashMap<String, Map<Boolean,ConfirmationItem>>();
 	}
 
-	public ConfirmationItem getConfirmationItem(String receiver, boolean isComplementary) {
-		if (table.containsKey(receiver)) {
-			Map<Boolean, ConfirmationItem> mapConfirmationItems =  table.get(receiver);
+	public void confirm(String receiver, boolean isComplementary, ProsumerRole issuerRole, Boolean value, String comment, int nbOfRenewals) {
+		ConfirmationItem newItem = new ConfirmationItem(this.issuer, issuerRole, receiver, isComplementary, value, comment, nbOfRenewals, timeShiftMS);
+		putConfirmationItem(newItem);
+	}
+
+	public boolean hasConfirmationItem(String receiver, boolean isComplementary, ProsumerRole issuerRole) {
+		if (table.containsKey(issuerRole)) {
+			Map<String, Map<Boolean, ConfirmationItem>> mapConfirmationItems1 = table.get(issuerRole);
 			Boolean bIsComplementary = Boolean.valueOf(isComplementary);
-			if(mapConfirmationItems.containsKey(bIsComplementary)) {
-				return mapConfirmationItems.get(bIsComplementary);
+			if(mapConfirmationItems1.containsKey(receiver)) {
+				Map<Boolean, ConfirmationItem> mapConfirmationItems2 = mapConfirmationItems1.get(receiver);
+				return mapConfirmationItems2.containsKey(bIsComplementary);
+			}
+		}
+		return false;
+	}
+
+	public ConfirmationItem getConfirmationItem(String receiver, boolean isComplementary, ProsumerRole issuerRole) {
+		if (table.containsKey(issuerRole)) {
+			Map<String, Map<Boolean, ConfirmationItem>> mapConfirmationItems1 = table.get(issuerRole);
+			if(mapConfirmationItems1.containsKey(receiver)) {
+				Map<Boolean, ConfirmationItem> mapConfirmationItems2 = mapConfirmationItems1.get(receiver);
+				Boolean bIsComplementary = Boolean.valueOf(isComplementary);
+				if(mapConfirmationItems2.containsKey(bIsComplementary)) {
+					return mapConfirmationItems2.get(bIsComplementary);
+				}
 			}
 		}
 		return null;
 	}
 
-	public void putConfirmationItem(String receiver, ConfirmationItem item) {
-		if(!table.containsKey(receiver)) {
-			table.put(receiver, new Hashtable<Boolean, ConfirmationItem>());
+	public void putConfirmationItem(ConfirmationItem item) {
+		ProsumerRole role = item.getIssuerRole();
+		if(!table.containsKey(role)) {
+			table.put(role, new Hashtable<String, Map<Boolean, ConfirmationItem>>());
 		}
-		Map<Boolean, ConfirmationItem> mapConfirmationItems =  table.get(receiver);
+		String receiver = item.getReceiver();
+		Map<String, Map<Boolean, ConfirmationItem>> mapConfirmationItems1 = table.get(role);
+		if(!mapConfirmationItems1.containsKey(receiver)) {
+			mapConfirmationItems1.put(receiver, new HashMap<Boolean, ConfirmationItem>());
+		}
+		Map<Boolean, ConfirmationItem> mapConfirmationItems2 = mapConfirmationItems1.get(receiver);
 		Boolean isComplementary = Boolean.valueOf(item.isComplementary());
-		mapConfirmationItems.put(isComplementary, item);
+		mapConfirmationItems2.put(isComplementary, item);
 	}
 
 	public ConfirmationItem getExpiredItem() {
-		for(String receiver : table.keySet()) {
-			Map<Boolean, ConfirmationItem> mapConfirmationItems =  table.get(receiver);
-			for(Boolean bIsComplentary : mapConfirmationItems.keySet()) {
-				ConfirmationItem item = mapConfirmationItems.get(bIsComplentary);
-				if (item.hasExpired()) {
-					return item;
+		for(ProsumerRole issuerRole : table.keySet()) {
+			Map<String, Map<Boolean, ConfirmationItem>> mapConfirmationItems1 = table.get(issuerRole);
+			for(String receiver : mapConfirmationItems1.keySet()) {
+				Map<Boolean, ConfirmationItem> mapConfirmationItems2 = mapConfirmationItems1.get(receiver);
+				for(Boolean isComplementary: mapConfirmationItems2.keySet()) {
+					ConfirmationItem item = mapConfirmationItems2.get(isComplementary);
+					if (item.hasExpired()) {
+						return item;
+					}
 				}
 			}
 		}
@@ -94,7 +133,7 @@ public class ConfirmationTable implements IPropertyObject {
 	public void cleanExpiredDate() {
 		ConfirmationItem item = null;
 		while ((item = getExpiredItem()) != null) {
-			this.removeConfirmation(item.getReceiver(), item.isComplementary());
+			this.removeConfirmation(item.getReceiver(), item.isComplementary(), item.getIssuerRole());
 		}
 	}
 
@@ -103,37 +142,73 @@ public class ConfirmationTable implements IPropertyObject {
 	}
 
 	public boolean hasReceiver(String agentName) {
-		return table.containsKey(agentName);
+		return hasReceiver(ProsumerRole.CONSUMER, agentName) || hasReceiver(ProsumerRole.PRODUCER, agentName);
+	}
+	public boolean hasReceiver(ProsumerRole issuerRole, String agentName) {
+		if(table.containsKey(issuerRole)) {
+			Map<String, Map<Boolean, ConfirmationItem>> confirmationsAsRole =  table.get(issuerRole);
+			return confirmationsAsRole.containsKey(agentName);
+		}
+		return false;
 	}
 
 	@Override
 	public String toString() {
 		StringBuffer result = new StringBuffer();
-		result.append(issuer).append("   ");
-		for(String receiver : table.keySet()) {
-			Map<Boolean, ConfirmationItem> mapConfirmationItems =  table.get(receiver);
-			if(mapConfirmationItems.size() > 0) {
-				result.append(",").append(receiver).append(":");
-				for(Boolean bIsComplentary : mapConfirmationItems.keySet()) {
-					if(bIsComplentary) {
-						result.append("(complementary)");
+		for (ProsumerRole issuerRole : ProsumerRole.values()) {
+			Map<String, Map<Boolean, ConfirmationItem>> confirmationsAsRole = getConfirmationTableAs(issuerRole);
+			String sRole = issuerRole.getLabel().toLowerCase();
+			//String issuer2 = issuer.replace("Prosumer", "Prs") + " as " + sRole;
+			result.append(" as " + sRole).append(":{");
+			for (String receiver : confirmationsAsRole.keySet()) {
+				Map<Boolean, ConfirmationItem> mapConfirmationItems1 = confirmationsAsRole.get(receiver);
+				String sep = "";
+				if (mapConfirmationItems1.size() > 0) {
+					String received2 = receiver.replace("Prosumer", "Prs");
+					result.append(sep).append(received2).append(":");
+					for (Boolean bIsComplentary : mapConfirmationItems1.keySet()) {
+						if (bIsComplentary) {
+							result.append("(complementary)");
+						}
+						ConfirmationItem item = mapConfirmationItems1.get(bIsComplentary);
+						result.append(item);
 					}
-					ConfirmationItem item = mapConfirmationItems.get(bIsComplentary);
-					result.append(item);
+					sep = ",";
 				}
 			}
+			result.append("}");
 		}
 		return result.toString();
 	}
 
+	public boolean renewConfirmations() {
+		boolean updated = false;
+		for (ProsumerRole issuerRole : table.keySet()) {
+			Map<String, Map<Boolean, ConfirmationItem>> mapConfirmationItems1 = table.get(issuerRole);
+			for (String receiver : mapConfirmationItems1.keySet()) {
+				Map<Boolean, ConfirmationItem> mapConfirmationItems2 = mapConfirmationItems1.get(receiver);
+				for (Boolean bIsComplementary : mapConfirmationItems2.keySet()) {
+					ConfirmationItem item = mapConfirmationItems2.get(bIsComplementary);
+					if (item.getNbOfRenewals() > 0) {
+						updated = updated || item.renewConfirmation();
+					}
+				}
+			}
+		}
+		return updated;
+	}
+
 	@Override
 	public ConfirmationTable copyForLSA(AbstractLogger logger) {
-		ConfirmationTable result = new ConfirmationTable(this.issuer);
-		for(String receiver : table.keySet()) {
-			Map<Boolean, ConfirmationItem> mapConfirmationItems =  table.get(receiver);
-			for(Boolean bIsComplentary : mapConfirmationItems.keySet()) {
-				ConfirmationItem item = mapConfirmationItems.get(bIsComplentary);
-				result.putConfirmationItem(receiver, item.clone());
+		ConfirmationTable result = new ConfirmationTable(this.issuer, this.timeShiftMS);
+		for(ProsumerRole issuerRole : table.keySet()) {
+			Map<String, Map<Boolean, ConfirmationItem>> mapConfirmationItems1 = table.get(issuerRole);
+			for(String receiver : mapConfirmationItems1.keySet()) {
+				Map<Boolean, ConfirmationItem> mapConfirmationItems2 = mapConfirmationItems1.get(receiver);
+				for(Boolean bIsComplementary: mapConfirmationItems2.keySet()) {
+					ConfirmationItem item = mapConfirmationItems2.get(bIsComplementary);
+					result.putConfirmationItem(item.clone());
+				}
 			}
 		}
 		return result;

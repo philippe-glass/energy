@@ -45,6 +45,7 @@ import com.sapereapi.model.energy.ExtendedEnergyEvent;
 import com.sapereapi.model.energy.PowerSlot;
 import com.sapereapi.model.energy.ProsumerProperties;
 import com.sapereapi.model.energy.RegulationWarning;
+import com.sapereapi.model.energy.StorageType;
 import com.sapereapi.model.energy.forcasting.EndUserForcastingResult;
 import com.sapereapi.model.energy.forcasting.ForcastingResult1;
 import com.sapereapi.model.energy.forcasting.ForcastingResult2;
@@ -115,8 +116,6 @@ public class Sapere {
 	public static NodeManager nodeManager;
 	private static Map<String, AgentAuthentication> mapAgentAuthentication = null;
 	private static Set<AgentAuthentication> authentifiedAgentsCash = null;
-	public static String learningAgentName = generateAgentName(AgentType.LEARNING_AGENT);
-	public static String regulatorAgentName = generateAgentName(AgentType.REGULATOR);
 	private static String salt = null;
 	//private static int nextConsumerId = 1;
 	//private static int nextProducerId = 1;
@@ -199,7 +198,9 @@ public class Sapere {
 		nodeContext.setUrlForcasting(serverConfig.getUrlForcasting());
 		nodeContext.setNodePredicitonSetting(serverConfig.getNodePredicitonSetting().clone());
 		nodeContext.setClusterPredictionSetting(serverConfig.getClusterPredictionSetting().clone());
+		String learningAgentName = generateAgentName(AgentType.LEARNING_AGENT);
 		nodeContext.setLearningAgentName(learningAgentName);
+		String regulatorAgentName = generateAgentName(AgentType.REGULATOR);
 		nodeContext.setRegulatorAgentName(regulatorAgentName);
 		Session session = SessionManager.getSession();
 		nodeContext.setSession(session);
@@ -531,8 +532,8 @@ public class Sapere {
 		if(initForm.getActivateAwards() != null) {
 			nodeContext.setAwardsActivated(initForm.getActivateAwards());
 		}
-		if(initForm.getActivateEnergyStorage() != null) {
-			nodeContext.setEnergyStorageActivated(initForm.getActivateEnergyStorage());
+		if (initForm.getEnergyStorageSetting() != null) {
+			nodeContext.setGlobalEnergyStorageSetting(initForm.getEnergyStorageSetting());
 		}
 		nodeContext.setcomplementaryRequestsActivated(activateComplementaryRequests);
 		nodeContext.setMaxTotalPower(maxTotalPower);
@@ -542,17 +543,24 @@ public class Sapere {
 		PolicyFactory.setNodeContext(nodeContext);
 		PredictionHelper.setMaxTotalPower(nodeContext.getMaxTotalPower());
 		PredictionHelper.setVariables(nodeContext.getVariables());
-		learningAgentName = generateAgentName(AgentType.LEARNING_AGENT);
-		regulatorAgentName = generateAgentName(AgentType.REGULATOR);
-		SapereAgent toRemove = getAgent(learningAgentName);
+		if(nodeContext.getLearningAgentName() == null) {
+			String learningAgentName = generateAgentName(AgentType.LEARNING_AGENT);
+			nodeContext.setLearningAgentName(learningAgentName);
+		}
+		if (nodeContext.getRegulatorAgentName() == null) {
+			String regulatorAgentName = generateAgentName(AgentType.REGULATOR);
+			nodeContext.setRegulatorAgentName(regulatorAgentName);
+		}
+		SapereAgent toRemove = getAgent(nodeContext.getLearningAgentName());
 		if (toRemove != null) {
 			serviceAgents.remove(toRemove);
 		}
 		nextProsumerId = 1;
 		//nextConsumerId = 1;
 		//nextProducerId = 1;
-		addServiceLearningAgent(learningAgentName);
-		addServiceRegulatorAgent(regulatorAgentName);
+		addServiceLearningAgent(nodeContext.getLearningAgentName());
+		addServiceRegulatorAgent(nodeContext.getRegulatorAgentName());
+
 		// Init stateVariable if requested in initForm
 		String stateVariable = initForm.getInitialStateVariable();
 		Integer stateId = initForm.getInitialStateId();
@@ -562,6 +570,10 @@ public class Sapere {
 				Boolean disableSupervision = initForm.getDisableSupervision();
 				initState(stateVariable, targetState, disableSupervision);
 			}
+		}
+		// add storage agent if necessary
+		if(nodeContext.getGlobalEnergyStorageSetting() != null && nodeContext.getGlobalEnergyStorageSetting().isCommon()) {
+			addServiceStorage();
 		}
 		isRunning = true;
 		return initForm;
@@ -594,8 +606,9 @@ public class Sapere {
 
 	public void stopEnergyService() {
 		// stopAllAgents1();
-		learningAgentName = null;
-		regulatorAgentName = null;
+		nodeContext.setLearningAgentName(null);
+		nodeContext.setRegulatorAgentName(null);
+		nodeContext.setStorageAgentName(null);
 		serviceAgents.clear();
 		querys.clear();
 		// nodeManager.stopServices();
@@ -612,9 +625,14 @@ public class Sapere {
 		if (!isRunning) {
 			return;
 		}
+		if(nodeContext == null) {
+			return;
+		}
+		String learningAgentName = nodeContext.getLearningAgentName();
 		if (getAgent(learningAgentName) == null) {
 			addServiceLearningAgent(learningAgentName);
 		}
+		String regulatorAgentName = nodeContext.getRegulatorAgentName();
 		if (getAgent(regulatorAgentName) == null) {
 			addServiceRegulatorAgent(regulatorAgentName);
 		}
@@ -635,7 +653,7 @@ public class Sapere {
 			logger.error("generateRequest : device should be a producer");
 		}
 		ProsumerProperties producerProperties = new ProsumerProperties(issuer, nodeContext.getNodeLocation(), issuerDistance, timeShiftMS, deviceProperties);
-		return new EnergySupply(producerProperties, false, PowerSlot.create(power), beginDate, endDate, pricingTable);
+		return new EnergySupply(producerProperties, false, PowerSlot.create(power), beginDate, endDate, pricingTable, false);
 	}
 
 	public EnergyRequest generateRequest(Double power, Date beginDate, Double durationMinutes,
@@ -661,7 +679,7 @@ public class Sapere {
 		int issuerDistance = 0;
 		ProsumerProperties consumerProperties = new ProsumerProperties(issuer, nodeContext.getNodeLocation(), issuerDistance, timeShiftMS, deviceProperties);
 		return new EnergyRequest(consumerProperties, false, PowerSlot.create(power), beginDate, endDate,
-				delayToleranceMinutes, priority);
+				delayToleranceMinutes, priority, false);
 	}
 
 	public static String generateAgentName(AgentType agentType) {
@@ -690,13 +708,14 @@ public class Sapere {
 	}
 
 	private static InitializationForm generateDefaultInitForm(String scenario) {
+		EnergyStorageSetting energyStorageSetting = new EnergyStorageSetting(false, false, StorageType.PRIVATE, 0.0, 0.0);
 		LearningAggregationOperator aggregationOp = new LearningAggregationOperator(LearningAggregationType.MODEL, ILearningModel.OP_SAMPLING_NB, 5);
-		PredictionSetting nodePredictionSetting = new PredictionSetting(true, aggregationOp, LearningModelType.MARKOV_CHAINS);
-		PredictionSetting clusterPredictionSetting = new PredictionSetting(false, null, null);
+		PredictionSetting nodePredictionSetting = new PredictionSetting(true, aggregationOp, LearningModelType.MARKOV_CHAINS, 1);
+		PredictionSetting clusterPredictionSetting = new PredictionSetting(false, null, null, 1);
 		InitializationForm initForm = new InitializationForm(scenario
 				,NodeStates.DEFAULT_NODE_MAX_TOTAL_POWER
 				,new HashMap<Integer, Integer>()
-				,nodePredictionSetting, clusterPredictionSetting);
+				,energyStorageSetting,nodePredictionSetting, clusterPredictionSetting);
 		initForm.setDisableSupervision(false);
 		return initForm;
 	}
@@ -710,23 +729,24 @@ public class Sapere {
 		initEnergyService(serverConfig, initForm);
 		Date current = getCurrentDate(); // getCurrentMinute();
 		PricingTable pricingTable = new PricingTable(current, 0, getTimeShiftMS());
+		EnergyStorageSetting energyStorageSetting = null;
 		addServiceProducer(generateSupply(30., current, YEAR_DURATION_MIN,
 				new DeviceProperties("SIG", DeviceCategory.EXTERNAL_ENG, EnvironmentalImpact.MEDIUM),
-				pricingTable), policyFactory.initDefaultProducerPolicy(), policyFactory.initDefaultConsumerPolicy());
+				pricingTable), energyStorageSetting, policyFactory.initDefaultProducerPolicy(), policyFactory.initDefaultConsumerPolicy());
 		addServiceProducer(generateSupply(15., current, 40.,
 				new DeviceProperties("wind turbine1", DeviceCategory.WIND_ENG, EnvironmentalImpact.LOW),
-				pricingTable), policyFactory.initDefaultProducerPolicy(), policyFactory.initDefaultConsumerPolicy());
+				pricingTable), energyStorageSetting, policyFactory.initDefaultProducerPolicy(), policyFactory.initDefaultConsumerPolicy());
 		addServiceProducer(generateSupply(30., current, 30.,
 				new DeviceProperties("wind turbine2", DeviceCategory.WIND_ENG, EnvironmentalImpact.LOW),
-				pricingTable), policyFactory.initDefaultProducerPolicy(), policyFactory.initDefaultConsumerPolicy());
+				pricingTable), energyStorageSetting, policyFactory.initDefaultProducerPolicy(), policyFactory.initDefaultConsumerPolicy());
 		addServiceProducer(generateSupply(100., current, 6.,
 				new DeviceProperties("wind turbine3", DeviceCategory.WIND_ENG, EnvironmentalImpact.LOW),
-				pricingTable), policyFactory.initDefaultProducerPolicy(), policyFactory.initDefaultConsumerPolicy());
+				pricingTable), energyStorageSetting, policyFactory.initDefaultProducerPolicy(), policyFactory.initDefaultConsumerPolicy());
 
 		// Add query
 		addServiceConsumer(generateRequest(43.1, current, YEAR_DURATION_MIN, YEAR_DURATION_MIN, PriorityLevel.LOW,
 				new DeviceProperties("Refrigerator", DeviceCategory.COLD_APPLIANCES, EnvironmentalImpact.MEDIUM),
-				pricingTable), policyFactory.initDefaultProducerPolicy(), policyFactory.initDefaultConsumerPolicy());
+				pricingTable), energyStorageSetting, policyFactory.initDefaultProducerPolicy(), policyFactory.initDefaultConsumerPolicy());
 		/*
 		 * addQueryConsumer(generateRequest(27.7, current, 0.1, 150., PriorityLevel.LOW,
 		 * "Laptop Compute", DeviceCategory.ICT));
@@ -746,14 +766,15 @@ public class Sapere {
 		// addServiceProducer(generateSupply(new Float(30.0), current, new
 		PricingTable pricingTable = new PricingTable(current, 0, getTimeShiftMS());
 		IProducerPolicy producerPolicy = policyFactory.initDefaultProducerPolicy();
+		EnergyStorageSetting energyStorageSetting = null;
 		addServiceProducer(generateSupply(150.0, current, 200.0,
 				new DeviceProperties("SIG", DeviceCategory.EXTERNAL_ENG, EnvironmentalImpact.MEDIUM),
-				pricingTable), producerPolicy, policyFactory.initDefaultConsumerPolicy());
+				pricingTable), energyStorageSetting, producerPolicy, policyFactory.initDefaultConsumerPolicy());
 
 		// Add query
 		addServiceConsumer(generateRequest(43.1, current, YEAR_DURATION_MIN, YEAR_DURATION_MIN, PriorityLevel.LOW,
 				new DeviceProperties("Refrigerator", DeviceCategory.COLD_APPLIANCES, EnvironmentalImpact.MEDIUM),
-				pricingTable), producerPolicy, policyFactory.initDefaultConsumerPolicy());
+				pricingTable), energyStorageSetting, producerPolicy, policyFactory.initDefaultConsumerPolicy());
 
 		return getLsas();
 	}
@@ -763,33 +784,34 @@ public class Sapere {
 		initEnergyService(serverConfig, generateDefaultInitForm("test1ter"));
 		Date current = getCurrentDate(); // getCurrentMinute();
 		PricingTable pricingTable = new PricingTable(current, 0, getTimeShiftMS());
+		EnergyStorageSetting energyStorageSetting = null;
 		addServiceProducer(generateSupply(2000.0, current, YEAR_DURATION_MIN,
 				new DeviceProperties("SIG", DeviceCategory.EXTERNAL_ENG, EnvironmentalImpact.MEDIUM),
-				pricingTable), policyFactory.initDefaultProducerPolicy(), policyFactory.initDefaultConsumerPolicy());
+				pricingTable), energyStorageSetting, policyFactory.initDefaultProducerPolicy(), policyFactory.initDefaultConsumerPolicy());
 		addServiceProducer(generateSupply(150.0, current, 120.0,
 				new DeviceProperties("wind turbine1", DeviceCategory.WIND_ENG, EnvironmentalImpact.LOW),
-				pricingTable), policyFactory.initDefaultProducerPolicy(), policyFactory.initDefaultConsumerPolicy());
+				pricingTable), energyStorageSetting, policyFactory.initDefaultProducerPolicy(), policyFactory.initDefaultConsumerPolicy());
 		addServiceProducer(generateSupply(300.0, current, 120.0,
 				new DeviceProperties("wind turbine2", DeviceCategory.WIND_ENG, EnvironmentalImpact.LOW),
-				pricingTable), policyFactory.initDefaultProducerPolicy(), policyFactory.initDefaultConsumerPolicy());
+				pricingTable), energyStorageSetting, policyFactory.initDefaultProducerPolicy(), policyFactory.initDefaultConsumerPolicy());
 		addServiceProducer(generateSupply(200.0, current, 120.0,
 				new DeviceProperties("wind turbine3", DeviceCategory.WIND_ENG, EnvironmentalImpact.LOW),
-				pricingTable), policyFactory.initDefaultProducerPolicy(), policyFactory.initDefaultConsumerPolicy());
+				pricingTable), energyStorageSetting, policyFactory.initDefaultProducerPolicy(), policyFactory.initDefaultConsumerPolicy());
 		/**/
 
 		// Add query
 		addServiceConsumer(generateRequest(43.1, current, YEAR_DURATION_MIN, YEAR_DURATION_MIN, PriorityLevel.HIGH,
 				new DeviceProperties("Refrigerator", DeviceCategory.COLD_APPLIANCES, EnvironmentalImpact.MEDIUM),
-				pricingTable), policyFactory.initDefaultProducerPolicy(), policyFactory.initDefaultConsumerPolicy());
+				pricingTable), energyStorageSetting, policyFactory.initDefaultProducerPolicy(), policyFactory.initDefaultConsumerPolicy());
 		addServiceConsumer(generateRequest(270.7, current, 150.0, 150., PriorityLevel.LOW,
 				new DeviceProperties("Household Fan ", DeviceCategory.OTHER, EnvironmentalImpact.MEDIUM),
-				pricingTable), policyFactory.initDefaultProducerPolicy(), policyFactory.initDefaultConsumerPolicy());
+				pricingTable), energyStorageSetting, policyFactory.initDefaultProducerPolicy(), policyFactory.initDefaultConsumerPolicy());
 		addServiceConsumer(generateRequest(720.7, current, 80., 80., PriorityLevel.LOW,
 				new DeviceProperties(" Toaster", DeviceCategory.COOKING, EnvironmentalImpact.MEDIUM),
-				pricingTable), policyFactory.initDefaultProducerPolicy(), policyFactory.initDefaultConsumerPolicy());
+				pricingTable), energyStorageSetting, policyFactory.initDefaultProducerPolicy(), policyFactory.initDefaultConsumerPolicy());
 		addServiceConsumer(generateRequest(100.0, current, 50., 50., PriorityLevel.LOW,
 				new DeviceProperties("iPad / Tablet", DeviceCategory.ICT, EnvironmentalImpact.MEDIUM),
-				pricingTable), policyFactory.initDefaultProducerPolicy(), policyFactory.initDefaultConsumerPolicy());
+				pricingTable), energyStorageSetting, policyFactory.initDefaultProducerPolicy(), policyFactory.initDefaultConsumerPolicy());
 		/**/
 
 		// restartConsumer("Consumer_3", new Float("11"), current,
@@ -801,18 +823,19 @@ public class Sapere {
 		initEnergyService(serverConfig, generateDefaultInitForm("test2"));
 		Date current = nodeContext.getCurrentDate(); // getCurrentMinute();
 		PricingTable pricingTable = new PricingTable(current, 0, getTimeShiftMS());
+		EnergyStorageSetting energyStorageSetting = null;
 		int nbAgents = 10;
 		for (int i = 0; i < nbAgents; i++) {
 			IProducerPolicy producerPolicy = policyFactory.initDefaultProducerPolicy();
 			addServiceProducer(generateSupply(25.0, current, 60.,
 					new DeviceProperties("wind turbine " + i, DeviceCategory.WIND_ENG, EnvironmentalImpact.LOW),
-					pricingTable), producerPolicy, policyFactory.initDefaultConsumerPolicy());
+					pricingTable), energyStorageSetting, producerPolicy, policyFactory.initDefaultConsumerPolicy());
 		}
 		for (int i = 0; i < nbAgents; i++) {
 			IProducerPolicy producerPolicy = policyFactory.initDefaultProducerPolicy();
 			addServiceConsumer(generateRequest(30 + 0.1 * i, current, 120., 120., PriorityLevel.LOW,
 					new DeviceProperties("Laptop " + i, DeviceCategory.ICT, EnvironmentalImpact.MEDIUM),
-					pricingTable), producerPolicy, policyFactory.initDefaultConsumerPolicy());
+					pricingTable), energyStorageSetting, producerPolicy, policyFactory.initDefaultConsumerPolicy());
 		}
 		return getLsas();
 	}
@@ -822,21 +845,22 @@ public class Sapere {
 		Date current = nodeContext.getCurrentDate(); // getCurrentMinute();
 		PricingTable pricingTable = new PricingTable(current, 0, getTimeShiftMS());
 		IProducerPolicy producerPolicy = policyFactory.initDefaultProducerPolicy();
+		EnergyStorageSetting energyStorageSetting = null;
 		addServiceProducer(generateSupply(30.0, current, YEAR_DURATION_MIN,
 				new DeviceProperties("SIG", DeviceCategory.EXTERNAL_ENG, EnvironmentalImpact.MEDIUM),
-				pricingTable), producerPolicy, policyFactory.initDefaultConsumerPolicy());
+				pricingTable), energyStorageSetting, producerPolicy, policyFactory.initDefaultConsumerPolicy());
 		addServiceProducer(generateSupply(25.0, current, 60.,
 				new DeviceProperties("wind turbine1", DeviceCategory.WIND_ENG, EnvironmentalImpact.LOW),
-				pricingTable), producerPolicy, policyFactory.initDefaultConsumerPolicy());
+				pricingTable), energyStorageSetting, producerPolicy, policyFactory.initDefaultConsumerPolicy());
 		addServiceProducer(generateSupply(25.0, current, 60.,
 				new DeviceProperties("wind turbine2", DeviceCategory.WIND_ENG, EnvironmentalImpact.LOW),
-				pricingTable), producerPolicy, policyFactory.initDefaultConsumerPolicy());
+				pricingTable), energyStorageSetting, producerPolicy, policyFactory.initDefaultConsumerPolicy());
 		addServiceProducer(generateSupply(25.0, current, 60.,
 				new DeviceProperties("wind turbine3", DeviceCategory.WIND_ENG, EnvironmentalImpact.LOW),
-				pricingTable), producerPolicy, policyFactory.initDefaultConsumerPolicy());
+				pricingTable), energyStorageSetting, producerPolicy, policyFactory.initDefaultConsumerPolicy());
 		addServiceConsumer(generateRequest(24.7, current, 150., 150., PriorityLevel.LOW,
 				new DeviceProperties("Laptop 1", DeviceCategory.ICT, EnvironmentalImpact.MEDIUM), pricingTable),
-				policyFactory.initDefaultProducerPolicy(), policyFactory.initDefaultConsumerPolicy());
+				energyStorageSetting, policyFactory.initDefaultProducerPolicy(), policyFactory.initDefaultConsumerPolicy());
 		return getLsas();
 	}
 
@@ -846,22 +870,23 @@ public class Sapere {
 		PricingTable pricingTable = new PricingTable(current,  0, getTimeShiftMS());
 		// addServiceProducer(generateSupply(new Float(30.0), current,
 		// YEAR_DURATION_MIN, "SIG", DeviceCategory.EXTERNAL_ENG));
+		EnergyStorageSetting energyStorageSetting = null;
 		DeviceProperties solorPanel = new DeviceProperties("solar panel1", DeviceCategory.SOLOR_ENG,
 				EnvironmentalImpact.LOW);
 		IProducerPolicy producerPolicy = policyFactory.initDefaultProducerPolicy();
 		addServiceProducer(generateSupply(50.0, current, 10., solorPanel, pricingTable)
-				, producerPolicy, policyFactory.initDefaultConsumerPolicy());
+				, energyStorageSetting, producerPolicy, policyFactory.initDefaultConsumerPolicy());
 		DeviceProperties tvLCD = new DeviceProperties("TV 32 LED/LCD ", DeviceCategory.AUDIOVISUAL,
 				EnvironmentalImpact.MEDIUM);
 		addServiceConsumer(generateRequest(97.7, current, 150., 150., PriorityLevel.LOW, tvLCD, pricingTable)
-				, policyFactory.initDefaultProducerPolicy(), policyFactory.initDefaultConsumerPolicy());
+				, energyStorageSetting, policyFactory.initDefaultProducerPolicy(), policyFactory.initDefaultConsumerPolicy());
 		int nbAgents = 5;
 		for (int i = 0; i < nbAgents; i++) {
 			DeviceProperties lapTop = new DeviceProperties("Laptop " + i, DeviceCategory.ICT,
 					EnvironmentalImpact.MEDIUM);
 			addServiceConsumer(
 					generateRequest(30 + 0.1 * i, current, 120., 120., PriorityLevel.LOW, lapTop, pricingTable)
-					, policyFactory.initDefaultProducerPolicy(), policyFactory.initDefaultConsumerPolicy());
+					, energyStorageSetting, policyFactory.initDefaultProducerPolicy(), policyFactory.initDefaultConsumerPolicy());
 		}
 		return getLsas();
 	}
@@ -870,11 +895,12 @@ public class Sapere {
 		initEnergyService(serverConfig, generateDefaultInitForm("test5"));
 		// Add producer agents
 		Date current = getCurrentDate();
+		EnergyStorageSetting energyStorageSetting = null;
 		PricingTable pricingTable = new PricingTable(current, 0, getTimeShiftMS());
 		DeviceProperties devicePropeties1 = new DeviceProperties("SIG", DeviceCategory.EXTERNAL_ENG,
 				EnvironmentalImpact.MEDIUM);
 		addServiceProducer(generateSupply(2700.0, current, YEAR_DURATION_MIN, devicePropeties1, pricingTable),
-				policyFactory.initDefaultProducerPolicy(), policyFactory.initDefaultConsumerPolicy());
+				energyStorageSetting, policyFactory.initDefaultProducerPolicy(), policyFactory.initDefaultConsumerPolicy());
 		// Add query
 		/*
 		 * addQueryConsumer( generateRequest(new Float(10.0), current, new Float(0.5),
@@ -892,6 +918,7 @@ public class Sapere {
 		*/
 		String policyId = useDynamicPricingPolicy? PolicyFactory.POLICY_LOWEST_DEMAND : null;
 		IProducerPolicy producerPolicy = policyFactory.initProducerPolicy(policyId, false);
+		EnergyStorageSetting energyStorageSetting = null;
 		/*
 		IProducerPolicy producerPolicy = useDynamicPricingPolicy
 				? new LowestDemandPolicy(pricingTable, IProducerPolicy.POLICY_PRIORITIZATION)
@@ -901,7 +928,7 @@ public class Sapere {
 				EnvironmentalImpact.MEDIUM);
 		Date current = nodeContext.getCurrentDate(); // getCurrentMinute();
 		addServiceProducer(generateSupply(33.0, current, 60., devicePropeties1, producerPolicy.getDefaultPricingTable())
-				, producerPolicy, policyFactory.initDefaultConsumerPolicy());
+				, energyStorageSetting, producerPolicy, policyFactory.initDefaultConsumerPolicy());
 		IConsumerPolicy lowestPricePolicy = new LowestPricePolicy();
 		int nbAgents = 10;
 		int priceDurationMinutes = PolicyFactory.getPriceDurationMinutes();
@@ -916,7 +943,7 @@ public class Sapere {
 			DeviceProperties devicePropeties2 = new DeviceProperties("Battery-" + (1+i), DeviceCategory.OTHER,
 					EnvironmentalImpact.MEDIUM);
 			EnergyRequest request = generateRequest(power, dateBegin, dateEnd, 120., PriorityLevel.LOW, devicePropeties2);
-			addServiceConsumer(request, policyFactory.initDefaultProducerPolicy() , lowestPricePolicy);
+			addServiceConsumer(request, energyStorageSetting, policyFactory.initDefaultProducerPolicy() , lowestPricePolicy);
 		}
 		return getLsas();
 	}
@@ -924,13 +951,14 @@ public class Sapere {
 	public List<Service> test6(ServerConfig serverConfig) throws HandlingException {
 		initEnergyService(serverConfig, generateDefaultInitForm("test6"));
 		Date current = nodeContext.getCurrentDate(); // getCurrentMinute();
+		EnergyStorageSetting energyStorageSetting = null;
 		// addServiceProducer(generateSupply(new Float(30.0), current,
 		// YEAR_DURATION_MIN, "SIG", DeviceCategory.EXTERNAL_ENG));
 		//PricingTable pricingTable = new PricingTable(current, 0, getTimeShiftMS());
 		DeviceProperties devicePropeties1 = new DeviceProperties("solar panel1", DeviceCategory.SOLOR_ENG,
 				EnvironmentalImpact.LOW);
 		IProducerPolicy producerPolicy = policyFactory.initDefaultProducerPolicy();
-		addServiceProducer(generateSupply(33.0, current, 10., devicePropeties1, null), producerPolicy, policyFactory.initDefaultConsumerPolicy());
+		addServiceProducer(generateSupply(33.0, current, 10., devicePropeties1, null), energyStorageSetting, producerPolicy, policyFactory.initDefaultConsumerPolicy());
 		int nbAgents = 10;
 		for (int i = 0; i < nbAgents; i++) {
 			Date dateBegin = UtilDates.shiftDateSec(current, 5 + 65 * i);
@@ -938,7 +966,7 @@ public class Sapere {
 			DeviceProperties devicePropeties2 = new DeviceProperties("Battery " + (1 + i), DeviceCategory.OTHER,
 					EnvironmentalImpact.MEDIUM);
 			EnergyRequest request = generateRequest(10.0, dateBegin, dateEnd, 120., PriorityLevel.LOW, devicePropeties2);
-			addServiceConsumer(request, policyFactory.initDefaultProducerPolicy(), policyFactory.initDefaultConsumerPolicy());
+			addServiceConsumer(request, energyStorageSetting, policyFactory.initDefaultProducerPolicy(), policyFactory.initDefaultConsumerPolicy());
 		}
 		return getLsas();
 	}
@@ -948,6 +976,7 @@ public class Sapere {
 		// Add producer agents
 		Date current = getCurrentDate();
 		PricingTable pricingTable = new PricingTable(current, 0, getTimeShiftMS());
+		EnergyStorageSetting energyStorageSetting = null;
 		double minPower = targetState.getMinValue();
 		double maxPower = targetState.getMaxValue() == null ? 1.7 * minPower : targetState.getMaxValue();
 		double powerRandom = Math.random();
@@ -959,6 +988,7 @@ public class Sapere {
 			DeviceProperties prodDeviceProperties = new DeviceProperties("wind turbine 0", DeviceCategory.WIND_ENG,
 					EnvironmentalImpact.LOW);
 			addServiceProducer(generateSupply(targetPower, current, 60., prodDeviceProperties, pricingTable),
+					energyStorageSetting,
 					producerPolicy, policyFactory.initDefaultConsumerPolicy());
 		}
 		if ("requested".equals(variable) || "missing".equals(variable) || "consumed".equals(variable)
@@ -966,7 +996,7 @@ public class Sapere {
 			DeviceProperties consumerDeviceProperties = new DeviceProperties("Heat pump 0", DeviceCategory.HEATING,
 					EnvironmentalImpact.MEDIUM);
 			addServiceConsumer(generateRequest(targetPower, current, 120., 120., PriorityLevel.LOW,
-					consumerDeviceProperties, pricingTable), policyFactory.initDefaultProducerPolicy(), policyFactory.initDefaultConsumerPolicy());
+					consumerDeviceProperties, pricingTable), energyStorageSetting, policyFactory.initDefaultProducerPolicy(), policyFactory.initDefaultConsumerPolicy());
 		}
 		try {
 			LearningAgent learningAgent = getLearningAgent();
@@ -1044,6 +1074,29 @@ public class Sapere {
 		startService(agentName);
 	}
 
+	private void addServiceStorage() {
+		AgentAuthentication authentication = generateAgentAuthentication(AgentType.PROSUMER);
+		Date current = getCurrentDate();
+		PricingTable pricingTable = new PricingTable(current, 0, getTimeShiftMS());
+		EnergySupply supply = generateSupply(0., current, 366 * 24 * 60.,
+				new DeviceProperties("Common storage", DeviceCategory.BATTERY_ENG, EnvironmentalImpact.LOW),
+				pricingTable);
+		try {
+			ProsumerAgent storageAgent = new ProsumerAgent(nextProsumerId, authentication, supply, null,
+					nodeContext.getGlobalEnergyStorageSetting(), policyFactory.initDefaultProducerPolicy(),
+					policyFactory.initDefaultConsumerPolicy(), nodeContext);
+			nextProsumerId++;
+			nodeContext.setStorageAgentName(storageAgent.getAgentName());
+			serviceAgents.add(storageAgent);
+			startService(storageAgent.getAgentName());
+			logger.info(
+					"addServiceStorage : add new " + storageAgent.computeRole() + " " + storageAgent.getAgentName());
+		} catch (HandlingException e) {
+			logger.error(e);
+		}
+
+	}
+
 	private LearningAgent getLearningAgent() {
 		for (SapereAgent agent : serviceAgents) {
 			if (agent instanceof LearningAgent) {
@@ -1083,7 +1136,8 @@ public class Sapere {
 				agentInputForm.generateSimplePricingTable(0);
 				newAgent = addServiceProducer(agentInputForm.getPower(), agentInputForm.getBeginDate(),
 						agentInputForm.getEndDate(), agentInputForm.retrieveDeviceProperties(),
-						agentInputForm.generatePricingTable(), producerPolicy, consumerPolicy);
+						agentInputForm.generatePricingTable(), agentInputForm.getEnergyStorageSetting()
+						, producerPolicy, consumerPolicy);
 			} else if (agentInputForm.isConsumer()) {
 				agentInputForm.generateSimplePricingTable(0);
 				PriorityLevel priority = agentInputForm.getPriorityLevel();
@@ -1094,8 +1148,9 @@ public class Sapere {
 				}
 				newAgent = addServiceConsumer(agentInputForm.getPower(), agentInputForm.getBeginDate(),
 						agentInputForm.getEndDate(), delayToleranceMinutes, priority,
-						agentInputForm.retrieveDeviceProperties(), agentInputForm.generatePricingTable(),
-						producerPolicy, consumerPolicy);
+						agentInputForm.retrieveDeviceProperties(), agentInputForm.generatePricingTable()
+						,agentInputForm.getEnergyStorageSetting()
+						,producerPolicy, consumerPolicy);
 			}
 			if (newAgent != null) {
 				Thread.sleep(1 * 1000);
@@ -1113,26 +1168,27 @@ public class Sapere {
 
 	public ProsumerAgent addServiceConsumer(Double power, Date beginDate, Date endDate
 			, Double delayToleranceMinutes,
-			PriorityLevel priority, DeviceProperties deviceProperties, PricingTable pricingTable
+			PriorityLevel priority, DeviceProperties deviceProperties, PricingTable pricingTable, EnergyStorageSetting energyStorageSetting
 			,IProducerPolicy producerPolicy, IConsumerPolicy consumerPolicy) throws HandlingException {
 		if(!deviceProperties.isConsumer()) {
 			throw new HandlingException("addServiceConsumer : the givent category " +  deviceProperties.getCategory() + " is not a consumer category");
 		}
 		EnergyRequest request = generateRequest(power, beginDate, endDate, delayToleranceMinutes, priority,	deviceProperties);
-		return addServiceConsumer(request, producerPolicy, consumerPolicy);
+		return addServiceConsumer(request, energyStorageSetting, producerPolicy, consumerPolicy);
 	}
 
-	private ProsumerAgent addServiceConsumer(EnergyRequest need, IProducerPolicy producerPolicy, IConsumerPolicy consumerPolicy) throws HandlingException {
+	private ProsumerAgent addServiceConsumer(EnergyRequest need, EnergyStorageSetting energyStorageSetting, IProducerPolicy producerPolicy, IConsumerPolicy consumerPolicy) throws HandlingException {
 		EnergySupply supply = null;
-		return  addServiceProsumer(supply, need, producerPolicy, consumerPolicy);
+		return  addServiceProsumer(supply, need, energyStorageSetting, producerPolicy, consumerPolicy);
 	}
 
-	private ProsumerAgent addServiceProducer(EnergySupply supply, IProducerPolicy producerPolicy, IConsumerPolicy consumerPolicy) throws HandlingException {
+	private ProsumerAgent addServiceProducer(EnergySupply supply, EnergyStorageSetting energyStorageSetting, IProducerPolicy producerPolicy, IConsumerPolicy consumerPolicy) throws HandlingException {
 		EnergyRequest need = null;
-		return addServiceProsumer(supply, need, producerPolicy, consumerPolicy);
+		return addServiceProsumer(supply, need, energyStorageSetting, producerPolicy, consumerPolicy);
 	}
 
-	private ProsumerAgent addServiceProsumer(EnergySupply supply, EnergyRequest need, IProducerPolicy producerPolicy, IConsumerPolicy consumerPolicy) throws HandlingException {
+	private ProsumerAgent addServiceProsumer(EnergySupply supply, EnergyRequest need, EnergyStorageSetting energyStorageSetting
+			, IProducerPolicy producerPolicy, IConsumerPolicy consumerPolicy) throws HandlingException {
 		if (!isRunning) {
 			return null;
 		}
@@ -1148,7 +1204,7 @@ public class Sapere {
 		}
 		synchronized (mapAgentAuthentication) {
 			AgentAuthentication authentication = generateAgentAuthentication(AgentType.PROSUMER);
-			ProsumerAgent prosumerAgent = new ProsumerAgent(nextProsumerId, authentication, supply, need, producerPolicy, consumerPolicy, nodeContext);
+			ProsumerAgent prosumerAgent = new ProsumerAgent(nextProsumerId, authentication, supply, need, energyStorageSetting, producerPolicy, consumerPolicy, nodeContext);
 			synchronized (prosumerAgent) {
 				prosumerAgent.setInitialLSA();
 			}
@@ -1161,7 +1217,8 @@ public class Sapere {
 
 	public ProsumerAgent addServiceProducer(Double power, Date beginDate, Date endDate,
 			DeviceProperties deviceProperties
-			, PricingTable pricingTable, IProducerPolicy producerPolicy,  IConsumerPolicy consumerPolicy) throws HandlingException {
+			, PricingTable pricingTable, EnergyStorageSetting energyStorageSetting
+			, IProducerPolicy producerPolicy,  IConsumerPolicy consumerPolicy) throws HandlingException {
 		if (!isRunning) {
 			throw new HandlingException("Service is not running");
 		}
@@ -1169,7 +1226,7 @@ public class Sapere {
 			throw new HandlingException("addServiceProducer : the givent category " +  deviceProperties.getCategory() + " is not a producer category");
 		}
 		EnergySupply supply = generateSupply(power, beginDate, endDate, deviceProperties, pricingTable);
-		return this.addServiceProducer(supply, producerPolicy, consumerPolicy);
+		return this.addServiceProducer(supply, energyStorageSetting, producerPolicy, consumerPolicy);
 	}
 
 	public AgentForm restartEnergyAgent(AgentInputForm agentInputForm) {
@@ -1188,10 +1245,10 @@ public class Sapere {
 			SapereAgent agent = null;
 			if (agentInputForm.isConsumer()) {
 				// Restart consumer agent
-				agent = restartConsumer(agentInputForm.getAgentName(), agentInputForm.retrieveEnergyRequest());
+				agent = restartConsumer(agentInputForm.getAgentName(), agentInputForm.retrieveEnergyRequest(), agentInputForm.getEnergyStorageSetting());
 			} else if (agentInputForm.isProducer()) {
 				// Restart producer agent
-				agent = restartProducer(agentInputForm.getAgentName(), agentInputForm.retrieveEnergySupply());
+				agent = restartProducer(agentInputForm.getAgentName(), agentInputForm.retrieveEnergySupply(), agentInputForm.getEnergyStorageSetting());
 			}
 			if (agent != null) {
 				result = generateAgentForm(agent);
@@ -1272,7 +1329,7 @@ public class Sapere {
 			return new OperationResult(true, "");
 		}
 		// Use the regulator agent to send a user interruption
-		SapereAgent regAgent = getAgent(regulatorAgentName);
+		SapereAgent regAgent = getAgent(nodeContext.getRegulatorAgentName());
 		if (regAgent instanceof RegulatorAgent) {
 			RegulatorAgent regulatorAgent = (RegulatorAgent) regAgent;
 			regulatorAgent.interruptListAgents(agentsToStop);
@@ -1322,7 +1379,7 @@ public class Sapere {
 			return getAgent(agentName);
 		}
 		// Use the regulator agent to send a user interruption
-		SapereAgent regAgent = getAgent(regulatorAgentName);
+		SapereAgent regAgent = getAgent(nodeContext.getRegulatorAgentName());
 		if (regAgent instanceof RegulatorAgent) {
 			RegulatorAgent regulatorAgent = (RegulatorAgent) regAgent;
 			regulatorAgent.interruptAgent(agentName);
@@ -1375,7 +1432,7 @@ public class Sapere {
 		// Use the regulator agent to send a user interruption
 		List<String> listRunningAgents = getRunningServiceAgents();
 		if (listRunningAgents.size() > 0) {
-			SapereAgent regAgent = getAgent(regulatorAgentName);
+			SapereAgent regAgent = getAgent(nodeContext.getRegulatorAgentName());
 			synchronized (regAgent) {
 				if (regAgent instanceof RegulatorAgent) {
 					RegulatorAgent regulatorAgent = (RegulatorAgent) regAgent;
@@ -1434,7 +1491,7 @@ public class Sapere {
 		if (energySupply.getIssuerProperties().getLocation() == null) {
 			energySupply.getIssuerProperties().setLocation(nodeContext.getNodeLocation());
 		}
-		SapereAgent regAgent = getAgent(regulatorAgentName);
+		SapereAgent regAgent = getAgent(nodeContext.getRegulatorAgentName());
 		if (regAgent instanceof RegulatorAgent) {
 			// Use the regulator agent to send a user interruption
 			RegulatorAgent regulatorAgent = (RegulatorAgent) regAgent;
@@ -1521,7 +1578,7 @@ public class Sapere {
 		return new ArrayList<VariableStateHistory>();
 	}
 
-	public ProsumerAgent restartProsumer(String agentName, EnergySupply supply, EnergyRequest need) {
+	public ProsumerAgent restartProsumer(String agentName, EnergySupply supply, EnergyRequest need, EnergyStorageSetting energyStorageSetting) {
 		if (!isRunning) {
 			return null;
 		}
@@ -1553,7 +1610,7 @@ public class Sapere {
 				try {
 					// Re-initialize consumer agent
 					Integer id = prosumerAgent.getId();
-					prosumerAgent.reinitialize(id, prosumerAuthentication, supply, need, producerPolicy, consumerPolicy,
+					prosumerAgent.reinitialize(id, prosumerAuthentication, supply, need, energyStorageSetting, producerPolicy, consumerPolicy,
 							nodeContext);
 					if (!serviceAgents.contains(prosumerAgent)) {
 						serviceAgents.add(prosumerAgent);
@@ -1589,15 +1646,15 @@ public class Sapere {
 		return null;
 	}
 
-	public ProsumerAgent restartConsumer(String consumerAgentName, EnergyRequest need) {
+	public ProsumerAgent restartConsumer(String consumerAgentName, EnergyRequest need, EnergyStorageSetting energyStorageSetting) {
 		EnergySupply supply = null;
 		logger.info("restartConsumer : needed power = " + need.getPower());
-		return restartProsumer(consumerAgentName, supply, need);
+		return restartProsumer(consumerAgentName, supply, need, energyStorageSetting);
 	}
 
-	public ProsumerAgent restartProducer(String agentName, EnergySupply supply) {
+	public ProsumerAgent restartProducer(String agentName, EnergySupply supply, EnergyStorageSetting energyStorageSetting) {
 		EnergyRequest need = null;
-		return restartProsumer(agentName, supply, need);
+		return restartProsumer(agentName, supply, need, energyStorageSetting);
 	}
 
 	public boolean isLocalAgent(String agentName) {
@@ -1738,20 +1795,21 @@ public class Sapere {
 		Date current = getCurrentDate();
 		List<ExtendedEnergyEvent> events = EnergyDbHelper.retrieveLastSessionEvents(current);
 		this.checkInitialisation();
+		EnergyStorageSetting energyStorageSetting = null;
 		for (EnergyEvent event : events) {
 			if (EventType.PRODUCTION_START.equals(event.getType())) {
 				PricingTable pricingTable = new PricingTable(nodeContext.getTimeShiftMS());
 				EnergySupply supply = generateSupply(event.getPower(), getCurrentDate(), event.getEndDate(),
 						event.getIssuerProperties().getDeviceProperties(), pricingTable);
 				IProducerPolicy producerPolicy = policyFactory.initDefaultProducerPolicy();
-				this.addServiceProducer(supply, producerPolicy, policyFactory.initDefaultConsumerPolicy());
+				this.addServiceProducer(supply, energyStorageSetting, producerPolicy, policyFactory.initDefaultConsumerPolicy());
 			} else if (EventType.REQUEST_START.equals(event.getType())) {
 				current = getCurrentDate();
 				double delayToleranceMinutes = UtilDates.computeDurationMinutes(current, event.getEndDate());
 				//PricingTable pricingTable = new PricingTable(nodeContext.getTimeShiftMS());
 				EnergyRequest request = generateRequest(event.getPower(), current, event.getEndDate(),
 						delayToleranceMinutes, PriorityLevel.LOW, event.getIssuerProperties().getDeviceProperties());
-				this.addServiceConsumer(request, policyFactory.initDefaultProducerPolicy(), policyFactory.initDefaultConsumerPolicy());
+				this.addServiceConsumer(request, energyStorageSetting, policyFactory.initDefaultProducerPolicy(), policyFactory.initDefaultConsumerPolicy());
 			}
 		}
 		return this.retrieveNodeContent();

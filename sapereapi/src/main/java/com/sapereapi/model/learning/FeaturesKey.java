@@ -55,7 +55,7 @@ public class FeaturesKey implements Serializable {
 	}
 
 	public int compareTo(FeaturesKey other) {
-		if(other != null && other.getTimeWindow() != null) {
+		if (other != null && other.getTimeWindow() != null) {
 			return timeWindow.getStartHour() - other.getTimeWindow().getStartHour();
 		}
 		return 1;
@@ -71,8 +71,8 @@ public class FeaturesKey implements Serializable {
 
 	public FeaturesKey clone() {
 		FeaturesKey result = new FeaturesKey();
-		TimeWindow tw = new TimeWindow(timeWindow.getId(), timeWindow.getDaysOfWeek()
-				, timeWindow.getStartHour(), timeWindow.getStartMinute(), timeWindow.getEndHour(), timeWindow.getEndMinute());
+		TimeWindow tw = new TimeWindow(timeWindow.getId(), timeWindow.getDaysOfWeek(), timeWindow.getStartHour(),
+				timeWindow.getStartMinute(), timeWindow.getEndHour(), timeWindow.getEndMinute());
 		result.setTimeWindow(tw);
 		return result;
 	}

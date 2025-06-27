@@ -28,6 +28,7 @@ import com.sapereapi.model.protection.ProtectedConfirmationTable;
 import com.sapereapi.model.protection.ProtectedContract;
 import com.sapereapi.model.protection.ProtectedSingleOffer;
 import com.sapereapi.model.referential.PriorityLevel;
+import com.sapereapi.model.referential.ProsumerRole;
 import com.sapereapi.util.SapereUtil;
 import com.sapereapi.util.UtilDates;
 
@@ -147,6 +148,16 @@ public class ConsumersProcessingMangager {
 				secondProcessingTable.getTableWaitingRequest(), logger);
 	}
 
+	public void checkWaitingRequests() {
+		Map<String, EnergyRequest> mainRequests = mainProcessingTable.getTableWaitingRequest();
+		Map<String, EnergyRequest> secondaryRequests = secondProcessingTable.getTableWaitingRequest();
+		for(String issuer: mainRequests.keySet()) {
+			if(secondaryRequests.containsKey(issuer)) {
+				logger.error("checkRequests " + issuer + " has both main and secondary requests " + mainRequests.get(issuer) + " and " + secondaryRequests.get(issuer));
+				secondaryRequests.remove(issuer);
+			}
+		}
+	}
 	public Collection<EnergyRequest> getWaitingRequest() {
 		return SapereUtil.mergeCollectionRequests(
 				mainProcessingTable.getTableWaitingRequest().values(),
@@ -217,8 +228,25 @@ public class ConsumersProcessingMangager {
 
 	public void addOrUpdateRequest(EnergyAgent producerAgent, String consumer, EnergyRequest request) {
 		if(request.isComplementary()) {
+			// For debug
+			if(mainProcessingTable.hasWaitingRequest(consumer)) {
+				EnergyRequest mainRequest = mainProcessingTable.getWaitingRequest(consumer);
+				logger.error("addOrUpdateRequest " + producerAgent.getAgentName() + " add complementary request " +request + " but mainProcessingTable already contains the request " + mainRequest);				
+			} // end for debug
 			secondProcessingTable.addOrUpdateRequest(producerAgent, consumer, request);
 		} else {
+			if(secondProcessingTable.hasWaitingRequest(consumer)) {
+				EnergyRequest secondRequest = secondProcessingTable.getWaitingRequest(consumer);
+				logger.warning("addOrUpdateRequest " + producerAgent.getAgentName() + " add main request " +request + " but secondProcessingTable already contains the request " + secondRequest);
+				if(!secondRequest.getBeginDate().after(request.getBeginDate())) {
+					// a complementary is already present for the same issuer: remove the complementary request for this issuer
+					logger.info("addOrUpdateRequest : remove second request " + secondRequest);
+					secondProcessingTable.removeConsumer(consumer, "Presence of a main request and a second request: delete the oldest request");
+				} else {
+					logger.info("addOrUpdateRequest : cannot remove the second request " + secondRequest+ " : the secondary request is more recent thant the request to add");
+				}
+				//.cleanExpiredData(producerAgent, producerAgent.getDebugLevel());
+			} // end for debug
 			mainProcessingTable.addOrUpdateRequest(producerAgent, consumer, request);
 		}
 	}
@@ -304,7 +332,7 @@ public class ConsumersProcessingMangager {
 
 	public void debug_checkOfferAcquitted(EnergyAgent producerAgent, String consumer) throws HandlingException {
 		ProtectedSingleOffer protectedOffer = (ProtectedSingleOffer) producerAgent.getLsa().getOnePropertyValueByQueryAndName(consumer, "OFFER");
-		if(protectedOffer!=null && protectedOffer.hasAccesAsProducer(producerAgent)) {
+		if(protectedOffer!=null && protectedOffer.hasAccessAsIssuer(producerAgent)) {
 			try {
 				SingleOffer offer = protectedOffer.getSingleOffer(producerAgent);
 				if(offer!=null) {
@@ -351,13 +379,22 @@ public class ConsumersProcessingMangager {
 		tableBondedRequests.clear();
 	}
 
-	public void stopAllContracts(EnergyAgent producerAgent) {
-		for(String consumer : mainProcessingTable.getTableValidContracts().keySet()) {
-			stopContract(producerAgent, consumer, mainProcessingTable.isComplementary(), producerAgent.getAgentName() + " is disabled");
-		}
-		for(String consumer : secondProcessingTable.getTableValidContracts().keySet()) {
-			stopContract(producerAgent, consumer, secondProcessingTable.isComplementary(), producerAgent.getAgentName() + " is disabled");
-		}
+	public void stopAllContracts(EnergyAgent producerAgent, String log) {
+		// Stop validated and waiting contracts
+		mainProcessingTable.stopAllContracts(producerAgent, log);
+		secondProcessingTable.stopAllContracts(producerAgent, log);
+		checkup(producerAgent);
+	}
+
+	/**
+	 * Send FALSE confirmation to all consumers of waiting offer (in case when the consumer start a new contract)
+	 * @param producerAgent
+	 * @param log
+	 */
+	public void cancelAllWaitingOffers(EnergyAgent producerAgent, String log) throws HandlingException {
+		mainProcessingTable.cancelAllWaitingOffers(producerAgent, log, activateOfferRemoveLog);
+		secondProcessingTable.cancelAllWaitingOffers(producerAgent, log, activateOfferRemoveLog);
+		checkup(producerAgent);
 	}
 
 	public ReducedContract getReducedContract(String consumer, boolean isComplementary) {
@@ -385,7 +422,11 @@ public class ConsumersProcessingMangager {
 			try {
 				if (!reducedContract.hasDisagreement()) {
 					reducedContract.addProducerAgreement(false);
-					logger.info(producerAgent.getAgentName()+ " stopContract : reducedContract = " + reducedContract + ", log = " + log);
+					logger.info(producerAgent.getAgentName()+ " stopContract : _reducedContract = " + reducedContract + ", log = " + log);
+					// For debug
+					if(!isComplementary) {
+						logger.info(producerAgent.getAgentName()+ " stopContract : secondary contract " + secondProcessingTable.getReducedContract(consumer));
+					}
 				}
 				if(isComplementary) {
 					secondProcessingTable.removeContract(producerAgent, consumer, log);
@@ -398,7 +439,8 @@ public class ConsumersProcessingMangager {
 				}
 				// Stop the complementary contract if a main contract is stopped
 				if(!isComplementary) {
-					if(secondProcessingTable.hasValidContract(consumer) || secondProcessingTable.hasWaitingValidationContract(consumer)) {				
+					if(secondProcessingTable.hasValidContract(consumer) || secondProcessingTable.hasWaitingValidationContract(consumer)) {
+						logger.info(producerAgent.getAgentName()+ " stopContract : stop also the secondary contract " + secondProcessingTable.getReducedContract(consumer));
 						stopContract(producerAgent, consumer, true, producerAgent.getAgentName() + " : the main contract has been stopped");
 					}
 				}
@@ -409,26 +451,32 @@ public class ConsumersProcessingMangager {
 	}
 
 	public void cleanConfirmationTable(EnergyAgent producerAgent) {
-		ProtectedConfirmationTable protectedConfirmationTable = getProtectedConfirmationTable(producerAgent);
+		ProtectedConfirmationTable protectedConfirmationTable = producerAgent.getProtectedConfirmationTable(producerAgent);
 		try {
+			// Renew confirmations if necessary
+			boolean updated = false;
 			if(protectedConfirmationTable.hasExpiredItem(producerAgent)) {
 				protectedConfirmationTable.cleanExpiredDate(producerAgent);
-				producerAgent.replacePropertyWithName(new Property("PROD_CONFIRM", protectedConfirmationTable));
+				updated = true;
+			}
+			updated = updated || protectedConfirmationTable.renewConfirmations(producerAgent);
+			if(updated) {
+				producerAgent.replacePropertyWithName(new Property("CONTRACT_CONFIRM", protectedConfirmationTable));
 			}
 		} catch (PermissionException e) {
 			logger.error(e);
 		}
 	}
-
+/*
 	public ProtectedConfirmationTable getProtectedConfirmationTable(EnergyAgent producerAgent) {
-		Property pProdConfirm = producerAgent.getLsa().getOnePropertyByName("PROD_CONFIRM");
+		Property pProdConfirm = producerAgent.getLsa().getOnePropertyByName("CONTRACT_CONFIRM");
 		if(pProdConfirm!=null && pProdConfirm.getValue() instanceof ProtectedConfirmationTable) {
 			return  (ProtectedConfirmationTable) pProdConfirm.getValue();
 		}
-		ConfirmationTable confirmationTable = new ConfirmationTable(producerAgent.getAgentName());
+		ConfirmationTable confirmationTable = new ConfirmationTable(producerAgent.getAgentName(), producerAgent.computeRole());
 		return new ProtectedConfirmationTable(confirmationTable);
 	}
-
+*/
 	public void addReceivedConfirmation(EnergyAgent producerAgent, String consumer) {
 		mainProcessingTable.addReceivedConfirmation(producerAgent, consumer);
 		secondProcessingTable.addReceivedConfirmation(producerAgent, consumer);
@@ -457,7 +505,7 @@ public class ConsumersProcessingMangager {
 			logger.warning("general checkup " + comment );
 		}
 		// Send confirmation to consumer agents
-		ProtectedConfirmationTable protectedConfirmationTable = getProtectedConfirmationTable(producerAgent);
+		ProtectedConfirmationTable protectedConfirmationTable = producerAgent.getProtectedConfirmationTable(producerAgent);
 		try {
 			ConfirmationTable confirmationTable = protectedConfirmationTable.getConfirmationTable(producerAgent);
 			for(ReducedContract reducedContract : getValidContracts()) {
@@ -471,11 +519,11 @@ public class ConsumersProcessingMangager {
 		}
 	}
 
-	public ConfirmationItem getSentConfirmationItem(EnergyAgent producerAgent, String consumer, boolean isComplementary) {
-		ProtectedConfirmationTable protectedConfirmationTable = getProtectedConfirmationTable(producerAgent);
+	public ConfirmationItem getSentConfirmationItem(EnergyAgent producerAgent, String consumer, boolean isComplementary, ProsumerRole role) {
+		ProtectedConfirmationTable protectedConfirmationTable = producerAgent.getProtectedConfirmationTable(producerAgent);
 		try {
 			ConfirmationTable confirmationTable = protectedConfirmationTable.getConfirmationTable(producerAgent);
-			return confirmationTable.getConfirmationItem(consumer, isComplementary);
+			return confirmationTable.getConfirmationItem(consumer, isComplementary, role);
 		} catch (PermissionException e) {
 			logger.error(e);
 		}
@@ -483,7 +531,12 @@ public class ConsumersProcessingMangager {
 	}
 
 	public boolean hasAlreadyInvalidation(EnergyAgent producerAgent, String consumer, boolean isComplementary) {
-		ConfirmationItem confirmationItem = getSentConfirmationItem(producerAgent, consumer, isComplementary);
+		return hasAlreadyInvalidation(producerAgent, consumer, isComplementary, ProsumerRole.CONSUMER)
+			|| hasAlreadyInvalidation(producerAgent, consumer, isComplementary, ProsumerRole.PRODUCER);
+	}
+
+	public boolean hasAlreadyInvalidation(EnergyAgent producerAgent, String consumer, boolean isComplementary, ProsumerRole role) {
+		ConfirmationItem confirmationItem = getSentConfirmationItem(producerAgent, consumer, isComplementary, role);
 		if(confirmationItem!=null) {
 			Date currentDate = UtilDates.getCurrentSeconde(timeShiftMS);
 			if(confirmationItem.getDate().getTime() >= currentDate.getTime()) {
@@ -497,9 +550,9 @@ public class ConsumersProcessingMangager {
 
 	public void sendConfirmation(EnergyAgent producerAgent, ReducedContract reducedContract, boolean ok, String comment) {
 		try {
-			ProtectedConfirmationTable protectedConfirmationTable = getProtectedConfirmationTable(producerAgent);
-			protectedConfirmationTable.confirm(producerAgent, reducedContract.getConsumerAgent(), reducedContract.isComplementary(), ok, comment, timeShiftMS);
-			producerAgent.replacePropertyWithName(new Property("PROD_CONFIRM", protectedConfirmationTable));
+			ProtectedConfirmationTable protectedConfirmationTable = producerAgent.getProtectedConfirmationTable(producerAgent);
+			protectedConfirmationTable.confirmAsProducer(producerAgent, reducedContract.getConsumerAgent(), reducedContract.isComplementary(), ok, comment, 0);
+			producerAgent.replacePropertyWithName(new Property("CONTRACT_CONFIRM", protectedConfirmationTable));
 		} catch (PermissionException e) {
 			logger.error(e);
 		}
@@ -581,17 +634,18 @@ public class ConsumersProcessingMangager {
 
 	public ConfirmationItem checkAvailabilityAndExpiration(EnergyAgent producerAgent, ReducedContract reducedContract) {
 		String agentName = producerAgent.getAgentName();
+		String consumer = reducedContract.getIssuer();
 		String comment = "";
 		Boolean isComplementary = reducedContract.isComplementary();
 		// TO DELETE !!!
 		int __foo = 0;
 		if(__foo>0) {
-			return new ConfirmationItem(agentName, isComplementary, false, agentName + " Foo test", timeShiftMS);
+			return new ConfirmationItem(agentName, ProsumerRole.PRODUCER, consumer, isComplementary, false, agentName + " Foo test", 0, timeShiftMS);
 		}
 		if(reducedContract.validationHasExpired()) {
 			comment = agentName + ": contract validation has expired : " + reducedContract;
 			logger.warning("checkAvailabilityAndExpiration " + agentName + ": contract validation has expired : " + reducedContract);
-			return new ConfirmationItem(agentName, isComplementary, false, comment, timeShiftMS);
+			return new ConfirmationItem(agentName, ProsumerRole.PRODUCER, consumer, isComplementary, false, comment, 0, timeShiftMS);
 		}
 		Double availablePower = computeAvailablePower(producerAgent,false, false);	// Do not ignore offers and waiting contracts
 		boolean isContractAlreadyInTable = hasContract(reducedContract.getConsumerAgent(), isComplementary);
@@ -628,7 +682,7 @@ public class ConsumersProcessingMangager {
 				);
 			logger.info("checkAvailabilityAndExpiration tableConsumersProcessing = " + tableConsumersProcessing);
 		}*/
-		return new ConfirmationItem(agentName, isComplementary, isOK, comment, timeShiftMS);
+		return new ConfirmationItem(agentName, ProsumerRole.PRODUCER, consumer, isComplementary, isOK, comment, 0, timeShiftMS);
 	}
 
 
@@ -744,8 +798,10 @@ public class ConsumersProcessingMangager {
 				// Break current contracts until there is enough energy left to meet this demand
 				Map<String, List<ReducedContract>> tableValidContracts = getTableValidContracts();
 				ReducedContract contractToCancel = SapereUtil.getContractToCancel(tableValidContracts);
-				while (availablePower < request.getPower() && contractToCancel.getConsumerAgent() != null) {
-					stopContract(producerAgent, contractToCancel.getConsumerAgent(), contractToCancel.isComplementary(), "The agent must respond to a higher priority request.");
+				while (availablePower < request.getPower() && contractToCancel != null) {
+					String warningLog = "The agent must respond to a higher priority request.";
+					logger.info("releaseEnergyForUrgentRequest " + producerAgent.getAgentName() + " : stops contract " + contractToCancel + " " + warningLog);
+					stopContract(producerAgent, contractToCancel.getConsumerAgent(), contractToCancel.isComplementary(), warningLog);
 					tableValidContracts = getTableValidContracts();
 					contractToCancel = SapereUtil.getContractToCancel(tableValidContracts);
 					availablePower = computeAvailablePower(producerAgent,false,false);
@@ -789,8 +845,8 @@ public class ConsumersProcessingMangager {
 	public int generateNewOffers(EnergyAgent producerAgent, NodeTotal nodeTotal) throws HandlingException {
 		int nbNewOFfers = 0;
 		String agentName = producerAgent.getAgentName();
-		boolean toLog = "Prod_N2_1".equals(agentName);
 		Map<String, List<EnergyRequest>> tableWaitingRequest = getTableWaitingRequest();
+		boolean toLog = "Prosumer_N1_2".equals(agentName) && (tableWaitingRequest.size() > 0);
 		if(toLog) {
 			logger.info("generateNewOffers  " + agentName + " : begin waitingoffers = " + getTableWaitingOffers().keySet() + " tableWaitingRequest keys = " + tableWaitingRequest.keySet());
 		}
@@ -809,7 +865,9 @@ public class ConsumersProcessingMangager {
 				return nbNewOFfers;
 			}
 			if(toLog) {
-				logger.info(" generateNewOffers "+ agentName + " : step1");
+				logger.info(" generateNewOffers "+ agentName + " : step1 "
+						+ ", globalProduction = " + producerAgent.getGlobalProduction()
+						+ ", producerAgent.isDisabled " + producerAgent.isDisabled());
 			}
 			// Debug requests under available
 			IProducerPolicy producerPolicy = producerAgent.getProducerPolicy();
@@ -868,7 +926,7 @@ public class ConsumersProcessingMangager {
 									: request.getEndDate();
 							EnergySupply supply = new EnergySupply(isseurProperties, false,
 									providedPowerSlot, providedBeginDate,
-									providedEndDate, producerPolicy.getDefaultPricingTable());
+									providedEndDate, producerPolicy.getDefaultPricingTable(), false);
 							try {
 								// For debug : log contracts
 								/*
@@ -960,13 +1018,37 @@ public class ConsumersProcessingMangager {
 	public boolean isConcerned(EnergyAgent producerAgent, ProtectedContract protectedContract) {
 		boolean result = false;
 		try {
-			if(protectedContract!=null && protectedContract.hasAccesAsProducer(producerAgent) && producerAgent.isProducer()) {
+			if(protectedContract!=null && protectedContract.hasAccessAsReceiver(producerAgent) && producerAgent.isProducer()) {
 				result = protectedContract.hasProducer(producerAgent);
 			}
 		} catch (PermissionException e) {
 			logger.error(e);
 		}
 		return result;
+	}
+
+	public void handleConsumerContracts(EnergyAgent produerAgent, Object oMainContract, Object oSecondContract, String consumer, Lsa bondedLsa, int debugLevel) {
+		if (oMainContract instanceof ProtectedContract) {
+			// handle consumer main contract
+			ProtectedContract mainContract = ((ProtectedContract) oMainContract).clone();
+			this.handleConsumerContract(produerAgent, mainContract, consumer, debugLevel);
+		} else if(mainProcessingTable.hasValidContract(consumer)){
+			// No contract property for this consumer: should remove it from the processing manager
+			// TODO: log CONTRACT_CONFIRM property contained in bondedLSA - to put in parameter
+			logger.error(produerAgent.getAgentName()  +  " should remove main contract of " + consumer
+					+ " CONTRACT_CONFIRM property = " + bondedLsa.getOnePropertyByName("CONTRACT_CONFIRM"));
+			mainProcessingTable.removeConsumer(consumer, "no CONTRACT1 property in LSA of " + consumer);
+		}
+		if(oSecondContract instanceof ProtectedContract) {
+			// handle consumer complementary contract
+			ProtectedContract secondContract = ((ProtectedContract) oSecondContract).clone();
+			this.handleConsumerContract(produerAgent, secondContract, consumer, debugLevel);
+		} else if(secondProcessingTable.hasValidContract(consumer)){
+			// No contract property for this consumer: should remove it from the processing manager
+			logger.error(produerAgent.getAgentName() +  " should remove secondary contract of " + consumer
+					+ " CONTRACT_CONFIRM property = " + bondedLsa.getOnePropertyByName("CONTRACT_CONFIRM"));
+			secondProcessingTable.removeConsumer(consumer, "no CONTRACT2 property in LSA of " + consumer);
+		}
 	}
 
 	/**
@@ -989,7 +1071,7 @@ public class ConsumersProcessingMangager {
 			if (hasWaitingRequest(consumer, isComplementary) || hasWaitingOffer(consumer, isComplementary)) {
 				// Remove waiting request of waiting offer
 				if(debugLevel>0) {
-					logger.info(agentName + " remove " + consumer + " object " + getWaitingRequest(consumer, isComplementary));
+					logger.info("handleConsumerContract(1) " + agentName + " remove " + consumer + " object " + getWaitingRequest(consumer, isComplementary));
 				}
 				removeConsumer(consumer, isComplementary ,"bonded contract " + protectedContract + " " + (isConcerned?"(concerned)":("not concerned")));
 			}
@@ -1033,6 +1115,12 @@ public class ConsumersProcessingMangager {
 		} catch (Exception e) {
 			logger.error(e);
 		}
+	}
+
+	public void handleConsumerConfirmation(EnergyAgent producerAgent,
+			ProtectedConfirmationTable issuerConfirmTable) throws HandlingException {
+		mainProcessingTable.handleConsumerConfirmation(producerAgent, issuerConfirmTable);
+		secondProcessingTable.handleConsumerConfirmation(producerAgent, issuerConfirmTable);
 	}
 
 	public Date getCurrentDate() {

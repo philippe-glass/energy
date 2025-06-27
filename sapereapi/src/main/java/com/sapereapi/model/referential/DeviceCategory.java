@@ -25,6 +25,7 @@ public enum DeviceCategory {
 	,SOLOR_ENG("Solar", true, false)
 	,BIOMASS_ENG("Biomass", true, false)
 	,HYDRO_ENG("Hydro", true, false)
+	,BATTERY_ENG("Battery", true, false)
 	// Hybrid categories
 	,HYBRID("Hybrid", true, true)
 	;

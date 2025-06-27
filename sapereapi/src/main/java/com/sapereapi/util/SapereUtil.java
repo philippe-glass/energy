@@ -1488,7 +1488,7 @@ public class SapereUtil {
 		if(prop.containsKey("activatePredictions")) {
 			String sActivatePredictions = prop.getProperty("activatePredictions");
 			boolean activatePredictions = "1".equalsIgnoreCase(sActivatePredictions) || "true".equalsIgnoreCase(sActivatePredictions);
-			serverConfig.setNodePredicitonSetting(new PredictionSetting(activatePredictions, null, LearningModelType.LSTM));
+			serverConfig.setNodePredicitonSetting(new PredictionSetting(activatePredictions, null, LearningModelType.LSTM, 1));
 		}
 		serverConfig.setModeAuto(modeAuto);
 		if(prop.containsKey("csv_file")) {

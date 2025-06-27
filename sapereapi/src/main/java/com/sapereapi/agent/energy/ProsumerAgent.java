@@ -2,6 +2,7 @@ package com.sapereapi.agent.energy;
 
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collection;
 import java.util.Collections;
 import java.util.Date;
 import java.util.HashSet;
@@ -14,6 +15,8 @@ import com.sapereapi.agent.energy.manager.ContractProcessingManager;
 import com.sapereapi.agent.energy.manager.OffersProcessingManager;
 import com.sapereapi.db.EnergyDbHelper;
 import com.sapereapi.exception.PermissionException;
+import com.sapereapi.log.SapereLogger;
+import com.sapereapi.model.EnergyStorageSetting;
 import com.sapereapi.model.HandlingException;
 import com.sapereapi.model.NodeContext;
 import com.sapereapi.model.energy.ChangeRequest;
@@ -22,7 +25,8 @@ import com.sapereapi.model.energy.EnergyEvent;
 import com.sapereapi.model.energy.EnergyRequest;
 import com.sapereapi.model.energy.EnergyStorage;
 import com.sapereapi.model.energy.EnergySupply;
-import com.sapereapi.model.energy.ExtraSupply;
+import com.sapereapi.model.energy.EnergyWithdrawal;
+import com.sapereapi.model.energy.StorageSupply;
 import com.sapereapi.model.energy.IEnergyRequest;
 import com.sapereapi.model.energy.IEnergySupply;
 import com.sapereapi.model.energy.PowerSlot;
@@ -63,6 +67,7 @@ public class ProsumerAgent extends EnergyAgent implements IEnergyAgent {
 	private static final long serialVersionUID = 1L;
 	private ProsumerEnergyRequest globalNeed = null;
 	private ProsumerEnergySupply globalProduction = null;
+	private EnergyWithdrawal donation = null;
 	private IConsumerPolicy consumerPolicy = null;
 	private IProducerPolicy producerPolicy = null;
 	private int useOffersDecay = 0;
@@ -76,20 +81,21 @@ public class ProsumerAgent extends EnergyAgent implements IEnergyAgent {
 			,AgentAuthentication authentication
 			,EnergySupply globalSupply
 			,EnergyRequest globalNeed
+			,EnergyStorageSetting storageSetting
 			,IEnergyAgentPolicy producerPolicy
 			,IEnergyAgentPolicy consumerPolicy
 			,NodeContext nodeContext) throws HandlingException {
 		super(id, authentication.getAgentName(), authentication
-				,getInputTags(globalSupply, globalNeed, nodeContext)
-				,getOutputTags(globalSupply, globalNeed, nodeContext)
+				,getInputTags(globalSupply, globalNeed, storageSetting, nodeContext)
+				,getOutputTags(globalSupply, globalNeed, storageSetting, nodeContext)
 				,nodeContext);
-		this.initFields(globalSupply, globalNeed, producerPolicy, consumerPolicy, nodeContext);
+		this.initFields(globalSupply, globalNeed, storageSetting, producerPolicy, consumerPolicy, nodeContext);
 	}
 
-	private static String[] getInputTags(IEnergySupply _globalSupply, IEnergyRequest _globalNeed, NodeContext nodeContext) {
+	private static String[] getInputTags(IEnergySupply _globalSupply, IEnergyRequest _globalNeed, EnergyStorageSetting storageSetting, NodeContext nodeContext) {
 		List<String> inputTags = new ArrayList<String>();
 		// common tags :
-		String[] commonTags =  {"DISABLED", "WARNING", "RESCHEDULE"};
+		String[] commonTags =  {"DISABLED", "WARNING", "RESCHEDULE", "CONTRACT_CONFIRM"};
 		inputTags.addAll(Arrays.asList(commonTags));
 		if(nodeContext.isAwardsActivated()) {
 			inputTags.add("AWARDS");
@@ -102,10 +108,14 @@ public class ProsumerAgent extends EnergyAgent implements IEnergyAgent {
 					inputTags.add(tag);
 				}
 			}
+			if(storageSetting != null && storageSetting.isCommon()) {
+				// To receive eneryg withdrawalls for common supply
+				inputTags.add("DONATION");
+			}
 		}
 		if (_globalNeed != null) {
 			// tags specific to consumers
-			String[] tagConsumer = { "PROD", "OFFER", "PROD_CONFIRM" };
+			String[] tagConsumer = { "PROD", "OFFER"};
 			for (String tag : tagConsumer) {
 				if (!inputTags.contains(tag)) {
 					inputTags.add(tag);
@@ -115,18 +125,21 @@ public class ProsumerAgent extends EnergyAgent implements IEnergyAgent {
 		return SapereUtil.toStrArray(inputTags);
 	}
 
-	private static String[] getOutputTags(IEnergySupply _globalSupply, IEnergyRequest _globalNeed, NodeContext nodeContext) {
+	private static String[] getOutputTags(IEnergySupply _globalSupply, IEnergyRequest _globalNeed, EnergyStorageSetting energyStorageSetting, NodeContext nodeContext) {
 		List<String> outputTags = new ArrayList<String>();
 		// common tags :
-		String[] commonTags =  { "EVENT", "DISABLED" };
+		String[] commonTags =  { "EVENT", "DISABLED", "CONTRACT_CONFIRM" };
 		outputTags.addAll(Arrays.asList(commonTags));
 		if (_globalSupply != null) {
 			// tags specific to producers
-			String[] tagsSupplier = { "PROD", "OFFER", "PROD_CONFIRM"};
+			String[] tagsSupplier = { "PROD", "OFFER"};
 			for (String tag : tagsSupplier) {
 				if (!outputTags.contains(tag)) {
 					outputTags.add(tag);
 				}
+			}
+			if(nodeContext.getStorageAgentName() != null && (energyStorageSetting == null || !energyStorageSetting.canSaveEnergy())) {
+				outputTags.add("DONATION");
 			}
 		}
 		if (_globalNeed != null) {
@@ -141,16 +154,16 @@ public class ProsumerAgent extends EnergyAgent implements IEnergyAgent {
 		return SapereUtil.toStrArray(outputTags);
 	}
 
-
 	private void updateLsaTags(NodeContext nodeContext) {
-		String[] lsaInputTags = getInputTags(this.globalProduction, this.globalNeed, nodeContext);
-		String[] lsaOutputTags = getOutputTags(this.globalProduction, this.globalNeed, nodeContext);
+		String[] lsaInputTags = getInputTags(this.globalProduction, this.globalNeed, getStorageSetting(), nodeContext);
+		String[] lsaOutputTags = getOutputTags(this.globalProduction, this.globalNeed, getStorageSetting(), nodeContext);
 		super.updateLsaPropertyTags(lsaInputTags, lsaOutputTags);
 	}
 
 	// merged
 	@Override
-	public void initFields(EnergySupply _globalProduction, EnergyRequest _globalNeed, IEnergyAgentPolicy _producerPolicy, IEnergyAgentPolicy _consumerPolicy, NodeContext nodeContext) {
+	public void initFields(EnergySupply _globalProduction, EnergyRequest _globalNeed, EnergyStorageSetting energyStorageSetting
+			, IEnergyAgentPolicy _producerPolicy, IEnergyAgentPolicy _consumerPolicy ,NodeContext nodeContext) {
 		if(_globalProduction != null && _globalProduction.getIssuerProperties() != null && _globalProduction.getIssuerProperties().getLocation() == null) {
 			logger.error("initFields :_globalProduction  parameter has no location");
 		}
@@ -190,7 +203,15 @@ public class ProsumerAgent extends EnergyAgent implements IEnergyAgent {
 		|| nodeContext().getClusterPredictionSetting().isModelAggregationActivated()) {
 		}*/
 		award = new AwardItem(agentName, null, 0.0, 0.0, 0.0);
-		storage = new EnergyStorage(this.nodeContext);
+		if (energyStorageSetting != null && energyStorageSetting.getActivateStorage()
+				&& energyStorageSetting.getStorageCapacityWH() > 0) {
+			storage = new EnergyStorage(this.nodeContext, energyStorageSetting, agentName);
+		}
+		if (nodeContext.getStorageAgentName() != null) {
+			if (storage == null || !storage.canSaveEnergy()) {
+				donation = new EnergyWithdrawal(new Date(), 0.0, agentName, nodeContext.getStorageAgentName());
+			}
+		}
 		logger.info("Prosumer " + agentName + " end constructor : For debug");
 	}
 
@@ -207,11 +228,13 @@ public class ProsumerAgent extends EnergyAgent implements IEnergyAgent {
 
 	// merged
 	@Override
-	public void reinitialize(int id, AgentAuthentication authentication, EnergySupply globalSupply, EnergyRequest globalNeed
+	public void reinitialize(int id, AgentAuthentication authentication, EnergySupply globalSupply, EnergyRequest globalNeed, EnergyStorageSetting storageSetting
 			, IEnergyAgentPolicy _producerPolicy , IEnergyAgentPolicy _consumerPolicy, NodeContext nodeContext) {
-		super.auxReinitializeLSA(id, authentication, getInputTags(globalSupply, globalNeed, nodeContext),
-				getOutputTags(globalSupply, globalNeed, nodeContext), nodeContext);
-		initFields(globalSupply, globalNeed, _producerPolicy, _consumerPolicy, nodeContext);
+		super.auxReinitializeLSA(id, authentication
+				, getInputTags(globalSupply, globalNeed, storageSetting, nodeContext)
+				, getOutputTags(globalSupply, globalNeed, storageSetting, nodeContext)
+				, nodeContext);
+		initFields(globalSupply, globalNeed, storageSetting, _producerPolicy, _consumerPolicy, nodeContext);
 		checkIssuerLocation("reinitialize end");
 	}
 
@@ -244,6 +267,15 @@ public class ProsumerAgent extends EnergyAgent implements IEnergyAgent {
 			return ProsumerRole.PRODUCER;
 		} else if (isConsumer()) {
 			return ProsumerRole.CONSUMER;
+		}
+		return null;
+	}
+
+	public StorageSupply getStorageSupply(ProsumerRole purpose) {
+		if(ProsumerRole.PRODUCER.equals(purpose) && globalProduction != null){
+			return  globalProduction.getStorageSupply();
+		} else if (ProsumerRole.CONSUMER.equals(purpose) && globalNeed != null) {
+			return globalNeed.getStorageSupply();
 		}
 		return null;
 	}
@@ -300,7 +332,7 @@ public class ProsumerAgent extends EnergyAgent implements IEnergyAgent {
 		//checkIsserLocation("onBondNotification begin");
 		try {
 			Lsa bondedLsa = event.getBondedLsa();
-			if("_Prosumer_N2_1".equals(agentName)) {
+			if("_Prosumer_N1_4".equals(agentName)) {
 				logger.info("onBondNotification " + this.agentName + " For debug");
 			}
 			// Begin-Producer
@@ -335,22 +367,35 @@ public class ProsumerAgent extends EnergyAgent implements IEnergyAgent {
 									contractProcessingManager.stopCurrentContracts(this, warning, this.agentName + " received a warning : " + warning);
 								}
 								consumersProcessingManager.removeConsumer(prosumer, "consumer disabled ");
+								if(offersProcessingManager.hasSingleOffer(prosumer)) {
+									logger.info("onBondNotification " + this.agentName + " has an offer from " + prosumer);
+								}
 							} else {
 								// Handle properties from producers
 								// Handle offers from producers
 								Property pOffer = bondedLsa.getOnePropertyByQueryAndName(this.agentName, "OFFER");
 								// Get offer of production agent
 								if(pOffer!=null && pOffer.getValue() instanceof ProtectedSingleOffer) {
+									if("_Prosumer_N1_4".equals(agentName)) {
+										logger.info("onBondNotification " + this.agentName + " For debug : pOffer= " + pOffer);
+									}
 									// handle producer offer
 									ProtectedSingleOffer protectedOffer = (ProtectedSingleOffer)  pOffer.getValue();
 									handleProducerOffer(protectedOffer, bondedLsa);
 								}
 								// Handle confirmations from producers
-								Object oConfirm = chosenLSA.getOnePropertyValueByName("PROD_CONFIRM");
+								Object oConfirm = chosenLSA.getOnePropertyValueByName("CONTRACT_CONFIRM");
 								if (oConfirm instanceof ProtectedConfirmationTable) {
-									ProtectedConfirmationTable producerConfirmTable = (ProtectedConfirmationTable) oConfirm;
+									ProtectedConfirmationTable pConfirmTable = (ProtectedConfirmationTable) oConfirm;
 									// handle producer confirmation
-									contractProcessingManager.handleProducerConfirmation(this,  prosumer,  producerConfirmTable) ;
+									if (pConfirmTable.hasAccessAsStackholder(this)) {
+										try {
+											contractProcessingManager.handleProducerConfirmation(this, pConfirmTable);
+											consumersProcessingManager.handleConsumerConfirmation(this,	pConfirmTable);
+										} catch (Exception e) {
+											logger.error(e);
+										}
+									}
 								}
 								if(this.consumerPolicy != null) {
 									// retrieve pricing table from producers
@@ -373,20 +418,39 @@ public class ProsumerAgent extends EnergyAgent implements IEnergyAgent {
 								}
 								Object oMainContract = chosenLSA.getOnePropertyValueByName("CONTRACT1");
 								Object oSecondContract = chosenLSA.getOnePropertyValueByName("CONTRACT2");
-								Object oSatisfied = chosenLSA.getOnePropertyValueByName("SATISFIED");
+								consumersProcessingManager.handleConsumerContracts(this, oMainContract, oSecondContract, prosumer, chosenLSA, debugLevel);
+								/*
 								if (oMainContract instanceof ProtectedContract) {
 									// handle consumer main contract
 									ProtectedContract mainContract = ((ProtectedContract) oMainContract).clone();
 									consumersProcessingManager.handleConsumerContract(this, mainContract, prosumer, debugLevel);
+								} else if(consumersProcessingManager.hasValidContract(bondedLsa.getAgentName(), false)){
+									// No contract property for this consumer: should remove it from the processing manager
+									logger.error(this.agentName +  " should remove main contract of " + bondedLsa.getAgentName());
+									consumersProcessingManager.removeConsumer(prosumer, false, "no CONTRACT1 property in LSA of " + bondedLsa.getAgentName());
 								}
 								if(oSecondContract instanceof ProtectedContract) {
 									// handle consumer complementary contract
 									ProtectedContract secondContract = ((ProtectedContract) oSecondContract).clone();
 									consumersProcessingManager.handleConsumerContract(this, secondContract, prosumer, debugLevel);
+								} else if(consumersProcessingManager.hasValidContract(bondedLsa.getAgentName(), true)){
+									// No contract property for this consumer: should remove it from the processing manager
+									logger.error(this.agentName +  " should remove secondary contract of " + bondedLsa.getAgentName());
+									consumersProcessingManager.removeConsumer(prosumer, true, "no CONTRACT2 property in LSA of " + bondedLsa.getAgentName());
 								}
+								*/
+								Object oSatisfied = chosenLSA.getOnePropertyValueByName("SATISFIED");
 								if(oSatisfied!=null && "1".equals(oSatisfied)) {
 									// handle consumer confirmation
 									consumersProcessingManager.addReceivedConfirmation(this, prosumer);
+								}
+								if (storage != null && storage.canSaveEnergy() && storage.getSetting().isCommon()) {
+									Object oDonation = chosenLSA.getOnePropertyValueByName("DONATION");
+									if (oDonation instanceof EnergyWithdrawal) {
+										// handle received donation
+										EnergyWithdrawal reveivedDonation = ((EnergyWithdrawal) oDonation).clone();
+										storage.addDonation(reveivedDonation);
+									}
 								}
 							}
 						}
@@ -483,6 +547,28 @@ public class ProsumerAgent extends EnergyAgent implements IEnergyAgent {
 		// End-Producer-merge
 	}
 
+	private void removeStorageSupplyForNeed() {
+		if(globalNeed != null) {
+			globalNeed.setStorageSupply(null);
+		}
+		/*
+		if(storage != null) {
+			storage.releaseEnergy(ProsumerRole.CONSUMER);
+		}
+		*/
+	}
+
+	private void removeStorageSupplyForProduction() {
+		if(globalProduction != null) {
+			globalProduction.setStorageSupply(null);
+		}
+		/*
+		if(storage != null) {
+			storage.releaseEnergy(ProsumerRole.PRODUCER);
+		}
+		*/
+	}
+
 	// merge done
 	@Override
 	public void handleWarningChangeRequest(RegulationWarning warning) throws HandlingException {
@@ -566,7 +652,6 @@ public class ProsumerAgent extends EnergyAgent implements IEnergyAgent {
 			double powerBefore = (globalProduction == null) ? 0 : globalProduction.getPower();
 			boolean switchToProducer = wasConsumer;
 			if(switchToProducer) {
-				//"PROD", "OFFER", "PROD_CONFIRM", "REQ", "CONTRACT1", "CONTRACT2", "SATISFIED", "DISABLED", "EVENT"
 				// The prosumer won't be consumer any more : stop its contrats as a consumer
 				this.contractProcessingManager.stopCurrentContracts(this, warning, agentName + " switch from consumer to producer");				
 			}
@@ -578,33 +663,41 @@ public class ProsumerAgent extends EnergyAgent implements IEnergyAgent {
 				lsa.removePropertiesByNames(new String[] {"REQ", "SATISFIED"});
 			}
 			//checkIssuerLocation("updateSupply 2");
-			Map<String, List<ReducedContract>> validContracts = consumersProcessingManager.getTableValidContracts();
-			if(newSupply.getPower() < powerBefore) {
-				// Stop contract if not the agent has not enougth availability
-				while(consumersProcessingManager.computeAvailablePower(this, false, false) < 0 && validContracts.size() > 0) {
-					// Remove contract
-					List<String> consumers = new ArrayList<>();
-					consumers.addAll(validContracts.keySet());
-					Collections.shuffle(consumers);
-					// TODO : sort contracts by request priority and power
-					String consumer = consumers.get(0);
-					double difference = powerBefore - newSupply.getPower();
-					consumersProcessingManager.stopContracts(this, consumer, "The producer agent " + agentName
-							+ " has received a change request with a decrease in power output of " + UtilDates.df5.format(difference) + " Watts. "+ WarningType.CHANGE_REQUEST);
-					validContracts = consumersProcessingManager.getTableValidContracts();
-				}
-			}
+			checkAvailabilityForExistingSupplies(powerBefore);
 			if(switchToProducer) {
 				generateSwitchEvent(WarningType.CHANGE_REQUEST);
 			} else {
-				generateUpdateEvent(WarningType.CHANGE_REQUEST);
+				generateUpdateEvent(WarningType.CHANGE_REQUEST, "");
 			}
 			// Refresh PROD property
 			replacePropertyWithName(new Property("PROD", this.globalProduction.clone()));
+			// For debug
+			if(switchToProducer) {
+				logger.info("updateSupply " + agentName + " with switchToProducer: CONTRACT_CONFIRM property = " + lsa.getOnePropertyByName("CONTRACT_CONFIRM"));
+			}
 		} catch (Throwable e) {
 			logger.error(e);
 		}
 		//checkIssuerLocation("updateSupply end");
+	}
+
+	public void checkAvailabilityForExistingSupplies(double powerBefore) {
+		Map<String, List<ReducedContract>> validContracts = consumersProcessingManager.getTableValidContracts();
+		if(this.globalProduction.getPower() < powerBefore) {
+			// Stop contract if not the agent has not enougth availability
+			while(consumersProcessingManager.computeAvailablePower(this, false, false) < 0 && validContracts.size() > 0) {
+				// Remove contract
+				List<String> consumers = new ArrayList<>();
+				consumers.addAll(validContracts.keySet());
+				Collections.shuffle(consumers);
+				// TODO : sort contracts by request priority and power
+				String consumer = consumers.get(0);
+				double difference = powerBefore - this.globalProduction.getPower();
+				consumersProcessingManager.stopContracts(this, consumer, "The producer agent " + agentName
+						+ " has received a change request with a decrease in power output of " + UtilDates.df5.format(difference) + " Watts. "+ WarningType.CHANGE_REQUEST);
+				validContracts = consumersProcessingManager.getTableValidContracts();
+			}
+		}
 	}
 
 	// No merge to do
@@ -631,6 +724,7 @@ public class ProsumerAgent extends EnergyAgent implements IEnergyAgent {
 				this.addDecay(1 + 30 * globalNeed.getTimeLeftSec(true));
 				this.globalNeed.setDelayToleranceMinutes(changeRequestCopy.getDelayToleranceMinutes());
 				this.globalNeed.setPriorityLevel(changeRequestCopy.getPriorityLevel());
+				removeStorageSupplyForNeed();
 			}
 			// For the moment : no supply and request at the same time
 			this.globalProduction = null;
@@ -654,8 +748,9 @@ public class ProsumerAgent extends EnergyAgent implements IEnergyAgent {
 		}
 		// End-Producer
 		contractProcessingManager.stopCurrentContracts(this, warning, agentName + " received a warning : " + warning);
-		consumersProcessingManager.stopAllContracts(this); // Begin-producer End
-		super.disableAgent(warning, new String[] {"REQ", "SATISFIED", "CONTRACT1", "CONTRACT2", "PROD_CONFIRM", "OFFER" }); 
+		consumersProcessingManager.stopAllContracts(this, agentName + " is disabled(2)"); // Begin-producer End
+		consumersProcessingManager.cancelAllWaitingOffers(this, agentName + " is disabled(2)");
+		super.disableAgent(warning, new String[] {"REQ", "SATISFIED", "CONTRACT1", "CONTRACT2", "CONTRACT_CONFIRM", "OFFER"});
 		// Begin-producer-merge End
 	}
 
@@ -780,7 +875,6 @@ public class ProsumerAgent extends EnergyAgent implements IEnergyAgent {
 		}
 	}
 
-	// merge done
 	@Override
 	public PowerSlot getWaitingContratsPowerSlot() {
 		// Begin-Producer
@@ -792,10 +886,8 @@ public class ProsumerAgent extends EnergyAgent implements IEnergyAgent {
 		}
 	}
 
-	// merge done
 	@Override
 	public Double computeAvailablePower() {
-		// Begin-Producer
 		if (hasExpired() || isDisabled()) {
 			return 0.0;
 		}
@@ -803,11 +895,20 @@ public class ProsumerAgent extends EnergyAgent implements IEnergyAgent {
 			PowerSlot contractsPowerSlot = getOngoingContractsPowerSlot(null);
 			return Math.max(0, globalProduction.getPower() - contractsPowerSlot.getMax());
 		}
-		// End-Producer
 		return 0.0;
 	}
 
-	// merge done
+	public Double computeProvidedPower() {
+		if (hasExpired() || isDisabled()) {
+			return 0.0;
+		}
+		if (isProducer()) {
+			PowerSlot contractsPowerSlot = getOngoingContractsPowerSlot(null);
+			return contractsPowerSlot.getCurrent();
+		}
+		return 0.0;
+	}
+
 	@Override
 	public Double computeMissingPower() {
 		if(hasExpired() || isDisabled() || isStartInFutur()) {
@@ -879,6 +980,123 @@ public class ProsumerAgent extends EnergyAgent implements IEnergyAgent {
 		}
 	}
 
+	@Override
+	public Double getStorageUsedForNeed() {
+		if (globalNeed != null) {
+			return globalNeed.getAdditionalPower();
+		}
+		return 0.0;
+	}
+
+	@Override
+	public Double getStorageUsedForProd() {
+		if (globalProduction != null) {
+			return globalProduction.getAdditionalPower();
+		}
+		return 0.0;
+	}
+
+	public double computeStorageAvailableWH() {
+		return computeStorageAvailableWH(new ArrayList<ProsumerRole>());
+	}
+
+	public double computeStorageAvailableWH(List<ProsumerRole> roleToIgnore) {
+		double remainWH = storage.computeBalanceSavedWH();
+		double availableWH = remainWH;
+		for(ProsumerRole nextRole : ProsumerRole.values()) {
+			if(!roleToIgnore.contains(nextRole)) {
+				StorageSupply storageSupply = getStorageSupply(nextRole);
+				if (storageSupply != null) {
+					availableWH-= storageSupply.getRemainWH();
+				}
+			}
+		}
+		return availableWH;
+	}
+
+	public StorageSupply reserveStorageSupply(Date aDate, Date endDate, Double toWithdrawWH, double powerToSupply) {
+		return createStorageSupplyForNeed(aDate, endDate, toWithdrawWH, new ArrayList<ProsumerRole>(), powerToSupply);
+	}
+
+	public StorageSupply createStorageSupplyForNeed(Date currentDate, Date desiredEndDate, Double toWithdrawWH, List<ProsumerRole> roleToIgnore, double powerToSupply) {
+		if (storage == null || !storage.canSaveEnergy() || !storage.getSetting().getActivateConsumption()) {
+			return null;
+		}
+		double availableWH = computeStorageAvailableWH(roleToIgnore);
+		double effectiveWithdrawalWH = Math.min(availableWH, toWithdrawWH);
+		if(effectiveWithdrawalWH > 0) {
+			SapereLogger.getInstance().info("reserveEnergy % used = " + UtilDates.df3.format(100*effectiveWithdrawalWH/availableWH));
+			double desiredDurationH = UtilDates.computeDurationHours(currentDate, desiredEndDate);
+			double powerStorageSupply = powerToSupply;
+			Date current = getCurrentDate();
+			StorageSupply storageSupply = null;
+			double effectiveDurationH = desiredDurationH;
+			if(powerToSupply > 0) {
+				powerStorageSupply = powerToSupply;
+				effectiveDurationH = Math.min(availableWH/powerStorageSupply, desiredDurationH);
+				double desiredDurationSec = Math.floor(desiredDurationH * 3600 * 1.0);
+				logger.info("createStorageSupplyForNeed : desiredDurationSec = " + desiredDurationSec
+						+ ", reducedDurationSec = " + Math.floor(effectiveDurationH * 3600 * 1.0)
+						+ ", effectiveDurationH = " +  UtilDates.df3.format(effectiveDurationH)
+						+ ", effectiveSupplyWH = " + effectiveDurationH*powerToSupply
+						+ ", availableWH = " + UtilDates.df3.format(availableWH)
+						+ ", powerToSupply = " + UtilDates.df3.format(powerToSupply));
+				if(effectiveDurationH < 20/3600) {
+					effectiveDurationH = desiredDurationH;
+					powerStorageSupply = SapereUtil.roundPower(effectiveWithdrawalWH / desiredDurationH);
+				}
+			} else {
+				powerStorageSupply = SapereUtil.roundPower(effectiveWithdrawalWH / desiredDurationH);
+			}
+			double effectiveDuractionSec = Math.floor(effectiveDurationH * 3600 * 1.0);
+			Date effectiveEndDate = UtilDates.shiftDateSec(current, effectiveDuractionSec);
+			storageSupply = new StorageSupply(powerStorageSupply, currentDate, effectiveEndDate, getTimeShiftMS());
+			return storageSupply;
+		}
+		return null;
+	}
+
+	private void useStorageForNeed() throws HandlingException {
+		// TODO: complete need
+		if(storage != null && this.globalNeed != null  && !this.isSatisfied()) {
+			double storageBalanceWH = this.storage.computeBalanceSavedWH();
+			if(storageBalanceWH > 0.5) {
+				Date maxStorageSupplyDate = UtilDates.shiftDateSec(getCurrentDate(), -10);
+				StorageSupply existingStorageSupply = globalNeed.getStorageSupply();
+				if(existingStorageSupply == null || existingStorageSupply.getBeginDate().before(maxStorageSupplyDate)) {
+					Date requestDate = globalNeed.getBeginDate();
+					Date current = getCurrentDate();
+					long missingDurationSec = (current.getTime() - requestDate.getTime())/1000;
+					logger.info("useStorageForNeed " + this.agentName + " : existingStorageSupply = " + existingStorageSupply + ", storageBalanceWH = " + SapereUtil.roundPower(storageBalanceWH)
+							+ ", missingDurationSec = " + missingDurationSec);
+					if(missingDurationSec >= 3) {
+						double needPowerBefore = globalNeed.getPower();
+						//double toDebug = globalNeed.getRemainWH();
+						List<ProsumerRole>  toIgnore = new ArrayList<ProsumerRole>();
+						toIgnore.add(ProsumerRole.CONSUMER);
+						//boolean forcePower = false;
+						StorageSupply storageSupplyForNeed = createStorageSupplyForNeed(getCurrentDate(), globalNeed.getEndDate(),
+								globalNeed.getRemainWH(), toIgnore, globalNeed.getInternalPower());
+						logger.info("useStorageEnergy " + this.agentName + " : globalNeed before " + globalNeed + ", storageSupplyForNeed = " +storageSupplyForNeed );
+						if(storageSupplyForNeed != null && storageSupplyForNeed.getPower() > 0) {
+							boolean hasChange = globalNeed.updateStorageSupply(storageSupplyForNeed, true);
+							logger.info("useStorageForNeed " + this.agentName + " : globalNeed after " + globalNeed );
+							double needPowerAfter = globalNeed.getPower();
+							if(hasChange) {
+								logger.info("useStorageForNeed " + this.agentName + " : use of additional power from battery " + storageSupplyForNeed
+										+ ", needPowerBefore = " + SapereUtil.roundPower(needPowerBefore)
+										+ ", needPowerAfter = " + SapereUtil.roundPower(needPowerAfter));
+								String comment = "For internal need: " + SapereUtil.roundPower(storageSupplyForNeed.getPower()) + " W (storageBalanceWH=" + SapereUtil.roundPower(storageBalanceWH) + ")";
+								generateUpdateEvent(WarningType.BATTERY_USAGE, comment);
+								contractProcessingManager.handleRequestChanges(this, "use of energy storage: " + comment);
+							}
+						}
+					}
+				}
+			}
+		}
+	}
+
 	public void applyProsumerPolicies() throws HandlingException {
 		//checkIssuerLocation("applyProsumerPolicies begin");
 		if(globalNeed != null) {
@@ -897,28 +1115,14 @@ public class ProsumerAgent extends EnergyAgent implements IEnergyAgent {
 					}
 				}
 			}
-			if(nodeContext.isEnergyStorageActivated()) {
-				// Use energy from storage
-				if(this.storage.computeBalanceSavedWH() > 2.0 && this.globalNeed.getPower() > 10.0 && !globalNeed.hasAdditionalPower()) {
-					double needPowerBefore = globalNeed.getPower();
-					ExtraSupply withDrawForNeed = storage.withdrawEnergy(getCurrentDate(), globalNeed.getEndDate(), globalNeed.getRemainWH(), ProsumerRole.CONSUMER);
-					logger.info("applyProsumerPolicies " + this.agentName + " : globalNeed before " + globalNeed );
-					globalNeed.setExtraSupply(withDrawForNeed);
-					logger.info("applyProsumerPolicies " + this.agentName + " : globalNeed after  " + globalNeed );
-					double needPowerAfter = globalNeed.getPower();
-					if(Math.abs(needPowerAfter - needPowerBefore)  >= 0.0001 ) {
-						logger.info("applyProsumerPolicies " + this.agentName + " : use of additional power from battery " + withDrawForNeed
-								+ ", needPowerBefore = " + needPowerBefore + ", needPowerAfter = " + needPowerAfter);
-						generateUpdateEvent(WarningType.BATTERY_USAGE);
-						contractProcessingManager.handleRequestChanges(this, "use of energy storage");
-					}
-				}
-				this.replacePropertyWithName(new Property("_DEBUG_STORAGE_", storage));
+			if(storage != null && storage.canSaveEnergy()) {
+				// Use energy from private storage
+				useStorageForNeed();
 			}
 		}
 		// Begin-Producer
 		if (globalProduction != null && producerPolicy.hasDefaultPrices() && !this.hasExpired()) {
-			logger.info("applyProsumerPolicies : " + agentName + " producerPolicy has default price");
+			//logger.info("applyProsumerPolicies : " + agentName + " producerPolicy has default price");
 			// Map<String, List<ReducedContract>> mapContracts =
 			// consumersProcessingManager.getTableValidContracts();
 			PricingTable newPricingTable = producerPolicy.getPricingTable(this);
@@ -927,6 +1131,9 @@ public class ProsumerAgent extends EnergyAgent implements IEnergyAgent {
 				// refresh PROD property LSA
 				replacePropertyWithName(new Property("PROD", this.globalProduction));
 			}
+		}
+		if(storage != null && storage.canSaveEnergy()) {
+			this.replacePropertyWithName(new Property("_DEBUG_STORAGE_", storage));
 		}
 		//checkIssuerLocation("applyProsumerPolicies end");
 	}
@@ -942,13 +1149,233 @@ public class ProsumerAgent extends EnergyAgent implements IEnergyAgent {
 		}
 	}
 
+	/**
+	 * savedEnergyWH
+	 *
+	 * @param deltaMS
+	 */
+	private void updateStorage(long deltaMS) {
+		boolean toLog = false;
+		if (storage != null) {
+			withdrawFromStorage(deltaMS, toLog);
+			storage.compactWithdrawal();
+		}
+		double unusedWH = 0.0;
+		if (globalProduction != null) {
+			double unusedPower = globalProduction.getPower() - computeProvidedPower();
+			unusedWH = (unusedPower * deltaMS) / (3600 * 1000);
+		}
+		if (unusedWH > 0) {
+			if (storage != null && storage.canSaveEnergy()) {
+				storage.addSavedWH(unusedWH);
+				if(toLog) {
+					logger.warning("updateStorage " + this.agentName + " : add = " +
+						SapereUtil.roundPower(unusedWH) + ", savedEnergyWH = " +
+						SapereUtil.roundPower(storage.computeBalanceSavedWH()));
+				}
+			} else if (donation != null) {
+				if (producerPolicy.confirmDonationOfAvailableEnergy(this, unusedWH)) {
+					donation.addEnergy(getCurrentDate(), unusedWH);
+					logger.info("updateStorage : " + this.agentName + " : donation = " + donation + "   [added="
+							+ UtilDates.df3.format(unusedWH) + "]");
+					if (donation.getEnergyWH() > 0.5 && !this.lsa.hasPropertiesName("DONATION")) {
+						this.addProperty(new Property("DONATION", donation.clone()));
+						donation.reset(getCurrentDate());
+						logger.info(
+								"updateStorage : " + this.agentName + " : after reset , donation = " + donation);
+					}
+				}
+			}
+			if(storage != null) {
+				double newReamin = storage.computeBalanceSavedWH();
+				if (newReamin <= 0) {
+					removeStorageSupplyForProduction();
+					removeStorageSupplyForNeed();
+				}
+			}
+		}
+	}
+
+	private void withdrawFromStorage(double deltaMS, boolean toLog) {
+		if(globalNeed != null) {
+			// Check if storage supply is still active
+			globalNeed.removeInactiveStorageSupply();
+			// compute energy used from storage supply
+			double additionalPower = globalNeed.getAdditionalPower();
+			double usedWH = (additionalPower * deltaMS) / (3600 * 1000);
+			if (usedWH > 0) {
+				storage.withdrawWH(usedWH, ProsumerRole.CONSUMER, this, logger);
+				if(toLog) {
+					logger.warning("withdrawFromStorage " + this.agentName + " : withdraw = " +
+							SapereUtil.roundPower(usedWH) + ", savedEnergyWH = " +SapereUtil.roundPower(storage.computeBalanceSavedWH()));
+				}
+			}
+		}
+		if(globalProduction != null) {
+			// Check if storage supply is still active
+			globalProduction.removeInactiveStorageSupply();
+			// compute energy used from storage supply
+			double additionalPower = globalProduction.getAdditionalPower();
+			double usedWH = (additionalPower * deltaMS) / (3600 * 1000);
+			if (usedWH > 0) {
+				storage.withdrawWH(usedWH, ProsumerRole.PRODUCER, this, logger);
+				if(toLog) {
+					logger.warning("withdrawFromStorage " + this.agentName + " : withdraw = " +
+							SapereUtil.roundPower(usedWH) + ", savedEnergyWH = " +SapereUtil.roundPower(storage.computeBalanceSavedWH()));
+				}
+			}
+		}
+	}
+
+	private void useStorageForProduction() throws HandlingException {
+		if (storage != null && storage.getSetting().isCommon() && storage.canSaveEnergy() && globalProduction != null) {
+			double storageBalance = SapereUtil.roundPower(storage.computeBalanceSavedWH());
+			String sStorageBalance = " [storageBalance=" + storageBalance +"]";
+			StorageSupply prodStorageSupply = null;
+			double marginFactor = 1 + EnergySupply.DEFAULT_POWER_MARGIN_RATIO;
+			storage.cleanReservations();
+			StorageSupply existingStorageSupply = getStorageSupply(ProsumerRole.PRODUCER);
+			Date current = getCurrentDate();
+			if (existingStorageSupply == null || !existingStorageSupply.isActive()) {
+				existingStorageSupply = new StorageSupply(0.0, current, UtilDates.shiftDateDays(current, 1),
+						getTimeShiftMS());
+			}
+			String commentUpdateEvent = null;
+			// TODO retrieve unmet request
+			consumersProcessingManager.checkWaitingRequests();
+			List<EnergyRequest> listWaitingRequests = producerPolicy
+					.sortRequests(consumersProcessingManager.getWaitingRequest());
+			listWaitingRequests = producerPolicy.sortRequests(listWaitingRequests);
+			Date thresholdDate = UtilDates.shiftDateSec(current, -5);
+			Collection<SingleOffer> waitingOffers = consumersProcessingManager.getWaitingOffers();
+			if(listWaitingRequests.size() == 0 && waitingOffers.size() == 0 && globalProduction.getAdditionalPower() > 0) {
+				// Check if too munch saving is used
+				//double availablePower = computeAvailablePower();
+				//PowerSlot contractPower = getOngoingContractsPowerSlot(null);
+				// TODO integrate offers + contracts to validate ?
+				Date lastReservation = storage.getLastReservationDate();
+				boolean hasRecentReservation = lastReservation != null && lastReservation.after(thresholdDate);
+				double availablePower = consumersProcessingManager.computeAvailablePower(this, false, false);
+				//double excess = globalProduction.getPower() - contractPower.getMax();
+				if(availablePower > 0 && !hasRecentReservation) {
+					logger.info("useStorageForProduction : excess = " + availablePower);
+					// try to reduce production
+					//double neeededPowerStorageSupply = globalProduction.getPower() - globalProduction.getInternalPower() - availablePower;
+					double neeededPowerStorageSupply = globalProduction.getAdditionalPower() - availablePower;
+					if (availablePower >= neeededPowerStorageSupply * 0.01
+							&& neeededPowerStorageSupply < globalProduction.getAdditionalPower()) {
+						logger.info("useStorageForProduction : availablePower = " + availablePower
+								+ ", neeededPowerStorageSupply = " + neeededPowerStorageSupply
+								+ ", currentPowerStorageSuppl = " + globalProduction.getAdditionalPower());
+						boolean activateUpdate = true;
+						if (activateUpdate) {
+							commentUpdateEvent = " reduce storage : -" + SapereUtil.roundPower(availablePower) + sStorageBalance;
+							prodStorageSupply = new StorageSupply(neeededPowerStorageSupply, current,
+									existingStorageSupply.getEndDate(), getTimeShiftMS());
+						}
+					}
+				}
+			}
+			if (storage.getTotalSavedWH() > 0 && listWaitingRequests.size() > 0) {
+				List<StorageSupply> listStorageSupplyToReseve = new ArrayList<StorageSupply>();
+				double toReserveWH = 0;
+				double storageAvailableWH = computeStorageAvailableWH();
+				if(storageAvailableWH < 0) {
+					StorageSupply storageSupply = globalProduction.getStorageSupply();
+					logger.info("useStorageForProduction : storageBalance = " + storageBalance
+							+ ", storageSupply = " + storageSupply
+							+ ", storageAvailableWH=" + UtilDates.df3.format(storageAvailableWH)
+							//+ ", WH=" + UtilDates.df3.format(storageSupply.getWH())
+							+ ", remainWH = " + UtilDates.df3.format(storageSupply.getRemainWH()) );
+				}
+				for (EnergyRequest waitingRequest : listWaitingRequests) {
+					// requests unmet for more than 5 seconds
+					if (waitingRequest.getBeginDate().before(thresholdDate)) {
+						if(storage.hasReservation(waitingRequest.getIssuer())) {
+							logger.info("useStorageForProduction : unmet request already handled " + waitingRequest);
+						} else {
+							double availableWH = storageAvailableWH - toReserveWH;
+							if (availableWH > 0) {
+								double missingDurationSec = UtilDates.computeDurationSeconds(current, waitingRequest.getEndDate());
+								logger.info("useStorageForProduction : unmet request for " + missingDurationSec + " sec : "
+										+ waitingRequest);
+								double neededWH = marginFactor*waitingRequest.getRemainWH();
+								double supplyDuractionSec = missingDurationSec;
+								if (neededWH > 0) {
+									double powerToSupply =  marginFactor * waitingRequest.getPower();
+									Date endDate = waitingRequest.getEndDate();
+									if (availableWH < neededWH) {
+										double reducedDurationH = availableWH/powerToSupply;
+										supplyDuractionSec = Math.floor(reducedDurationH * 3600 * 1.0);
+										logger.info("useStorageForProduction : defaultDurationSec = " + missingDurationSec + ", reducedDurationSec = " + supplyDuractionSec
+												+ ", reducedDurationH = " +  UtilDates.df3.format(reducedDurationH)
+												+ ", reducedWH = " + reducedDurationH*powerToSupply
+												+ ", availableWH = " + UtilDates.df3.format(availableWH)
+												+ ", powerToSupply = " + UtilDates.df3.format(powerToSupply));
+										endDate = UtilDates.shiftDateSec(current, supplyDuractionSec);
+									}
+									if(supplyDuractionSec >= 20) {
+										StorageSupply storageSupply = new StorageSupply(powerToSupply, current, endDate, getTimeShiftMS());
+										listStorageSupplyToReseve.add(storageSupply);
+										toReserveWH += storageSupply.getRemainWH();
+										logger.info("useStorageForProduction : add reservation " + storageSupply + " (" +  UtilDates.df3.format(storageSupply.getRemainWH()) + " WH) for request " + 
+												UtilDates.df3.format(waitingRequest.getRemainWH()) + " "+ sStorageBalance);
+										// add handled request
+										double marginW = EnergySupply.DEFAULT_POWER_MARGIN_RATIO * waitingRequest.getPower();
+										commentUpdateEvent = "to supply " + waitingRequest.getIssuer() + " (" + SapereUtil.roundPower(waitingRequest.getPower())
+											+ " with margin of " + SapereUtil.roundPower(marginW) + ")." + sStorageBalance;
+										this.storage.addReservation(waitingRequest.getIssuer(), storageSupply);
+									} else {
+										logger.info("useStorageForProduction : the offer is no longer sufficient in terms of duration: it is not possible to add an additional supply");
+									}
+								}
+							}
+						}
+					}
+				}
+				if (listStorageSupplyToReseve.size() > 0) {
+					// Merge storage-upplies
+					Date endDate = UtilDates.shiftDateDays(current, 1);
+					if(existingStorageSupply.getPower() >= 0.1) {
+						logger.info("useStorageForProduction : existingStorageSupply = " + existingStorageSupply);
+						endDate = existingStorageSupply.getEndDate();
+					}
+					Double power = existingStorageSupply.getPower();
+					for (StorageSupply storageSupply : listStorageSupplyToReseve) {
+						if (storageSupply.getEndDate().before(endDate)) {
+							endDate = storageSupply.getEndDate();
+						}
+						power += storageSupply.getPower();
+					}
+					prodStorageSupply = new StorageSupply(power, current, endDate, getTimeShiftMS());
+				}
+			}
+			if(prodStorageSupply != null) {
+				logger.info("useStorageForProduction (2) : change storage supply from " + globalProduction.getStorageSupply() + " to " + prodStorageSupply);
+				logger.info("useStorageForProduction (2) : current balance = " + UtilDates.df3.format(storage.computeBalanceSavedWH())
+						+ ", storageSupply(WH) = " + UtilDates.df3.format(prodStorageSupply.getRemainWH())
+						+ ", forcasted storageAvailableWH = " + UtilDates.df3.format(storage.computeBalanceSavedWH() - prodStorageSupply.getRemainWH())
+						);
+				double powerBefore = globalProduction.getPower();
+				boolean hasChanged = globalProduction.updateStorageSupply(prodStorageSupply, true);
+				if(hasChanged) {
+					generateUpdateEvent(WarningType.BATTERY_USAGE, commentUpdateEvent);
+					if(globalProduction.getPower() < powerBefore ) {
+						checkAvailabilityForExistingSupplies(powerBefore);
+					}
+					replacePropertyWithName(new Property("PROD", this.globalProduction.clone()));
+				}
+			}
+		}
+	}
+
 	// merge done
 	@Override
 	public void onDecayedNotification(DecayedEvent event) { // change to return only one result
 		try {
 			//checkIssuerLocation("onDecayedNotification begin");
-			if("_Prosumer_N1_23".equalsIgnoreCase(agentName)) {
-				logger.info("onDecayedNotification for debug");
+			if("_Prosumer_N1_2".equalsIgnoreCase(agentName) && globalProduction != null) {
+				logger.info("onDecayedNotification for debug : globalProduction = " + globalProduction);
 			}
 			// Remove obsolete data ( offers, warnings )
 			cleanExpiredData();
@@ -986,25 +1413,19 @@ public class ProsumerAgent extends EnergyAgent implements IEnergyAgent {
 					if (lsa.getPropertiesByName("PROD").isEmpty()) {
 						addProperty(new Property("PROD", this.globalProduction));
 					}
-					// Update savedEnergyWH
-					if(storage.isActivated()) {
-						double toAddInWH = (this.computeAvailablePower() * deltaMS) / (3600*1000);
-						if(toAddInWH > 0) {
-							storage.addSavedWH(toAddInWH);
-							//this.savedEnergyWH+=toAddInWH;
-							logger.warning("onDecayedNotification " + this.agentName + " : toAddInWH = " + SapereUtil.roundPower(toAddInWH)
-								+ ", savedEnergyWH = " + SapereUtil.roundPower(storage.getTotalSavedWH()));
-						}
-					}
 				}
 			}
+			updateStorage(deltaMS);
+			useStorageForProduction();
+
 			// Check received confirmation from consumers agents
 			if(isConsumer()) {
 				consumersProcessingManager.checkReceivedConfirmations(this);
 			}
 			if(this.isDisabled()) {
 				// Stop all contracts
-				consumersProcessingManager.stopAllContracts(this);
+				consumersProcessingManager.stopAllContracts(this, agentName + " is disabled(1)");
+				consumersProcessingManager.cancelAllWaitingOffers(this, agentName + " is disabled(1)");
 			}
 			// Retrieve the node availability from the last stored node total
 			lastNodeTotal = EnergyDbHelper.retrieveLastNodeTotal();
@@ -1049,6 +1470,10 @@ public class ProsumerAgent extends EnergyAgent implements IEnergyAgent {
 			logger.error("Exception thrown in ConsumerAgent.onDecayedNotification " + this.agentName + " " + event + " " + e.getMessage());
 		}
 		//checkIssuerLocation("onDecayedNotification end");
+	}
+
+	public void cleanDonationProperties() {
+		lsa.removePropertiesByName("DONATION");
 	}
 
 	// Specific to producer
@@ -1140,6 +1565,9 @@ public class ProsumerAgent extends EnergyAgent implements IEnergyAgent {
 		// Clean event
 		cleanEventProperties(); // Begin-producer End
 
+		// Clean donations
+		cleanDonationProperties();
+
 	}
 
 	// No merge to do
@@ -1156,7 +1584,7 @@ public class ProsumerAgent extends EnergyAgent implements IEnergyAgent {
 	// No merge to do
 	private void debug_checkOfferAcquitted(String consumer) throws HandlingException {
 		ProtectedSingleOffer protectedOffer = (ProtectedSingleOffer) lsa.getOnePropertyValueByQueryAndName(consumer, "OFFER");
-		if(protectedOffer!=null && protectedOffer.hasAccesAsProducer(this)) {
+		if(protectedOffer!=null && protectedOffer.hasAccessAsIssuer(this)) {
 			try {
 				SingleOffer offer = protectedOffer.getSingleOffer(this);
 				if(offer!=null) {
@@ -1176,17 +1604,21 @@ public class ProsumerAgent extends EnergyAgent implements IEnergyAgent {
 	// specific to consumer
 	private void handleProducerOffer(ProtectedSingleOffer protectedOffer, Lsa bondedLsa) {
 		try {
+			String sLogBegin = "handleProducerOffer " + this.agentName + " : ";
+			if("_Prosumer_N1_4".equals(agentName)) {
+				logger.info(sLogBegin + "For debug : protectedOffer= " + protectedOffer);
+			}
 			SingleOffer receivedOffer =  protectedOffer.getSingleOffer(this);
 			SingleOffer newOffer = receivedOffer.clone();
 			ProsumerProperties offerIssuer = newOffer.getIssuerProperties();
 			if(!NodeManager.isLocal(offerIssuer.getLocation())) {
-				logger.info("handleProducerOffer " + this.agentName + " : receive offer from other node " + offerIssuer.getLocation().getName() + " : " + newOffer);
+				logger.info(sLogBegin + "receive offer from other node " + offerIssuer.getLocation().getName() + " : " + newOffer);
 				if(!newOffer.checkLocation()) {
 					// TODO : set locationId
-					logger.error("handleProducerOffer offer has no location");
+					logger.error(sLogBegin + "offer has no location");
 				}
 				if(newOffer.hasExpired()) {
-					logger.error("handleProducerOffer this offer has expired " + newOffer.getExpirationDurationSec() + " seconds ago");
+					logger.error(sLogBegin + "this offer has expired " + newOffer.getExpirationDurationSec() + " seconds ago");
 				}
 			}
 			int isserDistance = bondedLsa.getSourceDistance();
@@ -1195,30 +1627,32 @@ public class ProsumerAgent extends EnergyAgent implements IEnergyAgent {
 			}
 			boolean isComplementary = newOffer.isComplementary();
 			boolean offerUsed = false;
-			if (contractProcessingManager.needOffer(isComplementary)) {
+			if (globalNeed != null && contractProcessingManager.needOffer(isComplementary)) {
 				//if(!SapereUtil.hasProperty(lsa, agentName, "CONTRACT1")) {
 				// Check the offer validity
 				if(newOffer.hasExpired()) {
-					logger.error("handleProducerOffer " + this.agentName + " offer has expired : " + newOffer.getExpirationDurationSec() + " seconds ago"
+					logger.error(sLogBegin + "offer has expired : " + newOffer.getExpirationDurationSec() + " seconds ago"
 						+ ", newOffer.deadline = " + UtilDates.format_time.format(newOffer.getDeadline())
 						+ ", currentTime = " + UtilDates.format_time.format(getCurrentDate())
 						+ ", newOffer.getCreationTime = " + UtilDates.format_time.format(newOffer.getCreationTime())
 						);
-				} else if (globalNeed.isOK(newOffer)) {
+				} else if (globalNeed != null && globalNeed.isOK(newOffer)) {
 					boolean hasNoOffer = !offersProcessingManager.hasSingleOffer();
 					offersProcessingManager.addSingleOffer(newOffer);
 					offerUsed = true;
-					logger.info("handleProducerOffer " + this.agentName + " set offer used : id:" + newOffer.getId() + "  "  + newOffer.getProducerAgent() + " W = " + SapereUtil.roundPower(newOffer.getPower()));
+					logger.info(sLogBegin + "set offer used : id:" + newOffer.getId() + "  "  + newOffer.getProducerAgent() + " W = " + SapereUtil.roundPower(newOffer.getPower()));
 					if(hasNoOffer) {
 						this.useOffersDecay = useOfferInitialDecay;
 					}
 				}
 				//}
+			}  else if (globalNeed == null){
+				logger.error(sLogBegin + " is producer : newOffer= " + newOffer);
 			}
 			EnergyDbHelper.setSingleOfferAcquitted(newOffer, getStartEvent(), offerUsed);
 			newOffer.setAcquitted(true);
 			if(!offerUsed /* && !isSatisfied()*/) {
-				logger.info(this.agentName + " For debug : satisfied = " + isSatisfied());
+				logger.info(sLogBegin + "For debug : satisfied = " + isSatisfied());
 			}
 		} catch (Exception e) {
 			logger.error(e);
@@ -1236,7 +1670,7 @@ public class ProsumerAgent extends EnergyAgent implements IEnergyAgent {
 					// Modify contract end date
 					globalProduction.setBeginDate(getCurrentDate());
 					globalProduction.setEndDate(rescheduleItem.getStopBegin());
-					generateUpdateEvent(rescheduleItem.getWarningType());
+					generateUpdateEvent(rescheduleItem.getWarningType(), "");
 				}
 			}
 			if(this.globalNeed != null) {
@@ -1244,7 +1678,7 @@ public class ProsumerAgent extends EnergyAgent implements IEnergyAgent {
 					// Modify contract end date
 					globalNeed.setBeginDate(getCurrentDate());
 					globalNeed.setEndDate(rescheduleItem.getStopBegin());
-					generateUpdateEvent(rescheduleItem.getWarningType());
+					generateUpdateEvent(rescheduleItem.getWarningType(), "");
 				}
 			}
 		}
@@ -1278,7 +1712,9 @@ public class ProsumerAgent extends EnergyAgent implements IEnergyAgent {
 			boolean switchToConsumer = wasProducer;
 			if (switchToConsumer) {
 				// The prosumer won't be producer anymore : stop all contract for which the prosumer is provider
-				consumersProcessingManager.stopAllContracts(this); // Begin-producer End
+				String comment = "Switch of " + this.agentName + " to consumer";
+				consumersProcessingManager.stopAllContracts(this, comment); // Begin-producer End
+				consumersProcessingManager.cancelAllWaitingOffers(this, comment);
 				lsa.removePropertiesByName("PROD");
 			}
 			auxUpdateRequest(changeRequest);
@@ -1299,7 +1735,7 @@ public class ProsumerAgent extends EnergyAgent implements IEnergyAgent {
 					if(switchToConsumer) {
 						generateSwitchEvent(WarningType.CHANGE_REQUEST);
 					} else {
-						generateUpdateEvent(WarningType.CHANGE_REQUEST);
+						generateUpdateEvent(WarningType.CHANGE_REQUEST, "");
 					}
 				}
 			} catch (Exception e) {
@@ -1322,7 +1758,7 @@ public class ProsumerAgent extends EnergyAgent implements IEnergyAgent {
 		boolean isInHighWarning = warningDuration>=8;
 		boolean isComplementary = (contractProcessingManager.getOngoingContractsPower() > 0);
 		boolean hasAlreadyNewContract =  contractProcessingManager.isContractWaitingValidation(isComplementary);
-		String msgTag = "handleReceivedOffers " + this.agentName + " [warningDuration=" + warningDuration + "] ";
+		String msgTag = "generateNewContract " + this.agentName + " [warningDuration=" + warningDuration + "] ";
 		String contractTag = isComplementary?"CONTRACT2" :"CONTRACT1";
 		// For debug
 		/*
@@ -1358,8 +1794,17 @@ public class ProsumerAgent extends EnergyAgent implements IEnergyAgent {
 				if(isInHighWarning) {
 					logger.warning(msgTag + " after generateGlobalOffer globalOffer = " + globalOffer);
 				}
+				boolean isOk = this.isOfferOK(globalOffer, isComplementary);
+				if("_Prosumer_N1_4".equals(agentName) || !isOk) {
+					logger.info("generateNewContract : for debug : globalOffer = " + globalOffer + ", isOk = " + isOk);
+					if(!isOk) {
+						boolean isComplementaryOk = globalOffer.isComplementary() == isComplementary;
+						boolean isPowerOK = globalOffer.getPower() >= (missing.getPower() - 0.0001);
+						logger.warning(msgTag + " globalOffer.isActive() = " + globalOffer.isActive() + ", isComplementaryOk = " + isComplementaryOk+ ", isPowerOK = " + isPowerOK);
+					}
+				}
 				// Check if the global offer can met the demand
-				if(this.isOfferOK(globalOffer, isComplementary)) {
+				if(isOk) {
 					if(isInHighWarning) {
 						logger.warning(msgTag + " globalOffer is OK");
 					}
@@ -1376,7 +1821,11 @@ public class ProsumerAgent extends EnergyAgent implements IEnergyAgent {
 					offersProcessingManager.clearSingleOffers();
 				} else {
 					if(isInHighWarning) {
-						logger.warning(msgTag + " global offer is still not OK : total = " + globalOffer.getPower() + " content = " +  globalOffer);
+						logger.warning(msgTag + " global offer is still not OK : globalOffer.getPower() = " + globalOffer.getPower() + " content = " +  globalOffer+ ", missing = " + missing);
+						// For debug
+						boolean isComplementaryOk = globalOffer.isComplementary() == isComplementary;
+						boolean isPowerOK = globalOffer.getPower() >= (missing.getPower() - 0.0001);
+						logger.warning(msgTag + " globalOffer.isActive() = " + globalOffer.isActive() + ", isComplementaryOk = " + isComplementaryOk+ ", isPowerOK = " + isPowerOK);
 					}
 				}
 			}

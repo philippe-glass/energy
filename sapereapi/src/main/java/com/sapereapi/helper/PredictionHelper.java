@@ -76,7 +76,6 @@ public class PredictionHelper {
 			for(String variable : listVariables) {
 				String nextState = nextTransition.getState(variable).getName();
 				Date stateDate = nextTransition.getStateDate();
-				//FeaturesKey featuresKey = OLD_getFeaturesKey(stateDate);
 				FeaturesKey featuresKey = predictionContext.getFeaturesKey2(stateDate);
 				//FeaturesKey featuresKey = new FeaturesKey(timeWindow);
 				VariableFeaturesKey trMatrixKey = predictionContext.getTransitionMatrixKey(featuresKey, variable);

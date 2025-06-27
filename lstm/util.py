@@ -147,6 +147,7 @@ def prepare_data(NewDataSet, train_depth, test_size, sc):
     testLast100b = sc.inverse_transform(testLast100b)
     #X_train, X_test, Y_train, Y_test = train_test_split(X,Y,random_state=104, test_size=test_size, shuffle=True)
     X_train, X_test, Y_train, Y_test = train_test_split(X,Y, test_size=test_size, shuffle=False)
+
     nb_train, nb_test = X_train.shape[0], X_test.shape[0]
     indexes_train, indexes_test = indexes[0:nb_train-0], indexes[nb_train:nb_train+nb_test-0]
     testLast100C = Y_test[-100:,0:1]
@@ -303,4 +304,5 @@ def prepare_df(json_data, list_valariables):
         df.index = list_dates2
     except Exception as err:
         print("Exception", err)
+        logging.error("Thrown exception:" + str(err))
     return df

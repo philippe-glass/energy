@@ -25,6 +25,7 @@ import org.json.JSONException;
 import org.json.JSONObject;
 
 import com.sapereapi.lightserver.DisableJson;
+import com.sapereapi.model.EnergyStorageSetting;
 import com.sapereapi.model.HandlingException;
 import com.sapereapi.model.LaunchConfig;
 import com.sapereapi.model.NodeContext;
@@ -57,7 +58,6 @@ import com.sapereapi.model.referential.DeviceCategory;
 import com.sapereapi.util.matrix.DoubleMatrix;
 import com.sapereapi.util.matrix.IterationMatrix;
 import com.sapereapi.util.matrix.IterationObsNb;
-import com.sapereapi.util.matrix.OldIterationMatrix2;
 
 import eu.sapere.middleware.log.AbstractLogger;
 import eu.sapere.middleware.node.NodeLocation;
@@ -85,6 +85,12 @@ public class UtilJsonParser {
 			LearningAggregationOperator aggregator = parseLearningAggregationOperator(jsonPredSettings.getJSONObject("aggregator"), logger);
 			predictionSetting.setAggregator(aggregator);
 		}
+		return predictionSetting;
+	}
+
+	public static EnergyStorageSetting parseEnergyStorageSetting(JSONObject jsonPredSettings, AbstractLogger logger) {
+		EnergyStorageSetting predictionSetting = new EnergyStorageSetting();
+		parseJSONObject(predictionSetting, jsonPredSettings, logger);
 		return predictionSetting;
 	}
 
@@ -281,23 +287,6 @@ public class UtilJsonParser {
 			for (int colIndex = 0; colIndex < jsonRowArray.length(); colIndex++) {
 				JSONObject testObj = jsonRowArray.getJSONObject(colIndex);
 				IterationObsNb iterationObsNb = parseIterationObsNb(testObj, logger);
-				//double cellValue = SapereUtil.getDoubleValue(jsonRowArray.get(colIndex));
-				matrix.set(rowIndex, colIndex, iterationObsNb);
-			}
-		}
-		return matrix;
-	}
-
-	public static OldIterationMatrix2 parseJsonIterationMatrix2(JSONObject jsonobj, AbstractLogger logger) throws HandlingException {
-		int nbOfColumns = SapereUtil.getIntValue(jsonobj.get("columnDimension"));
-		int nbOfRows = SapereUtil.getIntValue(jsonobj.get("rowDimension"));
-		OldIterationMatrix2 matrix = new OldIterationMatrix2(nbOfRows,nbOfColumns);
-		JSONArray jsonMatrix = jsonobj.getJSONArray("array");
-		for (int rowIndex = 0; rowIndex < jsonMatrix.length(); rowIndex++) {
-			JSONArray jsonRowArray = jsonMatrix.getJSONArray(rowIndex);
-			for (int colIndex = 0; colIndex < jsonRowArray.length(); colIndex++) {
-				JSONObject testObj = jsonRowArray.getJSONObject(colIndex);
-				Map<Integer, Double> iterationObsNb = parseJsonMapIntDouble(testObj, logger);
 				//double cellValue = SapereUtil.getDoubleValue(jsonRowArray.get(colIndex));
 				matrix.set(rowIndex, colIndex, iterationObsNb);
 			}

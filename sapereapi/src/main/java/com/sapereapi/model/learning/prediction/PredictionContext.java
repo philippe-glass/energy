@@ -199,6 +199,12 @@ public class PredictionContext implements Serializable {
 	}
 
 	@DisableJson
+	public Integer getNbOfSamplingsBeforeTraining() {
+		PredictionSetting predictionSetting = getPredictionSetting();
+		return predictionSetting.getNbOfSamplingsBeforeTraining();
+	}
+
+	@DisableJson
 	public boolean isSupervisionDisabled() {
 		return this.nodeContext.isSupervisionDisabled();
 	}

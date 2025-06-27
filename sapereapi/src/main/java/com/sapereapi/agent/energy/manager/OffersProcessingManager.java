@@ -89,9 +89,18 @@ public class OffersProcessingManager {
 		return (tableSingleOffers.size()>0);
 	}
 
+	public boolean hasSingleOffer(String issuer) {
+		return tableSingleOffers.containsKey(issuer);
+	}
+
 	public CompositeOffer generateGlobalOffer(EnergyAgent consumerAgent,EnergyRequest missing) {
 		String agentName = consumerAgent.getAgentName();
 		//EnergyRequest need = consumerAgent.getEnergyRequest();
+		if("_Prosumer_N1_4".equals(agentName) && tableSingleOffers.size() > 0) {
+			for(String issuer : tableSingleOffers.keySet()) {
+				logger.info("generateGlobalOffer : nextOffer in table = " + tableSingleOffers.get(issuer));
+			}
+		}
 		List<SingleOffer> offerList = new ArrayList<>();
 		for (SingleOffer singleOffer : tableSingleOffers.values()) {
 			if (!singleOffer.hasExpired(0) && singleOffer.getPower()>0 && (singleOffer.isComplementary() == missing.isComplementary())) {

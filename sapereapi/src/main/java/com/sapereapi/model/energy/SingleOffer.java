@@ -36,7 +36,7 @@ public class SingleOffer extends EnergySupply implements IEnergyObject, Cloneabl
 			,int validityDurationSeconds
 			, EnergyRequest request) {
 		super(energySupply.getIssuerProperties(), request.isComplementary(), energySupply.getPowerSlot(),
-				energySupply.getBeginDate(), energySupply.getEndDate(), energySupply.getPricingTable());
+				energySupply.getBeginDate(), energySupply.getEndDate(), energySupply.getPricingTable(), energySupply.getDisabled());
 		Date current = getCurrentDate();
 		if (beginDate.before(current)) {
 			beginDate = current;
@@ -239,6 +239,19 @@ public class SingleOffer extends EnergySupply implements IEnergyObject, Cloneabl
 	public boolean hasExpired() {
 		Date current = getCurrentDate();
 		return current.after(this.endDate) || current.after(this.deadline);
+	}
+
+	public long getRemainValidationTimeSec() {
+		Date current = getCurrentDate();
+		Date expiration = deadline;
+		if (endDate.before(expiration)) {
+			expiration = endDate;
+		}
+		if (current.before(expiration)) {
+			long duration_ms = expiration.getTime() - current.getTime();
+			return duration_ms / 1000;
+		}
+		return 0;
 	}
 
 	public long getExpirationDurationSec() {

@@ -170,7 +170,7 @@ public class RegulatorAgent extends SupervisionAgent implements ISupervisorAgent
 				if(linkedConsumer != null) {
 					PricingTable pricingTable = new PricingTable(nodeContext.getTimeShiftMS());
 					EnergySupply supply = new EnergySupply(nextEvent.getIssuerProperties(), nextEvent.isComplementary(),
-							nextEvent.getPowerSlot(), nextEvent.getBeginDate(), nextEvent.getEndDate(), pricingTable);
+							nextEvent.getPowerSlot(), nextEvent.getBeginDate(), nextEvent.getEndDate(), pricingTable, false);
 					result.add(supply);
 				}
 			}
@@ -187,7 +187,7 @@ public class RegulatorAgent extends SupervisionAgent implements ISupervisorAgent
 				ProsumerProperties supplierProperties = nextEvent.getIssuerProperties();
 				PricingTable pricingTable = new PricingTable(nodeContext.getTimeShiftMS());
 				EnergySupply supply = new EnergySupply(supplierProperties, nextEvent.getIsComplementary(),
-						nextEvent.getPowerSlot(), nextEvent.getBeginDate(), nextEvent.getEndDate(), pricingTable);
+						nextEvent.getPowerSlot(), nextEvent.getBeginDate(), nextEvent.getEndDate(), pricingTable, false);
 				result.add(supply);
 			}
 		}

@@ -4,10 +4,10 @@ import java.util.Date;
 import java.util.List;
 
 import com.sapereapi.model.energy.EnergySupply;
-import com.sapereapi.model.energy.ExtraSupply;
 import com.sapereapi.model.energy.IEnergySupply;
 import com.sapereapi.model.energy.PowerSlot;
 import com.sapereapi.model.energy.ProsumerProperties;
+import com.sapereapi.model.energy.StorageSupply;
 import com.sapereapi.model.energy.pricing.ComposedRate;
 import com.sapereapi.model.energy.pricing.PricingTable;
 import com.sapereapi.model.referential.PriorityLevel;
@@ -21,8 +21,6 @@ public class ProsumerEnergySupply extends ProsumerEnergyFlow implements IEnergyS
 	private static final long serialVersionUID = 1L;
 	protected Long eventId;
 	protected PricingTable pricingTable;
-
-	public final static double DEFAULT_POWER_MARGIN_RATIO = 1.0 * 0.05;
 
 	public Long getEventId() {
 		return eventId;
@@ -48,9 +46,9 @@ public class ProsumerEnergySupply extends ProsumerEnergyFlow implements IEnergyS
 	}
 
 	public ProsumerEnergySupply(ProsumerProperties issuerProperties, Boolean isComplementary,
-			PowerSlot internalPowerSlot, Date beginDate, Date endDate, ExtraSupply extraSupply,
-			PricingTable _pricingTable) {
-		super(issuerProperties, isComplementary, internalPowerSlot, beginDate, endDate, extraSupply);
+			PowerSlot internalPowerSlot, Date beginDate, Date endDate, StorageSupply storageSupply,
+			PricingTable _pricingTable, Boolean disabled) {
+		super(issuerProperties, isComplementary, internalPowerSlot, beginDate, endDate, storageSupply, disabled);
 		this.pricingTable = _pricingTable;
 	}
 
@@ -79,8 +77,8 @@ public class ProsumerEnergySupply extends ProsumerEnergyFlow implements IEnergyS
 	@Override
 	public Double getWH() {
 		Double result = getInternalWH();
-		if (extraSupply != null) {
-			result += this.extraSupply.getWH();
+		if (storageSupply != null) {
+			result += this.storageSupply.getWH();
 		}
 		return result;
 	}
@@ -110,12 +108,13 @@ public class ProsumerEnergySupply extends ProsumerEnergyFlow implements IEnergyS
 	public ProsumerEnergySupply copy(boolean copyIds) {
 		PricingTable copyPricingTable = pricingTable==null ? null : pricingTable.copy(copyIds);
 		ProsumerProperties cloneIssuerProperties = issuerProperties.copy(copyIds);
-		ExtraSupply cloneExtraSupply = extraSupply == null ? null : extraSupply.clone();
+		StorageSupply cloneStorageSupply = storageSupply == null ? null : storageSupply.clone();
 		ProsumerEnergySupply result = new ProsumerEnergySupply(cloneIssuerProperties
 				, isComplementary, getInternalPowerSlot()
 				,beginDate == null ? null : new Date(beginDate.getTime())
 				,endDate == null ? null : new Date(endDate.getTime())
-				, cloneExtraSupply, copyPricingTable);
+				, cloneStorageSupply, copyPricingTable, disabled);
+		result.setDisabled(disabled);
 		if(copyIds) {
 			result.setEventId(eventId);
 		}
@@ -135,11 +134,11 @@ public class ProsumerEnergySupply extends ProsumerEnergyFlow implements IEnergyS
 	public ProsumerEnergyRequest generateRequest() {
 		// Create energy request with the default values
 		double delayToleranceMinutes = UtilDates.computeDurationMinutes(getBeginDate(), getEndDate());
-		ExtraSupply cloneExtraSupply = (this.extraSupply == null) ? null : extraSupply.clone();
+		StorageSupply cloneStorageSupply = (this.storageSupply == null) ? null : storageSupply.clone();
 		//PricingTable clonePricingTable = (pricingTable == null) ? null : pricingTable.clone();
 		ProsumerEnergyRequest request = new ProsumerEnergyRequest(issuerProperties.clone(), isComplementary, getInternalPowerSlot()
-				, beginDate, endDate, cloneExtraSupply
-				, delayToleranceMinutes, PriorityLevel.LOW);
+				, beginDate, endDate, cloneStorageSupply
+				, delayToleranceMinutes, PriorityLevel.LOW, disabled);
 		return request;
 	}
 
@@ -147,8 +146,9 @@ public class ProsumerEnergySupply extends ProsumerEnergyFlow implements IEnergyS
 		ProsumerProperties cloneIssuerProperties = issuerProperties.clone();
 		PricingTable copyPricingTable = pricingTable==null ? null : pricingTable.clone();
 		EnergySupply result = new EnergySupply(cloneIssuerProperties, isComplementary, getPowerSlot(),
-				beginDate, endDate, copyPricingTable);
+				beginDate, endDate, copyPricingTable, disabled);
 		result.setEventId(eventId);
+		//result.setDisabled(disabled);
 		return result;
 	}
 

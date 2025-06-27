@@ -11,17 +11,20 @@ import java.util.Map;
 import java.util.TimeZone;
 
 import com.sapereapi.exception.MissingMeasureException;
+import com.sapereapi.model.EnergyStorageSetting;
 import com.sapereapi.model.LaunchConfig;
 import com.sapereapi.model.PredictionSetting;
 import com.sapereapi.model.energy.AgentForm;
 import com.sapereapi.model.energy.Device;
 import com.sapereapi.model.energy.DeviceMeasure;
+import com.sapereapi.model.energy.StorageType;
 import com.sapereapi.model.energy.pricing.PricingTable;
 import com.sapereapi.model.energy.input.AgentInputForm;
 import com.sapereapi.model.energy.input.SimulatorLog;
 import com.sapereapi.model.energy.node.NodeContent;
 import com.sapereapi.model.energy.node.NodeTotal;
 import com.sapereapi.model.input.InitializationForm;
+import com.sapereapi.model.learning.ILearningModel;
 import com.sapereapi.model.learning.LearningModelType;
 import com.sapereapi.model.learning.NodeStates;
 import com.sapereapi.model.learning.PredictionScope;
@@ -38,7 +41,7 @@ import com.sapereapi.util.UtilDates;
 
 import eu.sapere.middleware.node.NodeLocation;
 
-public class MeyrinSimulator extends TestSimulator {
+public class LivingLabSimulator extends TestSimulator {
 
 	static Map<DeviceCategory, Double> deviceStatistics = new HashMap<DeviceCategory, Double>();
 	static Map<Date, List<DeviceMeasure>> deviceMeasures = new HashMap<Date, List<DeviceMeasure>>();
@@ -60,7 +63,7 @@ public class MeyrinSimulator extends TestSimulator {
 	static List<String> listBaseUrl = new ArrayList<String>();
 	static Map<String, NodeLocation> mapNodeLocationByDevice = new HashMap<String, NodeLocation>();
 	static Map<String, String> mapNodeByLocation = new HashMap<String, String>();
-	static String scenario = MeyrinSimulator.class.getSimpleName();
+	static String scenario = LivingLabSimulator.class.getSimpleName();
 	static Date argTargetDate = null;
 	static Integer argTargetHour = null;
 	/*
@@ -153,7 +156,7 @@ public class MeyrinSimulator extends TestSimulator {
 			defaultbaseUrl = launchConfig.getBaseUrl();
 			int nodesNb = mapNodes.size();
 			testMultiNodes = ( nodesNb > 0);
-			scenario = MeyrinSimulator.class.getSimpleName() + ".mult" + nodesNb;
+			scenario = LivingLabSimulator.class.getSimpleName() + ".mult" + nodesNb;
 		}
 		// Initialize mapBaseUrl
 		listBaseUrl.clear();
@@ -261,11 +264,12 @@ public class MeyrinSimulator extends TestSimulator {
 		Date current = activateDateShift ? getCurrentDate() : getCurrentDateBidon();
 		ProsumerRole prosumerRole = aDevice.isProducer() ? ProsumerRole.PRODUCER : ProsumerRole.CONSUMER;
 		EnvironmentalImpact envImpact = aDevice.getEnvironmentalImpact();
+		EnergyStorageSetting energyStorageSetting = null;
 		Date endDate = UtilDates.shiftDateMinutes(current, duration);
 		long timeShiftMS = UtilDates.computeTimeShiftMS(datetimeShifts);
 		PricingTable pricingTable = new PricingTable(current, 0.0, timeShiftMS);
 		AgentInputForm result = new AgentInputForm(prosumerRole, "", aDevice.getName(), aDevice.getCategory(), envImpact, pricingTable.getMapPrices(), targetPower, current, endDate,
-				priority, duration, timeShiftMS);
+				priority, duration, energyStorageSetting, timeShiftMS);
 		result.updateDeviceProperties(aDevice.getProperties());
 		//result.setMapPrices(new HashMap<>());
 		if (existingForm != null) {
@@ -682,7 +686,8 @@ public class MeyrinSimulator extends TestSimulator {
 			stopEnergyService(baseUrl);
 		}
 	}*/
-
+	public static int GOSSIP_ENSEMBLE_LEARNING = 1;
+	public static int GOSSIP_FEDERATED_LEARNING = 2;
 
 	public static void doInitLearningModels(InitializationForm initForm) throws Exception {
 	int nbOfDays = 30;
@@ -704,25 +709,41 @@ public class MeyrinSimulator extends TestSimulator {
 
 		// Initialize the aggregator for node predictions
 		LearningAggregationOperator nodeAggregator = null;
-		int aggregationWaitingTimeMinutes = 5;
-		//nodeAggregator = LearningAggregationOperator.createPredictionAggregationOperator(PredictionData.OP_DISTANCE_POWER_PROFILE, aggregationWaitingTimeMinutes);
-		//nodeAggregator = LearningAggregationOperator.createModelAggregationOperator(ILearningModel.OP_DISTANCE_POWER_PROFILE, aggregationWaitingTimeMinutes);// ILearningModel.OP_POWER_LOSS, ILearningModel.OP_MIN_LOSS, ILearningModel.OP_SAMPLING_NB
-		PredictionSetting nodePredicitonSetting = new PredictionSetting(true, nodeAggregator, LearningModelType.MARKOV_CHAINS);
+		int usedDistributedLearning = GOSSIP_ENSEMBLE_LEARNING;
+		LearningModelType defaultModelType = LearningModelType.MARKOV_CHAINS;// MARKOV_CHAINS or LSTM
+		int aggregationWaitingTimeMinutes = (defaultModelType == LearningModelType.LSTM) ? 15 : 5;
+		if(usedDistributedLearning == GOSSIP_ENSEMBLE_LEARNING) {
+			nodeAggregator = LearningAggregationOperator.createPredictionAggregationOperator(PredictionData.OP_SAMPLING_NB, aggregationWaitingTimeMinutes); // OP_SAMPLING_NB, OP_DISTANCE_CURRENT_POWER, OP_DISTANCE_POWER_PROFILE
+		}
+		if(usedDistributedLearning == GOSSIP_FEDERATED_LEARNING) {
+			nodeAggregator = LearningAggregationOperator.createModelAggregationOperator(ILearningModel.OP_MIN_LOSS, aggregationWaitingTimeMinutes);// OP_SAMPLING_NB, OP_POWER_LOSS, OP_MIN_LOSS 
+		}
+		nodeAggregator = null;
+		int nbOfSamplingsBeforeTraining = (defaultModelType == LearningModelType.LSTM) ? 30 : 0;// 100;// 20;// 300;
+		//nbOfSamplingsBeforeTraining = 5; // TO TEST if the flask server falls down after 30 min
+		PredictionSetting nodePredicitonSetting = new PredictionSetting(true, nodeAggregator, defaultModelType, nbOfSamplingsBeforeTraining);
 		initForm.setNodePredicitonSetting(nodePredicitonSetting);
 
 		// initialize the aggregator for cluster predicitons
 		LearningAggregationOperator clusterAggregator = null;
-		clusterAggregator = LearningAggregationOperator.createPredictionAggregationOperator(PredictionData.OP_DISTANCE_CURRENT_POWER, aggregationWaitingTimeMinutes);
-		//clusterAggregator = LearningAggregationOperator.createModelAggregationOperator(ILearningModel.OP_DISTANCE_POWER_PROFILE, aggregationWaitingTimeMinutes);
-		PredictionSetting clusterPredictionSetting = new PredictionSetting(true, clusterAggregator, LearningModelType.MARKOV_CHAINS);
+		if(usedDistributedLearning == GOSSIP_ENSEMBLE_LEARNING) {
+			clusterAggregator = LearningAggregationOperator.createPredictionAggregationOperator(PredictionData.OP_SAMPLING_NB, aggregationWaitingTimeMinutes); // OP_SAMPLING_NB, OP_DISTANCE_CURRENT_POWER, OP_DISTANCE_POWER_PROFILE
+		}
+		if(usedDistributedLearning == GOSSIP_FEDERATED_LEARNING) {
+			clusterAggregator = LearningAggregationOperator.createModelAggregationOperator(ILearningModel.OP_MIN_LOSS, aggregationWaitingTimeMinutes);
+		}
+		//clusterAggregator = null;
+		PredictionSetting clusterPredictionSetting = new PredictionSetting(true, clusterAggregator, defaultModelType, nbOfSamplingsBeforeTraining);
 		initForm.setClusterPredictionSetting(clusterPredictionSetting);
 		Map <String, PredictionContext> mapLocalPredictionContext = new HashMap <String, PredictionContext>();
 		Map <String, PredictionContext> mapClusterPredictionContext = new HashMap <String, PredictionContext>();
 		int nodeIdx = 0;
 		for(String baseUrl : listBaseUrl) {
 			// For ensemble leaarning (one none with MC, the other with LSTM)
-			LearningModelType modelType = (nodeIdx % 2 == 0) ? LearningModelType.MARKOV_CHAINS : LearningModelType.LSTM;
-			//modelType =  LearningModelType.LSTM; // TO DELETE
+			LearningModelType modelType =  defaultModelType; // TO DELETE
+			if(usedDistributedLearning == GOSSIP_ENSEMBLE_LEARNING) {
+				modelType = (nodeIdx % 2 == 0) ? LearningModelType.MARKOV_CHAINS : LearningModelType.LSTM;
+			}
 			//modelType = LearningModelType.MARKOV_CHAINS;
 			initForm.getClusterPredictionSetting().setUsedModel(modelType);
 			initForm.getNodePredicitonSetting().setUsedModel(modelType);
@@ -884,9 +905,11 @@ public class MeyrinSimulator extends TestSimulator {
 		} catch (Exception e) {
 			logger.error(e);
 		}
-		PredictionSetting nodePredicitonSetting = new PredictionSetting(true, null, LearningModelType.MARKOV_CHAINS);
-		PredictionSetting clusterPredictionSetting = new PredictionSetting(false, null, LearningModelType.MARKOV_CHAINS);
-		InitializationForm initForm = new InitializationForm(scenario, maxTotalPower, datetimeShifts, nodePredicitonSetting, clusterPredictionSetting);
+		int nbOfSamplingsBeforeTraining =  5;
+		EnergyStorageSetting energyStorageSetting = new EnergyStorageSetting();
+		PredictionSetting nodePredicitonSetting = new PredictionSetting(true, null, LearningModelType.MARKOV_CHAINS, nbOfSamplingsBeforeTraining);
+		PredictionSetting clusterPredictionSetting = new PredictionSetting(false, null, LearningModelType.MARKOV_CHAINS, nbOfSamplingsBeforeTraining);
+		InitializationForm initForm = new InitializationForm(scenario, maxTotalPower, datetimeShifts, energyStorageSetting, nodePredicitonSetting, clusterPredictionSetting);
 		if(initLearningModel) {
 			try {
 				doInitLearningModels(initForm);

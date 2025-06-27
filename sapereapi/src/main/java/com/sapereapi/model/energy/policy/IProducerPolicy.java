@@ -14,6 +14,7 @@ public interface IProducerPolicy extends IEnergyAgentPolicy {
 	boolean hasDefaultPrices();
 	List<EnergyRequest> sortRequests(Collection<EnergyRequest> listWaitingRequest);
 	public boolean confirmSupply(EnergyAgent produserAgent, EnergyRequest request);
+	public boolean confirmDonationOfAvailableEnergy(EnergyAgent produserAgent, double availableWH);
 	public SingleOffer priceOffer(EnergyAgent producerAgent, SingleOffer offer);
 
 	public final static int POLICY_RANDOM = 10;

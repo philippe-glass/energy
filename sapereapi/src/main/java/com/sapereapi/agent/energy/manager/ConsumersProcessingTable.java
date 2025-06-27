@@ -11,6 +11,7 @@ import java.util.Set;
 
 import com.sapereapi.agent.energy.EnergyAgent;
 import com.sapereapi.db.EnergyDbHelper;
+import com.sapereapi.exception.PermissionException;
 import com.sapereapi.log.SapereLogger;
 import com.sapereapi.model.HandlingException;
 import com.sapereapi.model.Sapere;
@@ -20,6 +21,8 @@ import com.sapereapi.model.energy.IEnergyObject;
 import com.sapereapi.model.energy.PowerSlot;
 import com.sapereapi.model.energy.ReducedContract;
 import com.sapereapi.model.energy.SingleOffer;
+import com.sapereapi.model.protection.ProtectedConfirmationTable;
+import com.sapereapi.model.referential.ProsumerRole;
 import com.sapereapi.util.SapereUtil;
 import com.sapereapi.util.UtilDates;
 
@@ -355,7 +358,8 @@ public class ConsumersProcessingTable {
 	public void addReceivedConfirmation(EnergyAgent producerAgent, String consumer) {
 		if(hasValidContract(consumer)) {
 			// Add Received confirmation from consumer agent
-			receivedConfirmations.put(consumer, new ConfirmationItem(consumer, isComplementary(), true, "", timeShiftMS));
+			receivedConfirmations.put(consumer, new ConfirmationItem(consumer, ProsumerRole.CONSUMER, producerAgent.getAgentName()
+					,  isComplementary(), true, "", 0, timeShiftMS));
 		}
 	}
 
@@ -381,7 +385,7 @@ public class ConsumersProcessingTable {
 	public void addOrUpdateRequest(EnergyAgent producerAgent, String consumer, EnergyRequest request) {
 		try {
 			if(!this.hasConsumer(consumer)) {
-				request.setAux_expiryDate(getCurrentDate());
+				//request.setAux_expiryDate(getCurrentDate());
 				if(request.getIssuerProperties() != null && request.getIssuerProperties().getDistance() > 0) {
 					// id from an external database : DO NOT USE IT (constraint integrity)
 					request.setEventId(null);
@@ -563,18 +567,20 @@ public class ConsumersProcessingTable {
 
 	public String getExpiredObjectKey(Map<String, IEnergyObject> tableConsumersProcessing, int marginSeconds,
 			EnergyAgent prodAgent, AbstractLogger logger) {
-		Date current = getCurrentDate();
+		//Date current = getCurrentDate();
 		for (String consumerKey : tableConsumersProcessing.keySet()) {
 			IEnergyObject consumerObj = tableConsumersProcessing.get(consumerKey);
 			if (consumerObj instanceof EnergyRequest) {
 				EnergyRequest energyRequest = (EnergyRequest) consumerObj;
+				/*
 				if(energyRequest.getAux_expiryDate().after(current)) {
 					logger.info("getExpiredObjectKey this energyRequest will expire : " + "aux_expiryDate = "
 							+ UtilDates.format_time.format(energyRequest.getAux_expiryDate()) + ", current = "
 							+ UtilDates.format_time.format(current)
 							+ ", energyRequest = " + energyRequest);
-				}
-				if (energyRequest.getAux_expiryDate().after(current) || !energyRequest.canBeSupplied()) {
+				}*/
+				if (/*energyRequest.getAux_expiryDate().after(current) ||*/
+						!energyRequest.canBeSupplied()) {
 					return consumerKey;
 				}
 			} else if (consumerObj instanceof SingleOffer) {
@@ -593,7 +599,93 @@ public class ConsumersProcessingTable {
 		return null;
 	}
 
+	public void handleConsumerConfirmation(EnergyAgent producerAgent, ProtectedConfirmationTable confirmTable)
+			throws HandlingException {
+		Map<String, ReducedContract> validContracts = getTableValidContracts();
+		String consumer = confirmTable.getIssuer(producerAgent);
+		if (validContracts.containsKey(consumer)) {
+			ReducedContract consumerContract = validContracts.get(consumer);
+			try {
+				if (confirmTable.hasAccessAsStackholder(producerAgent)) {
+					ConfirmationItem confirmation = confirmTable.getConfirmationItem(producerAgent, isComplementary, ProsumerRole.CONSUMER);
+					if (confirmation != null) {
+						if (confirmation.isComplementary() == isComplementary) {
+							Date confirmationDate = confirmation.getDate();
+							if (confirmationDate.before(consumerContract.getBeginDate())) {
+								String sContractDate = UtilDates.format_time.format(consumerContract.getBeginDate());
+								logger.warning("addProducerConfirmation " + producerAgent.getAgentName()
+										+ " this confirmation [" + confirmation + " of " + consumer
+										+ " is before the contract begin date " + sContractDate + ": it will not be taken into account ");
+							} else {
+								if (!confirmation.getIsOK()) {
+									// remove the consumer from table
+									this.removeConsumer(consumer, "no CONTRACT2 property in LSA of " + consumer);
+								}
+								if (confirmation.getIsOK()) {
+									addReceivedConfirmation(producerAgent, consumer);
+								}
+							}
+						}
+					}
+				}
+			} catch (PermissionException e) {
+				logger.error(e);
+			}
+		}
+	}
+
 	public Date getCurrentDate() {
 		return UtilDates.getNewDateNoMilliSec(timeShiftMS);
+	}
+
+	public void cancelAllWaitingOffers(EnergyAgent producerAgent, String log, boolean activateOfferRemoveLog) throws HandlingException {
+		ProtectedConfirmationTable protectedConfirmationTable = producerAgent.getProtectedConfirmationTable(producerAgent);
+		try {
+			boolean updated = false;
+			Map<String, SingleOffer> waitingOffers = getTableWaitingOffers();
+			for (String consumer : waitingOffers.keySet()) {
+				SingleOffer offer = waitingOffers.get(consumer);
+				int remainValidationTimeSec = (int) Math.ceil(offer.getRemainValidationTimeSec());
+				logger.info("cancelAllWaitingOffers " + producerAgent.getAgentName() + " "
+						+ (isComplementary ? "Compl." : "") + " send false confirmation to consumer " + consumer + " remainValidationTimeSec = " + remainValidationTimeSec + " : " + log);
+				removeOffer(producerAgent, consumer, log, activateOfferRemoveLog);
+				protectedConfirmationTable.confirmAsProducer(producerAgent, consumer, isComplementary, Boolean.FALSE,
+						log, remainValidationTimeSec); // 5
+				updated = true;
+			}
+			if(updated) {
+				logger.info("cancelAllWaitingOffers " + producerAgent.getAgentName() + " : protectedConfirmationTable = " + protectedConfirmationTable);
+				producerAgent.replacePropertyWithName(new Property("CONTRACT_CONFIRM", protectedConfirmationTable));
+			}
+		} catch (PermissionException e) {
+			logger.error(e);
+		}
+	}
+
+	public void stopAllContracts(EnergyAgent producerAgent, String log) {
+		Map<String, ReducedContract> contractsToStop = getTableContracts(true, true, false);
+		if (contractsToStop.size() > 0) {
+			ProtectedConfirmationTable protectedConfirmationTable = producerAgent
+					.getProtectedConfirmationTable(producerAgent);
+			for (String consumer : contractsToStop.keySet()) {
+				ReducedContract reducedContract = contractsToStop.get(consumer);
+				if (reducedContract != null) {
+					try {
+						if (!reducedContract.hasDisagreement()) {
+							logger.info("stopAllContracts " + producerAgent.getAgentName() + " : reducedContract = "
+									+ reducedContract + ", log = " + log);
+							reducedContract.addProducerAgreement(false);
+						}
+						this.removeContract(producerAgent, consumer, log);
+						protectedConfirmationTable.confirmAsProducer(producerAgent, reducedContract.getConsumerAgent(),
+								reducedContract.isComplementary(), false, log, 5);
+						removeConfirmation(consumer);
+					} catch (Exception e) {
+						logger.error(e);
+					}
+				}
+			}
+			producerAgent.replacePropertyWithName(new Property("CONTRACT_CONFIRM", protectedConfirmationTable));
+		}
 	}
 }

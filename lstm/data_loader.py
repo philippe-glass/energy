@@ -205,7 +205,7 @@ def extract_node_history_data(history_data, node):
 
 
 
-def loadNodeHistory(scope, node, date_min, date_max):
+def loadNodeHistory(scope, node, date_min, date_max, is_simulation):
     list_dates, list_requested, list_produced, list_consumed, list_missing, list_provided, list_available = [],[],[],[],[],[],[]
     date_filter = "1"
     if not date_min is None:
@@ -214,7 +214,11 @@ def loadNodeHistory(scope, node, date_min, date_max):
     if not date_max is None:
         date_max_sql = date_max.strftime('%Y-%m-%d %H:%M:%S')
         date_filter = date_filter + " AND date <= '" + date_max_sql + "'"
-
+    if not is_simulation is None:
+        is_simulation2 = 0
+        if is_simulation:
+            is_simulation2 = 1
+        date_filter = date_filter + " AND is_simulation = '" + str(is_simulation2) + "'"
     sql_req = ""
     if (scope == "CLUSTER"):
         sql_req = """SELECT date

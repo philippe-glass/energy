@@ -57,6 +57,7 @@ export class SGCurrentComponent implements OnInit {
   mapNeighborNodes = {};
   listYesNo = [];
   maxDisplayTime = new Date();
+  displayStoredWH = false;
 
   targetAction = ""; // restart agent or modify agent
 
@@ -121,6 +122,10 @@ export class SGCurrentComponent implements OnInit {
       this.maxDisplayTime.setSeconds(0);
       this.maxDisplayTime.setMilliseconds(0);
       this.maxDisplayTime.setTime(this.maxDisplayTime.getTime() + 60 * 24*60 * 1000 );
+      this.displayStoredWH = false;
+      if(this.nodeContent['total']) {
+        this.displayStoredWH = this.nodeContent['total']['storedWH'] > 0;
+      }
       console.log("maxDisplayTime", this.maxDisplayTime);
     });
   }

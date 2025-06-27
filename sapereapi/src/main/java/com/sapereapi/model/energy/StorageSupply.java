@@ -6,7 +6,7 @@ import java.util.Date;
 import com.sapereapi.util.SapereUtil;
 import com.sapereapi.util.UtilDates;
 
-public class ExtraSupply implements Cloneable, Serializable {
+public class StorageSupply implements Cloneable, Serializable {
 
 	private static final long serialVersionUID = 1L;
 	protected Double power; // current electric power in watts
@@ -46,7 +46,7 @@ public class ExtraSupply implements Cloneable, Serializable {
 		this.timeShiftMS = timeShiftMS;
 	}
 
-	public ExtraSupply(Double power, Date beginDate, Date endDate, long timeShiftMS) {
+	public StorageSupply(Double power, Date beginDate, Date endDate, long timeShiftMS) {
 		super();
 		this.power = power;
 		this.beginDate = beginDate;
@@ -82,15 +82,15 @@ public class ExtraSupply implements Cloneable, Serializable {
 		return 0;
 	}
 
-	public ExtraSupply clone() {
-		return new ExtraSupply(power, beginDate, endDate, this.timeShiftMS);
+	public StorageSupply clone() {
+		return new StorageSupply(power, beginDate, endDate, this.timeShiftMS);
 	}
 
 	public Date getCurrentDate() {
 		return UtilDates.removeMilliSeconds(UtilDates.getNewDate(getTimeShiftMS()));
 	}
 
-	public boolean hasChanged(ExtraSupply newContent) {
+	public boolean hasChanged(StorageSupply newContent) {
 		if (newContent == null) {
 			return true;
 		}
@@ -107,7 +107,7 @@ public class ExtraSupply implements Cloneable, Serializable {
 	@Override
 	public String toString() {
 		StringBuffer result = new StringBuffer();
-		result.append("ExtraSupply : {").append(SapereUtil.roundPower(power))
+		result.append("StorageSupply : {").append(SapereUtil.roundPower(power))
 			.append(" W from ").append(UtilDates.format_time.format(beginDate)).append(" to ").append(UtilDates.format_time.format(endDate)).append("}");
 		return result.toString();
 	}

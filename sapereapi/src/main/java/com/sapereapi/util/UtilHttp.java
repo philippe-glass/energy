@@ -20,6 +20,7 @@ import java.util.Map;
 import org.json.JSONArray;
 import org.json.JSONObject;
 
+import com.sapereapi.model.EnergyStorageSetting;
 import com.sapereapi.model.HandlingException;
 import com.sapereapi.model.OptionItem;
 import com.sapereapi.model.PredictionSetting;
@@ -239,6 +240,9 @@ public class UtilHttp {
 						} else if(paramType.equals(PredictionSetting.class)) {
 							JSONObject jsonObject = (JSONObject) value;
 							valueToSet = UtilJsonParser.parsePredictionSetting(jsonObject, logger);
+						} else if(paramType.equals(EnergyStorageSetting.class)) {
+							JSONObject jsonObject = (JSONObject) value;
+							valueToSet = UtilJsonParser.parseEnergyStorageSetting(jsonObject, logger);
 						/*
 						} else if(NodeTransitionMatrices[].class.equals(paramType)) {
 							JSONArray jsonArray = (JSONArray) value;

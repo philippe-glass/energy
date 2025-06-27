@@ -1,18 +1,73 @@
 <app-header></app-header>
 
-<div class="content ">
+
+<div class="content " >
     <h2>Home history</h2>
+    <span *ngIf="this.total['deltaTime'] > 0" STYLE="font-size:9.5pt">
+        Cumulative warning duration {{this.formatDuration(1000*this.total['cumulativeWarningDuration'])}} / {{this.formatDuration(this.total["deltaTime"])}}
+          (  {{this.fnum2(this.total['warningPercent'])}} %)  max = {{this.total['maxWarningDuration']}} sec at {{this.disaplyTime(this.total['maxWarningDurationDate'])}}
+        <BR>
+          Cumulative warning : {{this.fnum2(this.total['warningWH'] )}} WH ( {{this.fnum2(100* this.total['warningWH'] / this.total['producedWH'])}}  % )
+            Cumulative produced : {{this.fnum2(this.total['producedWH'])}} WH
+        <BR>
+          Cumulative missing : {{this.fnum2(this.total['missingWH'])}} WH  / {{this.fnum2(this.total['requestedWH'])}} WH requested
+          ( {{this.fnum2(100*this.total['missingWH'] / this.total['requestedWH'] )}} % )
+          <span *ngIf="this.total['storageUsedForNeed'] > 0">
+            <BR> Cumulative storage used to reduce needs : {{this.fnum2(this.total['storageUsedForNeed'])}} WH
+          </span>
+          <span *ngIf="this.total['storageUsedForProdWH'] > 0">
+            <BR> Cumulative storage used to supply : {{this.fnum2(this.total['storageUsedForProdWH'])}} WH
+          </span>
+    </span>
     <app-barchart *ngIf="chartData" [data]="chartData"></app-barchart>
     <div class="d3-chart" id="chart">
     </div>
 <br>
 <form (ngSubmit)="applyFilter()">
   <label>Agent filter:
-    <select [(ngModel)]="filter.agentName"  name="filter.agentName">
+    <select [(ngModel)]="filter.agentName"  name="filter.agentName" (ngModelChange)="changeAgentFilter($event)">
         <option  [value]=""> </option>
-        <option *ngFor="let agent of listAgents" [value]="agent">{{agent}}</option>
+        <option *ngFor="let agent of listAgents" [value]="agent.value">{{agent.label}}</option>
     </select>
   </label>
+  <label>
+    processing time tolerance (Sec) <input type="text" name="filter.processingTimeToleranceSec" [(ngModel)]="filter.processingTimeToleranceSec" size="5">
+  </label>
+  Display variables:
+  <!--
+  <span *ngFor="let variable_entry of chartActivation | keyvalue">
+    <label>_ {{variable_entry.key}} :
+      <input type="checkbox" [(ngModel)]="chartActivation.variable_entry.key" name="chartActivation.variable_entry.key">
+    </label>
+  </span>
+  -->
+  <label color="green"><span font-color="green"> produced</span>  :
+    <input type="checkbox" [(ngModel)]="chartActivation.produced" name="chartActivation.produced">
+  </label>
+  &nbsp;&nbsp;
+  <label>requested:
+    <input type="checkbox" [(ngModel)]="chartActivation.requested" name="chartActivation.requested">
+  </label>
+  &nbsp;&nbsp;
+  <!--
+  <label>provided:
+    <input type="checkbox" [(ngModel)]="chartActivation.provided" name="chartActivation.provided">
+  </label>
+  &nbsp;&nbsp;
+  -->
+  <label>consumed:
+    <input type="checkbox" [(ngModel)]="chartActivation.consumed" name="chartActivation.consumed">
+  </label>
+  &nbsp;&nbsp;
+  <label>missing:
+    <input type="checkbox" [(ngModel)]="chartActivation.missing" name="chartActivation.missing">
+  </label>
+  &nbsp;&nbsp;
+  <label>available:
+    <input type="checkbox" [(ngModel)]="chartActivation.available" name="chartActivation.available">
+  </label>
+
+  &nbsp;&nbsp;&nbsp;&nbsp; <br>
   <button class="btn btn-success" type="submit">Reload</button>
 </form>
 <table class="table table-hover">
@@ -21,13 +76,16 @@
             <th class='next_bloc'>Time</th>
             <th class='next_bloc'>Evt type</th>
             <th>Agent</th>
+            <th>Device</th>
             <th>Begin</th>
             <th>End</th>
             <th>Power(W)</th>
+            <th *ngIf="displayAdditionalPower">Additional</th>
             <th>Variation</th>
             <th>(min)</th>
             <th>(max)</th>
             <th>Rate</th>
+            <th class="num next_bloc" *ngIf="displayAdditionalPower">Used Storage</th>
             <th class=" next_bloc">Requested(W)</th>
             <th>Produced(W)</th>
             <th>Provided(W)</th>
@@ -59,14 +117,21 @@
               </span>
             </div>
           </td>
-          <td class='center'>{{nodeTotal.event == null ? "" : nodeTotal.event.issuer + (nodeTotal.event.issuerLocal? "" : "*") }}</td>
+          <td class='center'>{{nodeTotal.event == null ? "" : nodeTotal.event.issuer + (nodeTotal.event.issuerLocal? "" : "*")}}</td>
+          <td class='center'>{{nodeTotal.event == null || nodeTotal.event.issuerProperties == null ? "" : nodeTotal.event.issuerProperties.deviceProperties.name }}</td>
           <td>{{nodeTotal.event == null ? "" : nodeTotal.event.beginDate | date:'HH:mm:ss'}}</td>
           <td>{{nodeTotal.event == null ? "" : disaplyTime(nodeTotal.event.endDate)}}</td>
           <td class="num">{{nodeTotal.event == null ? "" : fnum3(nodeTotal.event.power)}}</td>
+          <td class="num" *ngIf="displayAdditionalPower">
+            {{nodeTotal.event == null ? "" : fnum3(nodeTotal.event.additionalPower)}}
+          </td>
           <td class="num">{{nodeTotal.event == null ? "" : fnum3_minus_plus(nodeTotal.event.powerUpdate)}}</td>
           <td class="num">{{nodeTotal.event == null ? "" : (nodeTotal.event.type == 'CONTRACT_UPDATE' ? fnum3_minus_plus(nodeTotal.event.powerMinUpdate) : "")}}</td>
           <td class="num">{{nodeTotal.event == null ? "" : (nodeTotal.event.type == 'CONTRACT_UPDATE' ? fnum3_minus_plus(nodeTotal.event.powerMaxUpdate) : "")}}</td>
           <td class="num">{{nodeTotal.event == null ? "" : fnum3(nodeTotal.event.firstRate)}}</td>
+          <td class="num next_bloc" *ngIf="nodeTotal.rowspan > 0 && displayAdditionalPower" [attr.rowspan]="nodeTotal.rowspan" >
+          {{fnum3(nodeTotal.storageUsed)}}
+         </td>
           <td *ngIf= "nodeTotal.rowspan > 0" [attr.rowspan]="nodeTotal.rowspan" class="num txt_requested next_bloc">{{fnum3(nodeTotal.requested)}}</td>
           <td *ngIf= "nodeTotal.rowspan > 0" [attr.rowspan]="nodeTotal.rowspan" class="num txt_produced">{{fnum3(nodeTotal.produced)}}</td>
           <td *ngIf= "nodeTotal.rowspan > 0" [attr.rowspan]="nodeTotal.rowspan" class="num txt_provided">{{fnum3(nodeTotal.provided)}}</td>

@@ -1417,7 +1417,7 @@ public class PredictionDbHelper {
 
 	public static void savePredictionResult(PredictionData prediction) throws HandlingException {
 		String reqSeparator2 = dbConnection.getReqSeparator2();
-		PredictionContext predictionCtx = prediction.getContext();
+		PredictionContext predictionCtx = prediction.getPredictionContext();
 		Date initialDate = prediction.getInitialDate();
 		Date maxInitialDate = UtilDates.shiftDateMinutes(initialDate, 60);
 		String sqlInitialDate = addSingleQuotes(UtilDates.format_sql.format(initialDate));

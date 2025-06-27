@@ -133,4 +133,10 @@ public class ProsumerProperties implements Cloneable, Serializable {
 		return result.toString();
 	}
 
+	public boolean hasCategoryExternalSupply() {
+		if (deviceProperties != null) {
+			return deviceProperties.hasCategoryExternalSupply();
+		}
+		return false;
+	}
 }

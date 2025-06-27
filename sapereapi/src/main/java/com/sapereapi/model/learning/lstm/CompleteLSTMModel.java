@@ -175,7 +175,7 @@ public class CompleteLSTMModel extends AbstractLearningModel implements ILearnin
 	}
 
 	@Override
-	public int getNbOfObservations(String variable) {
+	public int getSamplingNb(String variable) {
 		if(mapModels.containsKey(variable)) {
 			return mapModels.get(variable).getSamplingNb();
 		}
@@ -311,7 +311,9 @@ public class CompleteLSTMModel extends AbstractLearningModel implements ILearnin
 			logger.info("refreshModel : keyHasChanged : " + this.getCurrentFeaturesKey());
 		}
 		// To submit to the server
-		int minLengthHeadToSumbmit = 100;// 20;// 300;
+		int minLengthHeadToSumbmit = this.predictionContext.getNbOfSamplingsBeforeTraining();
+		// TODO : configure this parameter 
+		//int minLengthHeadToSumbmit = 5;// 100;// 20;// 300;
 		/*
 		// history to add in the list to submit, according to the deepness parameter
 		// (10)

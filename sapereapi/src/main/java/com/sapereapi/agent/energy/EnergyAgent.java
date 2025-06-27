@@ -11,8 +11,10 @@ import java.util.TreeMap;
 import com.sapereapi.agent.energy.manager.ConsumersProcessingMangager;
 import com.sapereapi.db.EnergyDbHelper;
 import com.sapereapi.exception.DoublonException;
+import com.sapereapi.model.EnergyStorageSetting;
 import com.sapereapi.model.HandlingException;
 import com.sapereapi.model.NodeContext;
+import com.sapereapi.model.energy.ConfirmationTable;
 import com.sapereapi.model.energy.EnergyEvent;
 import com.sapereapi.model.energy.EnergyEventTable;
 import com.sapereapi.model.energy.EnergyFlow;
@@ -23,6 +25,7 @@ import com.sapereapi.model.energy.award.AwardItem;
 import com.sapereapi.model.energy.node.NodeTotal;
 import com.sapereapi.model.energy.reschedule.RescheduleItem;
 import com.sapereapi.model.energy.reschedule.RescheduleTable;
+import com.sapereapi.model.protection.ProtectedConfirmationTable;
 import com.sapereapi.model.referential.EventMainCategory;
 import com.sapereapi.model.referential.EventObjectType;
 import com.sapereapi.model.referential.EventType;
@@ -146,11 +149,11 @@ public abstract class EnergyAgent extends MicroGridAgent implements IEnergyAgent
 		return null;
 	}
 
-	public EnergyEvent generateUpdateEvent(WarningType warningType) throws HandlingException {
+	public EnergyEvent generateUpdateEvent(WarningType warningType, String log) throws HandlingException {
 		EventType eventType = getUpdateEventType();
 		EnergyEvent startEvent = getStartEvent();
 		if (startEvent != null) {
-			EnergyEvent updateEvent = this.generateEvent(eventType, "");
+			EnergyEvent updateEvent = this.generateEvent(eventType, log);
 			updateEvent.setWarningType(warningType);
 			EnergyEvent originStartEvent = startEvent.clone();
 			updateEvent.setOriginEvent(originStartEvent);
@@ -466,7 +469,7 @@ public abstract class EnergyAgent extends MicroGridAgent implements IEnergyAgent
 				// Modify contract end date
 				this.setBeginDate(getCurrentDate());
 				this.setEndDate(rescheduleItem.getStopBegin());
-				generateUpdateEvent(rescheduleItem.getWarningType());
+				generateUpdateEvent(rescheduleItem.getWarningType(), "");
 			}
 		}
 	}
@@ -601,6 +604,33 @@ public abstract class EnergyAgent extends MicroGridAgent implements IEnergyAgent
 
 	public String getNodeName() {
 		return lsa.getAgentAuthentication().getNodeLocation().getName();
+	}
+
+
+	@Override
+	public EnergyStorageSetting getStorageSetting() {
+		if(storage != null) {
+			return storage.getSetting();
+		}
+		return null;
+	}
+
+	@Override
+	public Double getStoredWH() {
+		if(storage != null) {
+			return storage.computeBalanceSavedWH();
+		}
+		return 0.0;
+	}
+
+	public ProtectedConfirmationTable getProtectedConfirmationTable(EnergyAgent producerAgent) {
+		Property pProdConfirm = producerAgent.getLsa().getOnePropertyByName("CONTRACT_CONFIRM");
+		if (pProdConfirm != null && pProdConfirm.getValue() instanceof ProtectedConfirmationTable) {
+			ProtectedConfirmationTable pConfirmationTable = (ProtectedConfirmationTable) pProdConfirm.getValue();
+			return pConfirmationTable;
+		}
+		ConfirmationTable confirmationTable = new ConfirmationTable(producerAgent.getAgentName(), getTimeShiftMS());
+		return new ProtectedConfirmationTable(confirmationTable);
 	}
 
 }

@@ -81,9 +81,12 @@
             <th>Location</th>
             <th>Sensor</th>
             <th>Category</th>
+            <th  *ngIf= "displayStoredWH"  >Stored(WH)</th>
+            <th  *ngIf= "displayStoredWH"  >Used&nbsp;storage(W)</th>
             <th>Needed(W)</th>
             <th style="min-width:200px">Supplier(s)</th>
             <th>Consumed(W)</th>
+            <th>Margin(W)</th>
             <th>Missing(W)</th>
             <th>Offers</th>
             <th>(Details)</th>
@@ -105,9 +108,12 @@
         <td></td>
         <td></td>
         <td></td>
+        <td *ngIf= "displayStoredWH" class='num'>{{(nodeContent.total) ? fnum3(nodeContent.total.storedConsumersWH) : ""}}</td>
+        <td *ngIf= "displayStoredWH" class='num'>{{(nodeContent.total) ? fnum3(nodeContent.total.storageUsedForNeed) : ""}}</td>
         <td class='num'>{{(nodeContent.total) ? fnum3(nodeContent.total.requested) : ""}}</td>
         <td class="num"></td>
         <td class="num">{{(nodeContent.total) ? fnum3(nodeContent.total.consumed) : ""}}</td>
+        <td class="num">{{(nodeContent.total) ? fnum3(nodeContent.total.consumedMargin) : ""}}</td>
         <td class="num txt_warning_high">{{(nodeContent.total) ? fnum3(nodeContent.total.missing) : ""}}</td>
         <td class="num">{{(nodeContent.total) ? fnum3(nodeContent.total.receivedOffersTotal) : ""}}</td>
         <td class="">
@@ -155,7 +161,13 @@
             <span id="txt_deviceCategory_{{consumer.agentName}}">{{auxGetLabel(consumer.deviceCategory, listDeviceCategoryConsumer)}}</span>
             <input size="5" type="text"  class="form-text hide" id="deviceCategory_{{consumer.agentName}}"  name="deviceCategory_{{consumer.agentName}}"  [(ngModel)]="tab_agents.deviceCategory[consumer.agentName]">
         </td>
-        <td  class="num">
+        <td  *ngIf= "displayStoredWH" class="num">
+            <span id="txt_storedWH_{{consumer.agentName}}">{{fnum3(consumer.storedWH)}}</span>
+        </td>
+        <td  *ngIf= "displayStoredWH" class="num">
+            <span id="txt_storageUsedForNeed_{{consumer.agentName}}">{{fnum3(consumer.storageUsedForNeed)}}</span>
+        </td>
+        <td class="num">
             <span id="txt_power_{{consumer.agentName}}">{{fnum3(consumer.power)}}</span>
             <span class='disabled_power'>{{fnum3(consumer.disabledPower)}}</span>
             <input size="5" type="text"  class="form-text hide"  id="power_{{consumer.agentName}}"  name="power_{{consumer.agentName}}"  [(ngModel)]="tab_agents.power[consumer.agentName]">
@@ -167,6 +179,7 @@
             </ng-container>
         </td>
         <td class="num">{{fnum3(consumer.ongoingContractsTotal.current)}}</td>
+        <td class="num">{{fnum3(consumer.ongoingContractsTotal.margin)}}</td>
         <td class="num txt_warning_high {{getClassMissing(consumer, nodeContent.total.available)}}">{{fnum3(consumer.missingPower)}}</td>
         <td class="num {{getOffersClass(consumer)}}">{{fnum3(consumer.offersTotal)}}</td>
         <td class="{{getOffersClass(consumer)}}">
@@ -197,9 +210,12 @@
         <th>Location</th>
         <th>Sensor</th>
         <th>Category</th>
+        <th *ngIf= "displayStoredWH">Stored(WH)</th>
+        <th  *ngIf= "displayStoredWH"  >Used&nbsp;storage(W)</th>
         <th>Produced(W)</th>
         <th>Client(s)</th>
         <th>Provided(W)</th>
+        <th>Margin(W)</th>
         <th>Available(W)</th>
         <th>Offers</th>
         <th>(Details)</th>
@@ -219,9 +235,12 @@
         <td></td>
         <td></td>
         <td></td>
+        <td *ngIf= "displayStoredWH" class='num'>{{(nodeContent.total) ? fnum3(nodeContent.total.storedProducersWH) : ""}}</td>
+        <td *ngIf= "displayStoredWH" class='num'>{{(nodeContent.total) ? fnum3(nodeContent.total.storageUsedForProd) : ""}}</td>
         <td class='num'>{{(nodeContent.total) ? fnum3(nodeContent.total.produced) : ""}}</td>
         <td class="num"></td>
         <td class="num">{{(nodeContent.total) ? fnum3(nodeContent.total.provided) : ""}}</td>
+        <td class="num">{{(nodeContent.total) ? fnum3(nodeContent.total.providedMargin) : ""}}</td>
         <td class="num">{{(nodeContent.total) ? fnum3(nodeContent.total.available) : ""}}</td>
         <td class="num">{{(nodeContent.total) ? fnum3(nodeContent.total.sentOffersTotal) : ""}}</td>
         <td class=" ">
@@ -265,6 +284,12 @@
             <span id="txt_deviceCategory_{{producer.agentName}}">{{auxGetLabel(producer.deviceCategory, listDeviceCategoryProducer)}}</span>
             <input size="5" type="text"  class="form-text hide" id="txt_deviceCategory_{{producer.agentName}}"  name="deviceCategory_{{producer.agentName}}"  [(ngModel)]="tab_agents.deviceName[producer.agentName]">
         </td>
+        <td *ngIf= "displayStoredWH" class="num">
+            <span id="txt_storedWH_{{producer.agentName}}">{{fnum3(producer.storedWH)}}</span>
+        </td>
+        <td  *ngIf= "displayStoredWH" class="num">
+            <span id="txt_storageUsedForProd_{{producer.agentName}}">{{fnum3(producer.storageUsedForProd)}}</span>
+        </td>
         <td  class="num">
             <span id="txt_power_{{producer.agentName}}">{{fnum3(producer.power)}}</span>
             <span class='disabled_power'>{{fnum3(producer.disabledPower)}}</span>
@@ -278,6 +303,7 @@
             </ng-container>
         </td>
         <td class="num">{{fnum3(producer.ongoingContractsTotal.current)}}</td>
+        <td class="num">{{fnum3(producer.ongoingContractsTotal.margin)}}</td>
         <td class="txt_ok num">{{fnum3(producer.availablePower)}}</td>
         <td class="num">{{fnum3(producer.offersTotal)}}</td>
         <td>

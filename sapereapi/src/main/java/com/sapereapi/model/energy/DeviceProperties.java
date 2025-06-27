@@ -188,4 +188,8 @@ public class DeviceProperties implements Cloneable, Serializable {
 		// result.setRunningAgentName(runningAgentName.clone);
 		return result;
 	}
+
+	public boolean hasCategoryExternalSupply() {
+		return DeviceCategory.EXTERNAL_ENG.equals(category);
+	}
 }

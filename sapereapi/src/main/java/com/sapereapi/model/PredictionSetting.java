@@ -10,16 +10,18 @@ public class PredictionSetting implements Serializable {
 	private Boolean activated = Boolean.FALSE;
 	private LearningAggregationOperator aggregator = null;
 	private LearningModelType usedModel = null;
+	private Integer nbOfSamplingsBeforeTraining = 1;
 
 	public PredictionSetting() {
 		super();
 	}
 
-	public PredictionSetting(Boolean activated, LearningAggregationOperator modelAggregator, LearningModelType _usedModel) {
+	public PredictionSetting(Boolean activated, LearningAggregationOperator modelAggregator, LearningModelType usedModel, Integer nbOfSamplingsBeforeTraining) {
 		super();
 		this.activated = activated;
 		this.aggregator = modelAggregator;
-		this.usedModel = _usedModel;// _usedModel.toOptionItem();
+		this.usedModel = usedModel;// _usedModel.toOptionItem();
+		this.nbOfSamplingsBeforeTraining = nbOfSamplingsBeforeTraining;
 	}
 
 	public Boolean isActivated() {
@@ -58,12 +60,23 @@ public class PredictionSetting implements Serializable {
 		this.usedModel = usedModel;
 	}
 
+	public Integer getNbOfSamplingsBeforeTraining() {
+		return nbOfSamplingsBeforeTraining;
+	}
+
+	public void setNbOfSamplingsBeforeTraining(Integer nbOfSamplingsBeforeTraining) {
+		this.nbOfSamplingsBeforeTraining = nbOfSamplingsBeforeTraining;
+	}
+
 	public PredictionSetting clone() {
+		/*
 		PredictionSetting result = new PredictionSetting();
 		if (activated != null) {
 			result.setActivated(activated.booleanValue());
 		}
 		result.setAggregator(aggregator);
+		*/
+		PredictionSetting result = new PredictionSetting(activated, aggregator, usedModel, nbOfSamplingsBeforeTraining);
 		return result;
 	}
 

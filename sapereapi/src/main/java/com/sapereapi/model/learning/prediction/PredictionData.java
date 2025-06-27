@@ -13,6 +13,7 @@ import java.util.TreeSet;
 import com.sapereapi.model.HandlingException;
 import com.sapereapi.model.energy.SingleNodeStateItem;
 import com.sapereapi.model.learning.FeaturesKey;
+import com.sapereapi.model.learning.ILearningModel;
 import com.sapereapi.model.learning.NodeStates;
 import com.sapereapi.model.learning.NodeStatesTransitions;
 import com.sapereapi.model.learning.VariableFeaturesKey;
@@ -41,13 +42,15 @@ public class PredictionData extends AbstractAggregatable implements IAggregateab
 	//private Map<String, PredictionResult> mapLastResults;
 	private Map<FeaturesKey, StatesStatistic> mapStatesStatistics = new HashMap<FeaturesKey, StatesStatistic>();
 	private List<String> errors;
-	private PredictionContext context = new PredictionContext();
+	private PredictionContext predictionContext = new PredictionContext();
 	private Boolean useCorrections = false;
 	private List<SingleNodeStateItem> stateHistory = new ArrayList<SingleNodeStateItem>();  // Optionnal : can be used for aggregation.
+	private Map<String, Integer> mapSamplingNb = new HashMap<String, Integer>();
 	protected Map<String, Map<String, Double>> aggregationWeights = new HashMap<String, Map<String, Double>>(); // Optionnal : can be used for aggregation.
 
 	public static final String OP_DISTANCE_POWER_PROFILE = "dist_power_hist";
 	public static final String OP_DISTANCE_CURRENT_POWER = "dist_power_last";
+	public static final String OP_SAMPLING_NB = "sampling_nb";
 
 	public PredictionData() {
 		super();
@@ -56,10 +59,11 @@ public class PredictionData extends AbstractAggregatable implements IAggregateab
 
 	public PredictionData(PredictionContext _context, boolean _useCorrections) {
 		super();
-		context = _context;
+		predictionContext = _context;
 		useCorrections = _useCorrections;
 		reset();
 		lastUpdate = new Date();
+		mapSamplingNb = new HashMap<String, Integer>();
 	}
 
 	private void reset() {
@@ -70,6 +74,7 @@ public class PredictionData extends AbstractAggregatable implements IAggregateab
 		errors = new ArrayList<String>();
 		mapStatesStatistics = new HashMap<FeaturesKey, StatesStatistic>();
 		lastUpdate = new Date();
+		mapSamplingNb.clear();
 	}
 
 	public List<String> getVariables() {
@@ -122,6 +127,25 @@ public class PredictionData extends AbstractAggregatable implements IAggregateab
 			return targetDates.last();
 		}
 		return null;// targetDate;
+	}
+
+	public Map<String, Integer> getMapSamplingNb() {
+		return mapSamplingNb;
+	}
+
+	public void setMapSamplingNb(Map<String, Integer> mapSamplingNb) {
+		this.mapSamplingNb = mapSamplingNb;
+	}
+
+	public void setSamplingNb(String variable, Integer samplingNb) {
+		this.mapSamplingNb.put(variable, samplingNb);
+	}
+
+	public Integer getSamplingNb(String variable) {
+		if(mapSamplingNb.containsKey(variable)) {
+			return mapSamplingNb.get(variable);
+		}
+		return null;
 	}
 
 	public Map<String, PredictionResult> getMapLastResults() {
@@ -245,7 +269,7 @@ public class PredictionData extends AbstractAggregatable implements IAggregateab
 	public List<VariableFeaturesKey> getListTransitionMatrixKeys(String variable) {
 		List<VariableFeaturesKey> result = new ArrayList<VariableFeaturesKey>();
 		for (PredictionStep nextStep : listSteps) {
-			VariableFeaturesKey nextKey = nextStep.getUsedTransitionMatrixKey(variable, context);
+			VariableFeaturesKey nextKey = nextStep.getUsedTransitionMatrixKey(variable, predictionContext);
 			if (nextKey != null && !result.contains(nextKey)) {
 				result.add(nextKey);
 
@@ -338,7 +362,7 @@ public class PredictionData extends AbstractAggregatable implements IAggregateab
 			PredictionResult nextPredictionResult = mapVariableResults.get(nextTargetDate);
 			FeaturesKey nextFeaturesKey = nextPredictionResult.getTargetFeaturesKey();
 			if (!mapStatesStatistics.containsKey(nextFeaturesKey)) {
-				StatesStatistic statesStatistic = nextPredictionResult.computeStateStatistic(context,
+				StatesStatistic statesStatistic = nextPredictionResult.computeStateStatistic(predictionContext,
 						localStateHistory);
 				mapStatesStatistics.put(nextFeaturesKey, statesStatistic);
 			}
@@ -418,12 +442,12 @@ public class PredictionData extends AbstractAggregatable implements IAggregateab
 		lastUpdate = new Date();
 	}
 
-	public PredictionContext getContext() {
-		return context;
+	public PredictionContext getPredictionContext() {
+		return predictionContext;
 	}
 
-	public void setContext(PredictionContext context) {
-		this.context = context;
+	public void setPredictionContext(PredictionContext context) {
+		this.predictionContext = context;
 	}
 
 	public SortedSet<Date> getTargetDates() {
@@ -520,14 +544,14 @@ public class PredictionData extends AbstractAggregatable implements IAggregateab
 
 	@Override
 	public String toString() {
-		long timeShiftMS = context.getTimeShiftMS();
+		long timeShiftMS = predictionContext.getTimeShiftMS();
 		StringBuffer result = new StringBuffer();
 		if(this.isAggregated()) {
 			result.append(super.toString());
 			result.append(SapereUtil.CR);
 		}
 		result.append(super.toString());
-		result.append("PredictionData [scenario = ").append(context.getScenario()).append(" : ")
+		result.append("PredictionData [scenario = ").append(predictionContext.getScenario()).append(" : ")
 				.append(UtilDates.formatTimeOrDate(initialDate, timeShiftMS)).append(", initialStates=")
 				.append(initialStates);
 		result.append(SapereUtil.CR);
@@ -544,7 +568,7 @@ public class PredictionData extends AbstractAggregatable implements IAggregateab
 			int idxLast = stateHistory.size() - 1;
 			SingleNodeStateItem lastItem = stateHistory.get(idxLast);
 			String sLastDate = UtilDates.format_time.format(lastItem.getDate());
-			String sCurrent = UtilDates.format_time.format(context.getCurrentDate());
+			String sCurrent = UtilDates.format_time.format(predictionContext.getCurrentDate());
 			result.append("stateHistory : size = ").append(stateHistory.size() + ", fistDate = " + sFistDate + ", lastDate" + sLastDate + ", current = " + sCurrent);
 			// Check dates
 			List<String> errors = checkDatesInHistory();
@@ -595,7 +619,7 @@ public class PredictionData extends AbstractAggregatable implements IAggregateab
 			result = new PredictionData();
 			result.setListSteps(localPrediction.getListSteps());
 			result.setInitialDate(localPrediction.getInitialDate());
-			result.setContext(localPrediction.getContext());
+			result.setPredictionContext(localPrediction.getPredictionContext());
 			result.setVariables(localPrediction.getVariables());
 			result.setInitialStates(localPrediction.getInitialStates());
 			result.setInitialValues(localPrediction.getInitialValues());
@@ -641,7 +665,7 @@ public class PredictionData extends AbstractAggregatable implements IAggregateab
 			}
 		}
 		if (result != null) {
-			Map<String, Map<String, Double>> weightTable = evaluatePredictionsWeigts(mapPredictionData, agentAuthentication, result.getContext(), operator, logger);
+			Map<String, Map<String, Double>> weightTable = evaluatePredictionsWeigts(mapPredictionData, agentAuthentication, result.getPredictionContext(), operator, logger);
 			result.setAggregationWeights(weightTable);
 			for (String variable : mapAllPredictionResults.keySet()) {
 				Map<String, Double> varWeightTable = weightTable.get(variable);
@@ -710,6 +734,14 @@ public class PredictionData extends AbstractAggregatable implements IAggregateab
 						varWeightTable.put(agentName, nodeWeight);
 					}
 				}
+			} else if(OP_SAMPLING_NB.equals(operator)) {
+				for (String variable : predictionContext.getNodeContext().getVariables()) {
+					Integer samplingNb = agentPredictionData.getSamplingNb(variable);
+					if(samplingNb != null) {
+						Map<String, Double> varWeightTable = weightsByVarAndNode.get(variable);
+						varWeightTable.put(agentName, samplingNb.doubleValue());
+					}
+				}
 			} else {
 				// Weight by default : set the same for all nodes
 				for (String variable : predictionContext.getNodeContext().getVariables()) {
@@ -761,12 +793,12 @@ public class PredictionData extends AbstractAggregatable implements IAggregateab
 	}
 
 	public boolean hasPredictionAggregator() {
-		LearningAggregationOperator aggregator = context.getAggregationOperator();
+		LearningAggregationOperator aggregator = predictionContext.getAggregationOperator();
 		return (aggregator != null && aggregator.isPredictionAggregation());
 	}
 
 	public boolean hasModelAggregator() {
-		LearningAggregationOperator aggregator = context.getAggregationOperator();
+		LearningAggregationOperator aggregator = predictionContext.getAggregationOperator();
 		return (aggregator != null && aggregator.isModelAggregation());
 	}
 
@@ -774,7 +806,7 @@ public class PredictionData extends AbstractAggregatable implements IAggregateab
 		if(this.hasPredictionAggregator() && this.isComplete() && lastUpdate != null) {
 			Date lastAggregation = this.getAggregationDate();
 			//Date current = predictionContext.getCurrentDate();
-			int waitingMinutesBetweenAggragations = this.context.getAggregationOperator().getWaitingMinutesBetweenAggragations();
+			int waitingMinutesBetweenAggragations = this.predictionContext.getAggregationOperator().getWaitingMinutesBetweenAggragations();
 			Date minAggregationDate = lastAggregation == null ? lastUpdate : UtilDates.shiftDateMinutes(lastAggregation, waitingMinutesBetweenAggragations);
 			if(lastAggregation == null || lastUpdate.after(minAggregationDate)) {
 				// send input for a new aggregation
@@ -794,11 +826,11 @@ public class PredictionData extends AbstractAggregatable implements IAggregateab
 			logger.info("AbstractLearningModel.checkuAggregation aggregationWeights = " + aggregationWeights);
 			result.setVariableName(variableName);
 			result.setAggregationDate(aggregationDate);
-			result.setAggragationOperator(context.getAggregationOperator());
+			result.setAggragationOperator(predictionContext.getAggregationOperator());
 			Map<String, String> mapNodes = new HashMap<String, String>();
 			for (String nextAgent : receivedPredictions.keySet()) {
 				PredictionData nextPredictionData = receivedPredictions.get(nextAgent);
-				String modelNode = nextPredictionData.getContext().getNodeLocation().getName();
+				String modelNode = nextPredictionData.getPredictionContext().getNodeLocation().getName();
 				mapNodes.put(nextAgent, modelNode);
 			}
 			result.setMapNodeByAgent(mapNodes);
@@ -858,12 +890,16 @@ public class PredictionData extends AbstractAggregatable implements IAggregateab
 
 			}
 			copyMapResult.put(variable, copyMapResult2);
+			if (mapSamplingNb.containsKey(variable)) {
+				Integer samplingNb = mapSamplingNb.get(variable);
+				result.setSamplingNb(variable, samplingNb);
+			}
 		}
 		result.setMapResults(copyMapResult);
 		result.setMapStatesStatistics(new HashMap<FeaturesKey, StatesStatistic>());
 		result.setErrors(SapereUtil.cloneListString(errors));
-		if (context != null) {
-			result.setContext(context.copyContent(false));
+		if (predictionContext != null) {
+			result.setPredictionContext(predictionContext.copyContent(false));
 		}
 		result.setUseCorrections(useCorrections);
 		List<SingleNodeStateItem> copyStateHistory = new ArrayList<SingleNodeStateItem>();
@@ -887,8 +923,8 @@ public class PredictionData extends AbstractAggregatable implements IAggregateab
 	@Override
 	public List<NodeLocation> retrieveInvolvedLocations() {
 		List<NodeLocation> result = new ArrayList<NodeLocation>();
-		if (this.context != null) {
-			result.add(context.getNodeLocation());
+		if (this.predictionContext != null) {
+			result.add(predictionContext.getNodeLocation());
 		}
 		return result;
 	}

@@ -31,15 +31,8 @@ public class ProtectedContract extends ProtectedObject {
 		this.contract = contract;
 	}
 
-	public boolean checkAccessAsProducer(AgentAuthentication authentication) {
-		boolean hasTypeProducer = AgentType.PROSUMER.name().equals(authentication.getAgentType());
-		if (hasTypeProducer && contract.hasProducer(authentication.getAgentName())) {
-			return checkAuthentication(authentication);
-		}
-		return false;
-	}
-
-	protected boolean checkAccessAsConsumer(AgentAuthentication authentication) {
+	@Override
+	protected boolean checkAccessAsIssuer(AgentAuthentication authentication) {
 		boolean hasTypeConsumer = AgentType.PROSUMER.name().equals(authentication.getAgentType());
 		if (hasTypeConsumer	&& contract.getConsumerAgent().equals(authentication.getAgentName())) {
 			return checkAuthentication(authentication);
@@ -47,20 +40,10 @@ public class ProtectedContract extends ProtectedObject {
 		return false;
 	}
 
-	protected boolean checkAccessAsStakeholder(AgentAuthentication authentication) {
-		return checkAccessAsConsumer(authentication) || checkAccessAsProducer(authentication);
-		/*
-		if (AgentType.CONSUMER.getLabel().equals(authentication.getAgentType())) {
-			return checkAccessAsConsumer(authentication);
-		} else if (AgentType.PRODUCER.getLabel().equals(authentication.getAgentType())) {
-			return checkAccessAsProducer(authentication);
-		}
-		return false;
-		*/
-	}
-
-	protected boolean checkAccessAsLearningAgent(AgentAuthentication authentication) {
-		if (AgentType.LEARNING_AGENT.name().equals(authentication.getAgentType())) {
+	@Override
+	public boolean checkAccessAsReceiver(AgentAuthentication authentication) {
+		boolean hasTypeProducer = AgentType.PROSUMER.name().equals(authentication.getAgentType());
+		if (hasTypeProducer && contract.hasProducer(authentication.getAgentName())) {
 			return checkAuthentication(authentication);
 		}
 		return false;
@@ -75,7 +58,7 @@ public class ProtectedContract extends ProtectedObject {
 	}
 
 	private Contract getContract(AgentAuthentication authentication) throws PermissionException {
-		if (!(checkAccessAsConsumer(authentication)
+		if (!(checkAccessAsIssuer(authentication)
 				|| checkAccessAsLearningAgent(authentication)
 				)) {
 			throw new PermissionException("Access denied for agent " + authentication.getAgentName());
@@ -83,17 +66,9 @@ public class ProtectedContract extends ProtectedObject {
 		return contract;
 	}
 
-	public boolean hasAccesAsConsumer(SapereAgent consumerAgent) {
-		return checkAccessAsConsumer(consumerAgent.getAuthentication());
-	}
-
-	public boolean hasAccesAsProducer(SapereAgent prodAgent) {
-		return checkAccessAsProducer(prodAgent.getAuthentication());
-	}
-
 	public boolean hasProducer(SapereAgent prodAgent) throws PermissionException {
 		AgentAuthentication authentication = prodAgent.getAuthentication();
-		if (!checkAccessAsProducer(authentication)) {
+		if (!checkAccessAsStackholder(authentication)) {
 			throw new PermissionException("Access denied for agent " + authentication.getAgentName());
 		}
 		return contract.hasProducer(authentication.getAgentName());
@@ -117,7 +92,7 @@ public class ProtectedContract extends ProtectedObject {
 
 	public boolean hasProducerAgreement(SapereAgent prodAgent) throws PermissionException {
 		AgentAuthentication authentication = prodAgent.getAuthentication();
-		if (!checkAccessAsProducer(authentication)) {
+		if (!checkAccessAsStackholder(authentication)) {
 			throw new PermissionException("Access denied for agent " + authentication.getAgentName());
 		}
 		return contract.hasAgreement(authentication.getAgentName());
@@ -125,7 +100,7 @@ public class ProtectedContract extends ProtectedObject {
 
 	public boolean hasProducerDisagreement(SapereAgent prodAgent) throws PermissionException {
 		AgentAuthentication authentication = prodAgent.getAuthentication();
-		if (!checkAccessAsProducer(authentication)) {
+		if (!checkAccessAsStackholder(authentication)) {
 			throw new PermissionException("Access denied for agent " + authentication.getAgentName());
 		}
 		return contract.hasDisagreement(authentication.getAgentName());
@@ -133,7 +108,7 @@ public class ProtectedContract extends ProtectedObject {
 
 	public void addProducerAgreement(SapereAgent prodAgent, boolean isOk) throws PermissionException {
 		AgentAuthentication authentication = prodAgent.getAuthentication();
-		if (!checkAccessAsProducer(authentication)) {
+		if (!checkAccessAsReceiver(authentication)) {
 			throw new PermissionException("Access denied for agent " + authentication.getAgentName());
 		}
 		contract.addAgreement(prodAgent, isOk);
@@ -145,7 +120,7 @@ public class ProtectedContract extends ProtectedObject {
 
 	public PowerSlot getProducerPowerSlot(SapereAgent prodAgent) throws PermissionException {
 		AgentAuthentication authentication = prodAgent.getAuthentication();
-		if (!checkAccessAsProducer(authentication)) {
+		if (!checkAccessAsReceiver(authentication)) {
 			throw new PermissionException("Access denied for agent " + authentication.getAgentName());
 		}
 		return contract.getPowerSlotFromAgent(authentication.getAgentName());
@@ -169,7 +144,7 @@ public class ProtectedContract extends ProtectedObject {
 
 	public Date getValidationDeadline(SapereAgent prodAgent) throws PermissionException {
 		AgentAuthentication authentication = prodAgent.getAuthentication();
-		if (!checkAccessAsProducer(authentication)) {
+		if (!checkAccessAsStackholder(authentication)) {
 			throw new PermissionException("Access denied for agent " + authentication.getAgentName());
 		}
 		return contract.getValidationDeadline();
@@ -177,7 +152,7 @@ public class ProtectedContract extends ProtectedObject {
 
 	public boolean validationHasExpired(SapereAgent prodAgent) throws PermissionException {
 		AgentAuthentication authentication = prodAgent.getAuthentication();
-		if (!checkAccessAsProducer(authentication)) {
+		if (!checkAccessAsStackholder(authentication)) {
 			throw new PermissionException("Access denied for agent " + authentication.getAgentName());
 		}
 		return contract.validationHasExpired();
@@ -224,7 +199,7 @@ public class ProtectedContract extends ProtectedObject {
 	public ReducedContract getProducerContent(SapereAgent agent) throws PermissionException {
 		AgentAuthentication authentication = agent.getAuthentication();
 		String agentName = authentication.getAgentName();
-		if (!checkAccessAsProducer(authentication) || !(agent instanceof EnergyAgent)) {
+		if (!checkAccessAsReceiver(authentication) || !(agent instanceof EnergyAgent)) {
 			throw new PermissionException("Access denied for agent " + agentName);
 		}
 		EnergyAgent producerAgent = (EnergyAgent) agent;

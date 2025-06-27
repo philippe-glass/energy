@@ -337,10 +337,10 @@ public class LearningAgent extends SupervisionAgent implements ISupervisorAgent 
 	}
 
 	public void refreshAggregationTrackingProperty(PredictionData predictionData) {
-		if (predictionData.getContext().isAggregationsActivated() && stepNumber > 1) {
+		if (predictionData.getPredictionContext().isAggregationsActivated() && stepNumber > 1) {
 			AggregationsTracking aggregationsTracking = retrieveAggregationTrackingFromLSA();
 			boolean isReady = predictionData.isReadyForAggregation();
-			PredictionScope scope = predictionData.getContext().getScope();
+			PredictionScope scope = predictionData.getPredictionContext().getScope();
 			int newObjAvailability = isReady ? 1 : 0;
 			// check if isReady has changed
 			if(newObjAvailability != aggregationsTracking.getObjectAvailability(scope)) {
@@ -453,7 +453,7 @@ public class LearningAgent extends SupervisionAgent implements ISupervisorAgent 
 			String nextEventKey = nextEvent.getKey();
 			if(EventType.CONTRACT_START.equals(nextEvent.getType())) {
 				if(nextEvent.isComplementary()) {
-					logger.info("handleEvent for debug");
+					logger.info("handleEvent for debug: receive CONTRACT_START event for complementary need");
 				}
 			}
 			if(!this.mapReceivedEventKeys.containsKey(nextEventKey)) {
@@ -762,7 +762,7 @@ public class LearningAgent extends SupervisionAgent implements ISupervisorAgent 
 
 	private void auxUpdateAggregatedPrediction(PredictionData aggregatedPrediction) throws HandlingException {
 		Date lastAggregationDate = null;
-		PredictionScope scope = aggregatedPrediction.getContext().getScope();
+		PredictionScope scope = aggregatedPrediction.getPredictionContext().getScope();
 		if (aggregatedPredictions.containsKey(scope)) {
 			lastAggregationDate = aggregatedPredictions.get(scope).getAggregationDate();
 		}

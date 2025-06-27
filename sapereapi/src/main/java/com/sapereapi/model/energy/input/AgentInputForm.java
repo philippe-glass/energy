@@ -5,6 +5,7 @@ import java.util.Map;
 
 import com.fasterxml.jackson.annotation.JsonFormat;
 import com.sapereapi.log.SapereLogger;
+import com.sapereapi.model.EnergyStorageSetting;
 import com.sapereapi.model.HandlingException;
 import com.sapereapi.model.energy.DeviceProperties;
 import com.sapereapi.model.energy.EnergyRequest;
@@ -32,6 +33,7 @@ public class AgentInputForm {
 	private int distance;
 	private DeviceCategory deviceCategory;
 	private EnvironmentalImpact environmentalImpact;
+	private EnergyStorageSetting energyStorageSetting = null;
 	private String electricalPanel;
 	private String sensorNumber;
 	private String deviceLocation;
@@ -62,6 +64,7 @@ public class AgentInputForm {
 		this.price = 0.0;
 		this.environmentalImpact = null;
 		this.distance = 0;
+		this.energyStorageSetting = null;
 	}
 
 	public int getId() {
@@ -166,6 +169,14 @@ public class AgentInputForm {
 
 	public void setUseAwardCredits(boolean useAwardCredits) {
 		this.useAwardCredits = useAwardCredits;
+	}
+
+	public EnergyStorageSetting getEnergyStorageSetting() {
+		return energyStorageSetting;
+	}
+
+	public void setEnergyStorageSetting(EnergyStorageSetting energyStorageSetting) {
+		this.energyStorageSetting = energyStorageSetting;
 	}
 
 	public void setPowers(Double _power, Double _powerMin, Double _powerMax) {
@@ -302,7 +313,7 @@ public class AgentInputForm {
 	public EnergySupply retrieveEnergySupply() {
 		ProsumerProperties issuerProperties = retrieveProsumerProperties();
 		return new EnergySupply(issuerProperties, false, generatePowerSlot(), this.beginDate,
-				this.endDate, generatePricingTable());
+				this.endDate, generatePricingTable(), false);
 	}
 
 	public EnergyRequest retrieveEnergyRequest() {
@@ -319,7 +330,7 @@ public class AgentInputForm {
 		}
 		ProsumerProperties issuerProperties = retrieveProsumerProperties();
 		return new EnergyRequest(issuerProperties, false, generatePowerSlot(),
-				this.beginDate, this.endDate, this.delayToleranceMinutes, this.priorityLevel);
+				this.beginDate, this.endDate, this.delayToleranceMinutes, this.priorityLevel, false);
 	}
 
 	public Double getPrice() {
@@ -399,6 +410,7 @@ public class AgentInputForm {
 
 	private AgentInputForm(ProsumerRole _prosumerRole, String _agentName, String _deviceName, DeviceCategory _deviceCategory,
 			EnvironmentalImpact _envImpact, Map<Long, Double> _mapPrices, Double _power, Date _beginDate, Date _enDate,
+			EnergyStorageSetting _energyStorageSetting,
 			long _timeShiftMS) {
 		super();
 		this.prosumerRole = _prosumerRole;
@@ -406,6 +418,7 @@ public class AgentInputForm {
 		this.deviceName = _deviceName;
 		this.deviceCategory = _deviceCategory;
 		this.environmentalImpact = _envImpact;
+		this.energyStorageSetting = _energyStorageSetting;
 		this.power = _power;
 		this.powerMin = _power;
 		this.powerMax = _power;
@@ -421,9 +434,9 @@ public class AgentInputForm {
 
 	public AgentInputForm(ProsumerRole _prosumerRole, String _agentName, String deviceName, DeviceCategory deviceCategory,
 			EnvironmentalImpact _envImpact, Map<Long, Double> mapPrices, Double _power, Date _beginDate, Date _enDate,
-			PriorityLevel priorityLevel, Double delayToleranceMinutes, long timeShiftMS) {
+			PriorityLevel priorityLevel, Double delayToleranceMinutes, EnergyStorageSetting _energyStorageSetting, long timeShiftMS) {
 		this(_prosumerRole, _agentName, deviceName, deviceCategory, _envImpact, mapPrices, _power, _beginDate, _enDate,
-				timeShiftMS);
+				_energyStorageSetting, timeShiftMS);
 		this.priorityLevel = priorityLevel;
 		this.delayToleranceMinutes = delayToleranceMinutes;
 		this.duration = UtilDates.computeDurationHours(_beginDate, _enDate);
@@ -548,6 +561,9 @@ public class AgentInputForm {
 		}
 		if (delayToleranceMinutes != null) {
 			result.append(", delayToleranceMinutes:").append(delayToleranceMinutes);
+		}
+		if (energyStorageSetting != null) {
+			result.append(", energyStorageSetting:").append(energyStorageSetting);
 		}
 		return result.toString();
 	}

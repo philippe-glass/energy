@@ -3,7 +3,7 @@ package com.sapereapi.model.energy.prosumerflow;
 import java.util.Date;
 
 import com.sapereapi.model.energy.EnergyRequest;
-import com.sapereapi.model.energy.ExtraSupply;
+import com.sapereapi.model.energy.StorageSupply;
 import com.sapereapi.model.energy.IEnergyRequest;
 import com.sapereapi.model.energy.PowerSlot;
 import com.sapereapi.model.energy.ProsumerProperties;
@@ -26,9 +26,9 @@ public class ProsumerEnergyRequest extends ProsumerEnergyFlow implements IEnergy
 	private double awardsCredit = 0.0;
 
 	public ProsumerEnergyRequest(ProsumerProperties issuerProperties, Boolean isComplementary,
-			PowerSlot internalPowerSlot, Date beginDate, Date endDate, ExtraSupply extraSupply,
-			Double delayToleranceMinutes, PriorityLevel priority) {
-		super(issuerProperties, isComplementary, internalPowerSlot, beginDate, endDate, extraSupply);
+			PowerSlot internalPowerSlot, Date beginDate, Date endDate, StorageSupply storageSupply,
+			Double delayToleranceMinutes, PriorityLevel priority, Boolean disabled) {
+		super(issuerProperties, isComplementary, internalPowerSlot, beginDate, endDate, storageSupply, disabled);
 		this.delayToleranceMinutes = delayToleranceMinutes;
 		this.priorityLevel = priority;
 		this.aux_expiryDate = getCurrentDate();
@@ -61,16 +61,16 @@ public class ProsumerEnergyRequest extends ProsumerEnergyFlow implements IEnergy
 	@Override
 	public Double getWH() {
 		Double result = getInternalWH();
-		if (extraSupply != null) {
-			result -= this.extraSupply.getWH();
+		if (storageSupply != null) {
+			result -= this.storageSupply.getWH();
 		}
 		return result;
 	}
 
 	public Double getRemainWH() {
 		Double result = getRemainInternalWH();
-		if (extraSupply != null) {
-			result -= this.extraSupply.getRemainWH();
+		if (storageSupply != null) {
+			result -= this.storageSupply.getRemainWH();
 		}
 		return result;
 	}
@@ -214,8 +214,8 @@ public class ProsumerEnergyRequest extends ProsumerEnergyFlow implements IEnergy
 		if(Math.abs(this.awardsCredit) > 0) {
 			result.append(", awardsCredit : ").append(SapereUtil.roundPower(awardsCredit));
 		}
-		if(this.extraSupply != null) {
-			result.append(", extraSupply : ").append(extraSupply);
+		if(this.storageSupply != null) {
+			result.append(", storageSupply : ").append(storageSupply);
 		}
 		return result.toString();
 	}
@@ -229,13 +229,13 @@ public class ProsumerEnergyRequest extends ProsumerEnergyFlow implements IEnergy
 
 	public ProsumerEnergyRequest copy(boolean addIds) {
 		ProsumerProperties cloneIssuerProperties = issuerProperties.copy(addIds);
-		ExtraSupply cloneExtraSupply = extraSupply == null ? null : extraSupply.clone();
+		StorageSupply cloneStorageSupply = storageSupply == null ? null : storageSupply.clone();
 		//PricingTable pricingTable = new PricingTable(issuerProperties.getTimeShiftMS());
 		ProsumerEnergyRequest copy = new ProsumerEnergyRequest(cloneIssuerProperties, isComplementary, getInternalPowerSlot()
 				,beginDate == null ? null : new Date(beginDate.getTime())
 				,endDate == null ? null : new Date(endDate.getTime())
-				,cloneExtraSupply
-				,this.delayToleranceMinutes, this.priorityLevel);
+				,cloneStorageSupply
+				,this.delayToleranceMinutes, this.priorityLevel, disabled);
 		if(addIds) {
 			copy.setEventId(eventId);
 		}
@@ -260,8 +260,9 @@ public class ProsumerEnergyRequest extends ProsumerEnergyFlow implements IEnergy
 	public EnergyRequest generateSimpleRequest() {
 		ProsumerProperties cloneIssuerProperties = issuerProperties.clone();
 		EnergyRequest result = new EnergyRequest(cloneIssuerProperties, isComplementary, getPowerSlot(),
-				beginDate, endDate, this.delayToleranceMinutes, this.priorityLevel);
+				beginDate, endDate, this.delayToleranceMinutes, this.priorityLevel, disabled);
 		result.setEventId(eventId);
+		//result.setDisabled(disabled);
 		result.setRefreshDate(new Date(refreshDate.getTime()));
 		if(warningDate!=null) {
 			result.setWarningDate(new Date(warningDate.getTime()));
@@ -272,10 +273,10 @@ public class ProsumerEnergyRequest extends ProsumerEnergyFlow implements IEnergy
 
 	public ProsumerEnergySupply generateSupply() {
 		PricingTable pricingTable = new PricingTable(issuerProperties.getTimeShiftMS());
-		ExtraSupply cloneExtraSupply = (this.extraSupply == null) ? null : extraSupply.clone();
+		StorageSupply cloneStorageSupply = (this.storageSupply == null) ? null : storageSupply.clone();
 		ProsumerProperties cloneIssuerProperties = issuerProperties.copy(true);
 		ProsumerEnergySupply result = new ProsumerEnergySupply(cloneIssuerProperties, isComplementary,
-				getInternalPowerSlot(), beginDate, endDate, cloneExtraSupply, pricingTable);
+				getInternalPowerSlot(), beginDate, endDate, cloneStorageSupply, pricingTable, disabled);
 		result.setEventId(eventId);
 		return result;
 	}

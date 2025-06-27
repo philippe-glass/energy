@@ -7,6 +7,7 @@ import java.util.List;
 import java.util.Map;
 
 import com.sapereapi.lightserver.DisableJson;
+import com.sapereapi.model.energy.StorageType;
 import com.sapereapi.model.learning.PredictionScope;
 import com.sapereapi.util.UtilDates;
 
@@ -29,9 +30,9 @@ public class NodeContext implements Serializable {
 	protected String variables[] = { "requested", "produced", "consumed", "provided", "available", "missing" };
 	protected boolean supervisionDisabled;
 	protected boolean awardsActivated = true;
-	protected boolean energyStorageActivated = false;
 	protected boolean complementaryRequestsActivated = true;
 	protected boolean qualityOfServiceActivated = false;
+	protected EnergyStorageSetting globalEnergyStorageSetting = new EnergyStorageSetting(false, false, StorageType.PRIVATE, 0.0, 0.0);
 	protected PredictionSetting nodePredicitonSetting = new PredictionSetting();
 	protected PredictionSetting clusterPredictionSetting = new PredictionSetting();
 	protected String urlForcasting = null;
@@ -39,6 +40,7 @@ public class NodeContext implements Serializable {
 	protected int debugLevel;
 	protected String learningAgentName;
 	protected String regulatorAgentName;
+	protected String storageAgentName;
 
 	public NodeContext(Long _id
 			, NodeLocation _nodeLocation
@@ -48,10 +50,11 @@ public class NodeContext implements Serializable {
 			, String[] _variables
 			, String _learningAgentName
 			, String _regulatorAgentName
+			, String _storageAgentName
 			, boolean _supervisionDisabled
 			, boolean _activateComplementaryRequests
 			, boolean _awardsActivated
-			, boolean _energyStorageActivated
+			, EnergyStorageSetting _energyStorageSetting
 			, PredictionSetting _nodePredicitonSetting
 			, PredictionSetting _clusterPredictionSetting
 			, String _timeZoneId
@@ -69,7 +72,7 @@ public class NodeContext implements Serializable {
 		this.supervisionDisabled = _supervisionDisabled;
 		this.complementaryRequestsActivated = _activateComplementaryRequests;
 		this.awardsActivated = _awardsActivated;
-		this.energyStorageActivated = _energyStorageActivated;
+		this.globalEnergyStorageSetting = _energyStorageSetting;
 		this.nodePredicitonSetting = _nodePredicitonSetting;
 		this.clusterPredictionSetting = _clusterPredictionSetting;
 		this.neighbourNodeLocations = new ArrayList<>();
@@ -77,6 +80,7 @@ public class NodeContext implements Serializable {
 		this.urlForcasting = _urlForcasting;
 		this.learningAgentName = _learningAgentName;
 		this.regulatorAgentName = _regulatorAgentName;
+		this.storageAgentName = _storageAgentName;
 		this.debugLevel = _debugLevel;
 	}
 
@@ -194,13 +198,10 @@ public class NodeContext implements Serializable {
 		this.awardsActivated = awardsActivated;
 	}
 
-	public boolean isEnergyStorageActivated() {
-		return energyStorageActivated;
+	public boolean isGlobalEnergyStorageActivated() {
+		return this.globalEnergyStorageSetting.getActivateStorage();
 	}
 
-	public void setEnergyStorageActivated(boolean energyStorageActivated) {
-		this.energyStorageActivated = energyStorageActivated;
-	}
 
 	public PredictionSetting getPredictionSetting(PredictionScope scope) {
 		if(PredictionScope.NODE.equals(scope)) {
@@ -209,6 +210,14 @@ public class NodeContext implements Serializable {
 			return clusterPredictionSetting;
 		}
 		return null;
+	}
+
+	public EnergyStorageSetting getGlobalEnergyStorageSetting() {
+		return globalEnergyStorageSetting;
+	}
+
+	public void setGlobalEnergyStorageSetting(EnergyStorageSetting globalEnergyStorageSetting) {
+		this.globalEnergyStorageSetting = globalEnergyStorageSetting;
 	}
 
 	public boolean isPredictionsActivated(PredictionScope scope) {
@@ -277,6 +286,14 @@ public class NodeContext implements Serializable {
 		this.clusterPredictionSetting = clusterPredictionSetting;
 	}
 
+	public String getStorageAgentName() {
+		return storageAgentName;
+	}
+
+	public void setStorageAgentName(String storageAgentName) {
+		this.storageAgentName = storageAgentName;
+	}
+
 	public List<String> getNeighbourNMainServiceAddresses() {
 		List<String> result = new ArrayList<String>();
 		for(NodeLocation nextNodeLocation : this.neighbourNodeLocations) {
@@ -302,8 +319,9 @@ public class NodeContext implements Serializable {
 		Long idToSet = copyId ? id : null;
 		NodeContext result = new NodeContext(idToSet, nodeLocation.clone(), scenario, datetimeShifts, maxTotalPower
 				, session == null ? null : session.clone()
-				, variables, learningAgentName, regulatorAgentName
-				, supervisionDisabled, complementaryRequestsActivated, awardsActivated, energyStorageActivated
+				, variables, learningAgentName, regulatorAgentName, storageAgentName
+				, supervisionDisabled, complementaryRequestsActivated, awardsActivated
+				, globalEnergyStorageSetting == null ? null : globalEnergyStorageSetting.clone()
 				, nodePredicitonSetting.clone(), clusterPredictionSetting.clone()
 				, timeZoneId, urlForcasting, debugLevel);
 		for(NodeLocation nextNodeLocation : neighbourNodeLocations) {

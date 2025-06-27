@@ -44,8 +44,8 @@ public class EnergySupply extends EnergyFlow implements IEnergySupply {
 	}
 
 	public EnergySupply(ProsumerProperties issuerProperties, Boolean isComplementary, PowerSlot powerSlot,
-			Date beginDate, Date endDate, PricingTable _pricingTable) {
-		super(issuerProperties, isComplementary, powerSlot, beginDate, endDate);
+			Date beginDate, Date endDate, PricingTable _pricingTable, Boolean disabled) {
+		super(issuerProperties, isComplementary, powerSlot, beginDate, endDate, disabled);
 		this.pricingTable = _pricingTable;
 	}
 
@@ -78,7 +78,7 @@ public class EnergySupply extends EnergyFlow implements IEnergySupply {
 				, isComplementary, getPowerSlot()
 				,beginDate == null ? null : new Date(beginDate.getTime())
 				,endDate == null ? null : new Date(endDate.getTime())
-				, copyPricingTable);
+				, copyPricingTable, disabled);
 		if(copyIds) {
 			result.setEventId(eventId);
 		}
@@ -100,7 +100,7 @@ public class EnergySupply extends EnergyFlow implements IEnergySupply {
 		double delayToleranceMinutes = UtilDates.computeDurationMinutes(getBeginDate(), getEndDate());
 		//PricingTable clonePricingTable = (pricingTable == null) ? null : pricingTable.clone();
 		EnergyRequest request = new EnergyRequest(issuerProperties.clone(), isComplementary, getPowerSlot(), beginDate, endDate
-				, delayToleranceMinutes, PriorityLevel.LOW);
+				, delayToleranceMinutes, PriorityLevel.LOW, disabled);
 		return request;
 	}
 
@@ -137,7 +137,7 @@ public class EnergySupply extends EnergyFlow implements IEnergySupply {
 	public ProsumerEnergySupply generateProsumerEnergySupply() {
 		ProsumerProperties cloneIssuerProperties = issuerProperties == null ? null : issuerProperties.clone();
 		PricingTable clonePricingTable = pricingTable == null ? null : pricingTable.clone();
-		return new ProsumerEnergySupply(cloneIssuerProperties, isComplementary, getPowerSlot(), beginDate, endDate, null, clonePricingTable);
+		return new ProsumerEnergySupply(cloneIssuerProperties, isComplementary, getPowerSlot(), beginDate, endDate, null, clonePricingTable, disabled);
 	}
 	/*
 	public void completeLocationId(Map<String, NodeLocationg> mapNeighborNodeLocations) {

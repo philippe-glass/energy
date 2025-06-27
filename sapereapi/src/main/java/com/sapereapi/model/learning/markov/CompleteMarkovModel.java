@@ -506,7 +506,7 @@ public class CompleteMarkovModel extends AbstractLearningModel implements ILearn
 		int nbStates = NodeStates.getNbOfStates();
 		DoubleMatrix predictionRow = new DoubleMatrix(1, nbStates);
 		predictionRow.set(0, stateIdx, 1);
-		long timeShiftMS = prediction.getContext().getTimeShiftMS();
+		long timeShiftMS = prediction.getPredictionContext().getTimeShiftMS();
 		double checkSum = predictionRow.getSum();
 		// logger.info("prediction testSum=" + checkSum);
 		for (PredictionStep nextStep : prediction.getListSteps()) {
@@ -644,7 +644,7 @@ public class CompleteMarkovModel extends AbstractLearningModel implements ILearn
 		this.refreshAllMatrices();
 	}
 
-	public int getNbOfObservations(String variable) {
+	public int getSamplingNb(String variable) {
 		if (mapModels.containsKey(variable)) {
 			VariableMarkovModel varModel = mapModels.get(variable);
 			return varModel.getNbOfObservations();

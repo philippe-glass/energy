@@ -19,6 +19,7 @@ import com.sapereapi.model.energy.AgentForm;
 import com.sapereapi.model.energy.Device;
 import com.sapereapi.model.energy.DeviceMeasure;
 import com.sapereapi.model.energy.DeviceProperties;
+import com.sapereapi.model.energy.StorageType;
 import com.sapereapi.model.energy.input.AgentInputForm;
 import com.sapereapi.model.energy.policy.IConsumerPolicy;
 import com.sapereapi.model.energy.policy.IProducerPolicy;
@@ -315,8 +316,9 @@ public class DataRetriever extends Thread {
 	}
 
 	private void initService() throws HandlingException {
-		PredictionSetting nodePredictionSetting = new PredictionSetting(false, null, null);
-		PredictionSetting clusterPredictionSetting = new PredictionSetting(false, null, null);
+		EnergyStorageSetting energyStorageSetting = new EnergyStorageSetting(false, false, StorageType.PRIVATE, 0.0, 0.0);
+		PredictionSetting nodePredictionSetting = new PredictionSetting(false, null, null, 1);
+		PredictionSetting clusterPredictionSetting = new PredictionSetting(false, null, null, 1);
 		String scenario = "auto";
 		Date current = new Date();
 		// long currentMS = current.getTime();
@@ -345,6 +347,7 @@ public class DataRetriever extends Thread {
 		InitializationForm initForm = new InitializationForm(scenario
 				,100 * NodeStates.DEFAULT_NODE_MAX_TOTAL_POWER
 				,new HashMap<Integer, Integer>()
+				,energyStorageSetting
 				,nodePredictionSetting, clusterPredictionSetting
 				);
 		initForm.setShiftDayOfMonth(datetimeShifts.get(Calendar.DAY_OF_YEAR));
@@ -380,6 +383,7 @@ public class DataRetriever extends Thread {
 			Date endDate = UtilDates.shiftDateMinutes(measureDate, 60);
 			ProsumerRole prosumerRole = device.isProducer() ? ProsumerRole.PRODUCER : ProsumerRole.CONSUMER;
 			EnvironmentalImpact envImpact = device.getEnvironmentalImpact();
+			EnergyStorageSetting energyStorageSetting = null;
 			double power_p = measure.computeTotalPower_p();
 			boolean isRunning = Device.STATUS_RUNNING.equals(device.getStatus());
 			double duration = Sapere.YEAR_DURATION_MIN;
@@ -390,7 +394,7 @@ public class DataRetriever extends Thread {
 				AgentInputForm agentInputForm = new AgentInputForm(prosumerRole,
 						device.getRunningAgentName(), device.getName(), device.getCategory(), envImpact,
 						pricingTable.getMapPrices(), power_p, measureDate, endDate, PriorityLevel.LOW, duration,
-						timeShiftMS);
+						energyStorageSetting, timeShiftMS);
 				agentInputForm.updateDeviceProperties(device.getProperties());
 				result = Sapere.getInstance().modifyEnergyAgent(agentInputForm);
 			} else {
@@ -402,11 +406,11 @@ public class DataRetriever extends Thread {
 							.addServiceProducer(
 									power_p, current, endDate, new DeviceProperties(device.getName(),
 											device.getCategory(), device.getEnvironmentalImpact()),
-									pricingTable, producerPolicy, consumerPolicy);
+									pricingTable, energyStorageSetting, producerPolicy, consumerPolicy);
 
 				} else {
 					agent = Sapere.getInstance().addServiceConsumer(power_p, current, endDate, duration,
-							PriorityLevel.LOW, device.getProperties(), pricingTable,
+							PriorityLevel.LOW, device.getProperties(), pricingTable, energyStorageSetting,
 							Sapere.getPolicyFactory().initDefaultProducerPolicy(), consumerPolicy);
 				}
 				result = Sapere.getInstance().generateAgentForm(agent);

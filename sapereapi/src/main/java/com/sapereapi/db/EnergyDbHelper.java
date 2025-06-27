@@ -323,6 +323,8 @@ public class EnergyDbHelper {
 		Double powerMaxUpdate = SapereUtil.getDoubleValue(row, "power_max_update", logger);
 		result.setPowerUpates(powerUpdate, powerMinUpdate, powerMaxUpdate);
 		result.setHistoId(SapereUtil.getLongValue(row, "id_history"));
+		Double additionalPower = SapereUtil.getDoubleValue(row, "additional_power", logger);
+		result.setAdditionalPower(additionalPower);
 		if (row.get("warning_type") != null) {
 			String sWarningType = "" + row.get("warning_type");
 			if(sWarningType.length() > 0) {
@@ -351,12 +353,14 @@ public class EnergyDbHelper {
 
 	public static List<ExtendedEnergyEvent> retrieveSessionEvents(Long sessionId, Date currentDateFilter, String agentFilter) throws HandlingException {
 		List<ExtendedEnergyEvent> result = new ArrayList<ExtendedEnergyEvent>();
+		long timeBegin = new Date().getTime();
 		StringBuffer query = new StringBuffer("");
 		query.append(CR).append("SELECT event.*")
 				// effective_end_date")
 				.append(CR).append(" ,").append(OP_LEAST).append("(event.expiry_date")
 				.append(CR).append(" , IFNULL(event.interruption_date,'3000-01-01')")
 				.append(CR).append(" , IFNULL(event.cancel_date,'3000-01-01')) AS  effective_end_date")
+				.append(CR).append("  ,(SELECT agent.device_name FROM agent WHERE agent.id_session = event.id_session AND agent.name = event.agent_name) AS device_name")
 				.append(CR).append(" FROM event")
 				.append(CR).append(" WHERE event.id_session = ").append(sessionId);
 		if (currentDateFilter != null) {
@@ -376,6 +380,8 @@ public class EnergyDbHelper {
 		for (Map<String, Object> row : rows) {
 			EnergyEvent nextEvent = auxGetEvent(row);
 			ProsumerProperties nextEventIssuer = nextEvent.getIssuerProperties();
+			String deviceName = "" + row.get("device_name");
+			nextEventIssuer.getDeviceProperties().setName(deviceName);
 			ExtendedEnergyEvent nextEvent2 = new ExtendedEnergyEvent(nextEvent.getType(), nextEventIssuer,
 					nextEvent.isComplementary(), nextEvent.getPowerSlot(), nextEvent.getBeginDate(),
 					nextEvent.getEndDate(), nextEvent.getComment(), nextEvent.getFirstRate());
@@ -383,6 +389,8 @@ public class EnergyDbHelper {
 			nextEvent2.setHistoId(nextEvent.getHistoId());
 			nextEvent2.setWarningType(nextEvent.getWarningType());
 			nextEvent2.setPowerUpdateSlot(nextEvent.getPowerUpdateSlot());
+			Double additionalPower = SapereUtil.getDoubleValue(row, "additional_power", logger);
+			nextEvent2.setAdditionalPower(additionalPower);
 			result.add(nextEvent2);
 			EventType evtType = nextEvent2.getType();
 			if(EventObjectType.CONTRACT.equals(evtType.getObjectType()) && !evtType.getIsEnding()) {
@@ -421,6 +429,8 @@ public class EnergyDbHelper {
 				}
 			}
 		}
+		long timeEnd = new Date().getTime();
+		logger.info("retrieveSessionEvents : timeSpentMS = " + (timeEnd - timeBegin));
 		return result;
 	}
 
@@ -559,7 +569,7 @@ public class EnergyDbHelper {
 		long result = dbConnection.execUpdate(query.toString());
 		Date end = new Date();
 		long timeSpentMS = end.getTime() - begin.getTime();
-		logger.info("registerAgent : result = " + result + ", timeSpentMS = " + timeSpentMS);
+		logger.info("registerAgent : result = " + result + ", timeSpentMS = " + timeSpentMS + ", issuerProperties = " + issuerProperties);
 	}
 
 	public static EnergyEvent registerEvent(EnergyEvent event, Contract contract, String log) throws HandlingException {
@@ -718,6 +728,7 @@ public class EnergyDbHelper {
 		nodeTotal.setDistance(distance);
 		nodeTotal.setAdditionalRefresh(isAdditionalRefresh);
 		String sComputeDate = UtilDates.format_sql.format(computeDate);
+		//logger.info("generateNodeTotal : linkedEvent = " + linkedEvent + ", sComputeDate = " + sComputeDate);
 		String quotedComputeDate = addSingleQuotes(sComputeDate);
 		boolean debugTmpTables = false; // debug mode : to replace TEMPORARY tables by tables
 		String reqSeparator2 = dbConnection.getReqSeparator2();
@@ -753,6 +764,8 @@ public class EnergyDbHelper {
 			.append(CR).append("	,provided_margin		DECIMAL(15,3) NOT NULL DEFAULT 0.0")
 			.append(CR).append("	,consumed 				DECIMAL(15,3) NOT NULL DEFAULT 0.0")
 			.append(CR).append("	,missing 				DECIMAL(15,3) NOT NULL DEFAULT 0.0")
+			.append(CR).append("	,storage_used_for_need	DECIMAL(15,3) NOT NULL DEFAULT 0.0")
+			.append(CR).append("	,storage_used_for_prod	DECIMAL(15,3) NOT NULL DEFAULT 0.0")
 			.append(CR).append((sqlite ? "" : "  ,PRIMARY KEY (`id`)"))
 			.append(CR).append("	)");
 		/*
@@ -783,7 +796,7 @@ public class EnergyDbHelper {
 		*/
 		query.append(reqSeparator2)
 		.append(CR).append("INSERT INTO TmpEvent")
-		.append(CR).append("(id, begin_date, id_origin,effective_end_date,object_type,main_category,agent_name,node,distance,is_complementary,power,power_margin,is_request,is_producer,is_contract, is_selected)")
+		.append(CR).append("(id, begin_date, id_origin,effective_end_date,object_type,main_category,agent_name,node,distance,is_complementary,power,power_margin,is_request,is_producer,is_contract, is_selected, storage_used_for_need, storage_used_for_prod)")
 		.append(CR).append("	SELECT id, begin_date, id_origin")
 		.append(CR).append(" 		,effective_end_date")
 		.append(CR).append("		,object_type,main_category,agent_name")
@@ -796,6 +809,8 @@ public class EnergyDbHelper {
 		.append(CR).append("		,object_type = 'PRODUCTION'			AS is_producer")
 		.append(CR).append("		,object_type = 'CONTRACT'			AS is_contract")
 		.append(CR).append("		,1 									AS is_selected")
+		.append(CR).append("		,IIF(object_type = 'REQUEST', additional_power, 0)	AS storage_used_for_need")
+		.append(CR).append("		,IIF(object_type = 'PRODUCTION', additional_power, 0) AS storage_used_for_prod")
 		.append(CR).append("	FROM (")
 		.append(CR).append("			SELECT event.*")
 		.append(CR).append(" 				,").append((sqlite ? "MIN" : "LEAST")).append("(event.expiry_date")
@@ -893,10 +908,10 @@ public class EnergyDbHelper {
 			.append(CR).append(",IFNULL(SUM(").append(OP_IF).append("(TmpEvent.is_producer, TmpEvent.power,0.0)),0) AS total_produced")
 			.append(CR).append(",IFNULL(SUM(").append(OP_IF).append("(TmpEvent.is_producer, TmpEvent.provided,0.0)),0) AS total_provided")
 			.append(CR).append(",IFNULL(SUM(").append(OP_IF).append("(TmpEvent.is_request, TmpEvent.consumed,0.0)),0) AS total_consumed")
-			// .append(CR).append(",IFNULL(SUM().append(OP_IF).append("(TmpEvent.is_contract,
-			// TmpEvent.power_margin,0.0)),0) AS old_total_margin")
 			.append(CR).append(",IFNULL(SUM(").append(OP_IF).append("(TmpEvent.is_producer, TmpEvent.provided_margin,0.0)),0) AS total_provided_margin")
 			.append(CR).append(",IFNULL(MIN(").append(OP_IF).append("(TmpEvent.is_request AND TmpEvent.missing > 0, TmpEvent.missing, 999999.0)),0) AS min_request_missing")
+			.append(CR).append(",IFNULL(SUM(TmpEvent.storage_used_for_need),0) AS storage_used_for_need")
+			.append(CR).append(",IFNULL(SUM(TmpEvent.storage_used_for_prod),0) AS storage_used_for_prod")
 			.append(CR).append("	 FROM TmpEvent WHERE is_selected");
 		dbConnection.setDebugLevel(0);
 		List<Map<String, Object>> sqlResult = dbConnection.executeSelect(query.toString());
@@ -909,6 +924,11 @@ public class EnergyDbHelper {
 			double providedMargin = SapereUtil.getDoubleValue(row, "total_provided_margin", logger);
 			double consumed = SapereUtil.getDoubleValue(row, "total_consumed", logger);
 			double minRequestMissing = SapereUtil.getDoubleValue(row, "min_request_missing", logger);
+			double storageUsedForNeed = SapereUtil.getDoubleValue(row, "storage_used_for_need", logger);
+			double storageUsedForProd = SapereUtil.getDoubleValue(row, "storage_used_for_prod", logger);
+			if(storageUsedForNeed > 0 ) {
+				logger.info("generateNodeTotal : storageUsed " + storageUsedForNeed+ ", linkedEvent = " + linkedEvent);
+			}
 			if (linkedEvent != null && EventType.REQUEST_EXPIRY.equals(linkedEvent.getType())) {
 				logger.info("generateNodeTotal : Request expiry");
 			}
@@ -990,8 +1010,12 @@ public class EnergyDbHelper {
 			if (minRequestMissing <= requested) {
 				nodeTotal.setMinRequestMissing(minRequestMissing);
 			}
+			nodeTotal.setStorageUsedForNeed(storageUsedForNeed);
+			nodeTotal.setStorageUsedForProd(storageUsedForProd);
 		}
-		if (nodeTotal.hasActivity()) {
+		if (!nodeTotal.hasActivity() && linkedEvent == null) {
+			logger.warning("generateNodeTotal nodeTotal has no activity : sComputeDate = " + sComputeDate + ", linkedEvent = " + linkedEvent);
+		} else {
 			nodeTotal = registerNodeTotal(nodeTotal, linkedEvent);
 			long newHistoryId = nodeTotal.getId() == null ? -1 : nodeTotal.getId();
 			// nodeTotal.setId(id);
@@ -1024,6 +1048,7 @@ public class EnergyDbHelper {
 				.append(CR).append(" 			AND last.id_event = current_event.id_origin)")
 				.append(CR).append("  	WHERE link_history_active_event.id_history = ").append(newHistoryId).append(CR).append(" AND link_history_active_event.id_last IS NULL");
 			queryInsertLHE.append(reqSeparator2);
+			// Compute warning duration: time elapsed since the request is "in warning" (not satisfied while available power is sufficient).
 			queryInsertLHE.append(CR).append("UPDATE link_history_active_event SET warning_duration = ");
 			if (sqlite) {
 				queryInsertLHE.append(CR).append("	(SELECT last.warning_duration + strftime('%s',link_history_active_event.date) - strftime('%s' ,last.date)");
@@ -1034,6 +1059,19 @@ public class EnergyDbHelper {
 			queryInsertLHE.append(CR).append("  WHERE id_history = ").append(newHistoryId)
 				.append(CR).append(" AND link_history_active_event.has_warning_req")
 				.append(CR).append("  AND EXISTS (SELECT 1 FROM link_history_active_event AS last WHERE last.id = link_history_active_event.id_last AND last.has_warning_req)");
+			queryInsertLHE.append(reqSeparator2);
+			// Compute missing duration: time elapsed since the request is not satified.
+			queryInsertLHE.append(CR).append("UPDATE link_history_active_event SET missing_duration = ");
+			if (sqlite) {
+				queryInsertLHE.append(CR).append("	(SELECT last.missing_duration + strftime('%s',link_history_active_event.date) - strftime('%s' ,last.date)");
+			} else {
+				queryInsertLHE.append(CR).append("	(SELECT last.missing_duration + UNIX_TIMESTAMP(link_history_active_event.date) - UNIX_TIMESTAMP(last.date)");
+			}
+			queryInsertLHE.append(CR).append(" FROM link_history_active_event AS last WHERE last.id =  link_history_active_event.id_last AND last.missing > 0)");
+			queryInsertLHE.append(CR).append("  WHERE id_history = ").append(newHistoryId)
+				.append(CR).append(" AND link_history_active_event.missing > 0")
+				.append(CR).append("  AND EXISTS (SELECT 1 FROM link_history_active_event AS last WHERE last.id = link_history_active_event.id_last AND last.missing > 0)");
+
 			long result = dbConnection.execUpdate(queryInsertLHE.toString());
 			if (result < 0) {
 				// ONLY FOR DEBUG IF THERE IS AN SQL ERROR
@@ -1111,6 +1149,8 @@ public class EnergyDbHelper {
 		defaultAffectation.put("total_missing", addSingleQuotes("" + nodeTotal.getMissing()));
 		defaultAffectation.put("min_request_missing", addSingleQuotes("" + nodeTotal.getMinRequestMissing()));
 		defaultAffectation.put("total_margin", addSingleQuotes("" + nodeTotal.getProvidedMargin()));
+		defaultAffectation.put("storage_used_for_need", addSingleQuotes("" + nodeTotal.getStorageUsedForNeed()));
+		defaultAffectation.put("storage_used_for_prod", addSingleQuotes("" + nodeTotal.getStorageUsedForProd()));
 		defaultAffectation.put("is_additional_refresh", nodeTotal.isAdditionalRefresh()? "1" : "0");
 		defaultAffectation.put("id_last", "(SELECT ID FROM node_history WHERE date < " + sHistoryDate + " AND node = " + node2 + " ORDER BY date DESC LIMIT 0,1)");
 		defaultAffectation.put("id_next", "(SELECT ID FROM node_history WHERE date > " + sHistoryDate + " AND node = " + node2 + " ORDER BY date LIMIT 0,1)");
@@ -1124,6 +1164,8 @@ public class EnergyDbHelper {
 		confilctAffectation.put("total_missing", addSingleQuotes("" + nodeTotal.getMissing()));
 		confilctAffectation.put("min_request_missing", addSingleQuotes("" + nodeTotal.getMinRequestMissing()));
 		confilctAffectation.put("total_margin", addSingleQuotes("" + nodeTotal.getProvidedMargin()));
+		confilctAffectation.put("storage_used_for_need", addSingleQuotes("" + nodeTotal.getStorageUsedForNeed()));
+		confilctAffectation.put("storage_used_for_prod", addSingleQuotes("" + nodeTotal.getStorageUsedForProd()));
 		confilctAffectation.put("is_additional_refresh", nodeTotal.isAdditionalRefresh()? "1" : "0");
 		confilctAffectation.put("id_last", "(SELECT ID FROM node_history WHERE date < " + sHistoryDate + " AND node = " + node2 + " ORDER BY date DESC LIMIT 0,1)");
 		confilctAffectation.put("id_next", "(SELECT ID FROM node_history WHERE date > " + sHistoryDate + " AND node = " + node2 + " ORDER BY date LIMIT 0,1)");
@@ -1405,18 +1447,19 @@ public class EnergyDbHelper {
 
 	public static List<ExtendedNodeTotal> retrieveNodeTotalHistory(NodeHistoryFilter historyFilter) throws HandlingException {
 		String agentFilter = historyFilter.getAgentName();
-		return aux_retrieveNodeTotalHistory(null, agentFilter);
+		int processingTimeToleranceSec = historyFilter.getProcessingTimeToleranceSec();
+		return aux_retrieveNodeTotalHistory(null, agentFilter, processingTimeToleranceSec);
 	}
 
 	public static ExtendedNodeTotal retrieveNodeTotalHistoryById(Long historyId) throws HandlingException {
-		List<ExtendedNodeTotal> listHistory = aux_retrieveNodeTotalHistory(historyId, null);
+		List<ExtendedNodeTotal> listHistory = aux_retrieveNodeTotalHistory(historyId, null, 0);
 		if (listHistory.size() > 0) {
 			return listHistory.get(0);
 		}
 		return null;
 	}
 
-	private static List<ExtendedNodeTotal> aux_retrieveNodeTotalHistory(Long filterHistoryId, String agentFilter) throws HandlingException {
+	private static List<ExtendedNodeTotal> aux_retrieveNodeTotalHistory(Long filterHistoryId, String agentFilter, int processingTimeToleranceSec) throws HandlingException {
 		// correctHisto();
 		Long sessionId = getSessionId();
 		long beginTime = new Date().getTime();
@@ -1446,6 +1489,8 @@ public class EnergyDbHelper {
 			.append(CR).append("		,SUM(missing) AS total_missing	")
 			.append(CR).append("		,SUM(margin) AS total_margin	")
 			.append(CR).append("		,MAX(request_missing) AS min_request_missing")
+			.append(CR).append("		,SUM(storage_used_for_need) AS storage_used_for_need")
+			.append(CR).append("		,SUM(storage_used_for_prod) AS storage_used_for_prod")
 			.append(CR).append("		,GROUP_CONCAT(Label3,  ', ') AS list_missing_requests")
 			.append(CR).append("		,IIF(SUM(missing)>0, 1, 0) AS nb_missing_request")
 			.append(CR).append("		,SUM(warning_missing) AS sum_warning_missing1")
@@ -1461,10 +1506,12 @@ public class EnergyDbHelper {
 			.append(CR).append("						,IIF(is_request , histo_req.consumed, 0) AS consumed")
 			.append(CR).append("						,IIF(is_producer, histo_req.provided, 0) AS provided")
 			.append(CR).append("						,IIF(is_producer, req.power - histo_req.provided, 0) AS available")
-			.append(CR).append("						,IIF(is_request , req.power - histo_req.consumed, 0) AS missing	")
-			.append(CR).append("						,IIF(is_request , req.power - histo_req.consumed, 0) AS request_missing")
+			.append(CR).append("						,IIF(is_request AND missing_duration >=").append(processingTimeToleranceSec).append(", req.power - histo_req.consumed, 0) AS missing	")
+			.append(CR).append("						,IIF(is_request AND missing_duration >=").append(processingTimeToleranceSec).append(", req.power - histo_req.consumed, 0) AS request_missing")
+			.append(CR).append("						,IIF(is_request , req.additional_power, 0) AS storage_used_for_need")
+			.append(CR).append("						,IIF(is_producer , req.additional_power, 0) AS storage_used_for_prod")
 			.append(CR).append("						,IIF(is_producer, histo_req.provided_margin, 0) AS margin")
-			.append(CR).append("						,IIF(missing>0 AND warning_duration > 0,req.agent_name,'') AS warning_consumer")
+			.append(CR).append("						,IIF(missing>0 AND warning_duration > 0 AND warning_duration >=").append(processingTimeToleranceSec).append(" ,req.agent_name,'') AS warning_consumer")
 			.append(CR).append("						,req.power")
 			.append(CR).append("						,histo_req.missing")
 			.append(CR).append("						,histo_req.warning_duration")
@@ -1486,8 +1533,9 @@ public class EnergyDbHelper {
 		} else {
 			query2.append(
 					"SELECT h.id, h.id_last, h.id_next, h.date, h.total_produced, h.total_requested, h.total_consumed ")
-				.append(CR).append(",h.total_available, h.total_missing, h.total_provided")
+				.append(CR).append(",h.total_available, h.total_provided, h.storage_used_for_need, h.storage_used_for_prod")
 				.append(CR).append(", h.min_request_missing, h.total_margin, h.node, h.distance, h.max_warning_duration,h.max_warning_consumer")
+				.append(CR).append(",").append(processingTimeToleranceSec > 0 ? "IFNULL(TmpUnReqByHisto.sum_missing,0)" : "h.total_missing").append(" AS total_missing")
 				.append(CR).append(",IFNULL(TmpUnReqByHisto.nb_missing_request,0) AS nb_missing_request")
 				.append(CR).append(",IFNULL(TmpUnReqByHisto.list_missing_requests,'') AS list_missing_requests")
 				.append(CR).append(",IFNULL(TmpUnReqByHisto.sum_warning_missing1,0) AS sum_warning_missing1")
@@ -1495,6 +1543,7 @@ public class EnergyDbHelper {
 				.append(CR).append(" LEFT JOIN (SELECT ")
 				.append(CR).append("	     UnReq.id_history")
 				.append(CR).append("		,Count(*) 	AS nb_missing_request")
+				.append(CR).append(" 		,SUM(UnReq.missing) AS sum_missing")
 				.append(CR).append(" 		,SUM(UnReq.warning_missing) AS sum_warning_missing1");
 			if (sqlite) {
 				query2.append(CR).append("		,GROUP_CONCAT(UnReq.Label3,  ', ') AS list_missing_requests");
@@ -1517,7 +1566,7 @@ public class EnergyDbHelper {
 				.append(CR).append("		JOIN event AS req ON req.id = histo_req.id_event")
 				.append(CR).append("		JOIN agent AS requester ON requester.id_session = req.id_session  AND requester.name = req.agent_name")
 				.append(CR).append("		WHERE ").append(sqlFilterHistoryId1).append("requester.node =  ").append(node2)
-				.append(CR).append("			AND is_request > 0 AND missing > 0")
+				.append(CR).append("			AND is_request > 0 AND missing > 0 AND missing_duration >=").append(processingTimeToleranceSec)
 				.append(CR).append("		) AS UnReq")
 				.append(CR).append("	GROUP BY UnReq.id_history")
 				.append(CR).append(") AS TmpUnReqByHisto ON TmpUnReqByHisto.id_history = h.id")
@@ -1557,6 +1606,8 @@ public class EnergyDbHelper {
 			nextTotal.setAvailable(SapereUtil.getDoubleValue(nextRow, "total_available", logger));
 			nextTotal.setMissing(SapereUtil.getDoubleValue(nextRow, "total_missing", logger));
 			nextTotal.setMinRequestMissing(SapereUtil.getDoubleValue(nextRow, "min_request_missing", logger));
+			nextTotal.setStorageUsedForNeed(SapereUtil.getDoubleValue(nextRow, "storage_used_for_need", logger));
+			nextTotal.setStorageUsedForProd(SapereUtil.getDoubleValue(nextRow, "storage_used_for_prod", logger));
 			nextTotal.setId(SapereUtil.getLongValue(nextRow, "id"));
 			nextTotal.setIdLast(SapereUtil.getLongValue(nextRow, "id_last"));
 			nextTotal.setIdNext(SapereUtil.getLongValue(nextRow, "id_next"));
@@ -1606,6 +1657,11 @@ public class EnergyDbHelper {
 					mapHistoEvents.put(histoId, new ArrayList<EnergyEvent>());
 				}
 				(mapHistoEvents.get(histoId)).add(nextEvent);
+				/*
+				if(nextEvent.getAdditionalPower() > 0) {
+					logger.info("aux_retrieveNodeTotalHistory : additionalPower = " + nextEvent.getAdditionalPower());
+				}
+				*/
 			}
 			// TODO : add historyId in retrieveOffers function
 			// Retrieve offers
@@ -1696,7 +1752,7 @@ public class EnergyDbHelper {
 		String sId = "" + offerId;
 		StringBuffer query = new StringBuffer();
 		query.append("UPDATE single_offer SET log2 = ");
-		if (sqlite) {
+		if (!sqlite) {
 			query.append("CONCAT(log2, ' ', ").append(addSingleQuotes(textToAdd)).append(")");
 		} else {
 			query.append("log2 || ' ' || ").append(addSingleQuotes(textToAdd)).append("");
@@ -1798,7 +1854,7 @@ public class EnergyDbHelper {
 				PowerSlot resPowerSlot = new PowerSlot(reqPower, reqPowerMin, reqPowerMax);
 				request = new EnergyRequest(reqIssuerProperties,
 						resIsComplementary, resPowerSlot, reqBeginDate, reqExpiryDate, tolerance,
-						PriorityLevel.LOW);
+						PriorityLevel.LOW, false);
 			}
 			EnergySupply supply = null;
 			Double power = SapereUtil.getDoubleValue(row, "power", logger);
@@ -1820,7 +1876,7 @@ public class EnergyDbHelper {
 					// TODO : use cashNodeLocation to retrieve the right nodeLocation.
 					ProsumerProperties producerProperties = new ProsumerProperties(producerAgent, NodeManager.getNodeLocation(), issuerDistance, timeShiftMS, deviceProperties);
 					PowerSlot supplyPowerSlot = new PowerSlot(power, powerMin, powerMax);
-					supply = new EnergySupply(producerProperties, false, supplyPowerSlot, beginDate, endDate, pricingTable);
+					supply = new EnergySupply(producerProperties, false, supplyPowerSlot, beginDate, endDate, pricingTable, false);
 					SingleOffer nextOffer = new SingleOffer(producerAgent, supply, 0, request);
 					nextOffer.setDeadline(SapereUtil.getDateValue(row, "deadline", logger));
 					if (row.get("used_time") != null) {

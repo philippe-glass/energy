@@ -3,11 +3,12 @@ package com.sapereapi.model.energy.prosumerflow;
 import java.util.Date;
 import java.util.List;
 
+
 import com.sapereapi.log.SapereLogger;
 import com.sapereapi.model.HandlingException;
 import com.sapereapi.model.energy.AbstractEnergyFlow;
 import com.sapereapi.model.energy.EnergyEvent;
-import com.sapereapi.model.energy.ExtraSupply;
+import com.sapereapi.model.energy.StorageSupply;
 import com.sapereapi.model.energy.IEnergyObject;
 import com.sapereapi.model.energy.PowerSlot;
 import com.sapereapi.model.energy.ProsumerProperties;
@@ -25,9 +26,7 @@ public abstract class ProsumerEnergyFlow extends AbstractEnergyFlow implements I
 	//protected Double internalPower; // current electric power in watts
 	//protected Double internalPowerMin;
 	//protected Double internalPowerMax;
-	protected ExtraSupply extraSupply;
-
-	public final static double DEFAULT_POWER_MARGIN_RATIO = 1.0 * 0.05;
+	protected StorageSupply storageSupply;
 
 	public Double getInternalPower() {
 		return internalPowerSlot.getCurrent();
@@ -42,23 +41,37 @@ public abstract class ProsumerEnergyFlow extends AbstractEnergyFlow implements I
 	}
 
 	public Double getAdditionalPower() {
-		return extraSupply == null ? 0 : extraSupply.getCurrentPower();
+		return storageSupply == null ? 0 : storageSupply.getCurrentPower();
 	}
 
 	public PowerSlot getAdditionalPowerSlot() {
-		return extraSupply == null ? null : PowerSlot.create(extraSupply.getCurrentPower());
+		return storageSupply == null ? null : PowerSlot.create(storageSupply.getCurrentPower());
 	}
 
 	public boolean hasAdditionalPower() {
-		return extraSupply != null && extraSupply.getCurrentPower() > 0;
+		return storageSupply != null && storageSupply.getCurrentPower() > 0;
 	}
 
-	public ExtraSupply getExtraSupply() {
-		return extraSupply;
+	public StorageSupply getStorageSupply() {
+		return storageSupply;
 	}
 
-	public void setExtraSupply(ExtraSupply extraSupply) {
-		this.extraSupply = extraSupply;
+	public void setStorageSupply(StorageSupply storageSupply) {
+		this.storageSupply = storageSupply;
+	}
+
+	public boolean updateStorageSupply(StorageSupply storageSupply, boolean updateBeginDate) {
+		double additionalBefore = getAdditionalPower();
+		this.storageSupply = storageSupply;
+		if(updateBeginDate) {
+			double additionalAfter = getAdditionalPower();
+			if(Math.abs(additionalAfter - additionalBefore) > 0.0001) {
+				// change in additional supply : update the begin date
+				this.beginDate = getCurrentDate();
+				return true;
+			}
+		}
+		return false;
 	}
 
 	public Double getPowerMargin() {
@@ -71,6 +84,12 @@ public abstract class ProsumerEnergyFlow extends AbstractEnergyFlow implements I
 
 	public void setInternalPowerSlot(PowerSlot internalPowerSlot) {
 		this.internalPowerSlot = internalPowerSlot;
+	}
+
+	public void removeInactiveStorageSupply() {
+		if (storageSupply != null && !storageSupply.isActive()) {
+			storageSupply = null;
+		}
 	}
 
 	protected Double getInternalWH() {
@@ -95,14 +114,15 @@ public abstract class ProsumerEnergyFlow extends AbstractEnergyFlow implements I
 	}
 
 	public ProsumerEnergyFlow(ProsumerProperties _issuerProperties, Boolean _isComplementary
-			, PowerSlot internalPowerSlot, Date beginDate, Date endDate, ExtraSupply extraSupply) {
+			, PowerSlot internalPowerSlot, Date beginDate, Date endDate, StorageSupply storageSupply, Boolean disabled) {
 		super();
 		this.issuerProperties = _issuerProperties;
 		this.internalPowerSlot = internalPowerSlot;
-		this.extraSupply = extraSupply;
+		this.storageSupply = storageSupply;
 		this.beginDate = beginDate;
 		this.endDate = endDate;
 		this.isComplementary = _isComplementary;
+		this.disabled = disabled;
 		try {
 			checkPowers();
 		} catch (Exception e) {
@@ -162,10 +182,10 @@ public abstract class ProsumerEnergyFlow extends AbstractEnergyFlow implements I
 		if (Math.abs(getInternalPowerMax() - newContent.getInternalPowerMax()) > 0.0001) {
 			return true;
 		}
-		if(extraSupply == null && newContent.getExtraSupply() != null) {
+		if(storageSupply == null && newContent.getStorageSupply() != null) {
 			return true;
 		}
-		if(extraSupply != null && extraSupply.hasChanged(newContent.getExtraSupply())) {
+		if(storageSupply != null && storageSupply.hasChanged(newContent.getStorageSupply())) {
 			return true;
 		}
 		return false;

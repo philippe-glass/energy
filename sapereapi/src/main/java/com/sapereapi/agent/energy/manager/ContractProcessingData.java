@@ -20,11 +20,15 @@ import com.sapereapi.model.energy.Contract;
 import com.sapereapi.model.energy.EnergyEvent;
 import com.sapereapi.model.energy.PowerSlot;
 import com.sapereapi.model.energy.RegulationWarning;
+import com.sapereapi.model.protection.ProtectedConfirmationTable;
 import com.sapereapi.model.referential.EventMainCategory;
 import com.sapereapi.model.referential.EventType;
+import com.sapereapi.model.referential.ProsumerRole;
 import com.sapereapi.model.referential.WarningType;
 import com.sapereapi.util.SapereUtil;
 import com.sapereapi.util.UtilDates;
+
+import eu.sapere.middleware.lsa.Property;
 
 public class ContractProcessingData {
 	private Boolean isComplementary = null;
@@ -148,30 +152,6 @@ public class ContractProcessingData {
 		return currentContract.getProducerAgents();
 	}
 
-	/*
-	private EnergyEvent oldAuxCreateEvent(EventType type, EnergyAgent consumerAgent, TimeSlot timeSlot, String comment, PowerSlot mainContractPower) {
-		EnergyEvent result = consumerAgent.generateEvent(type, comment);
-		result.setBeginDate(timeSlot.getBeginDate());
-		result.setEndDate(timeSlot.getEndDate());
-		double firstRate = (currentContract == null) ? 0.0 : currentContract.getFirstRateValue();
-		result.setFirstRate(firstRate);
-		if(currentContract != null) {
-			if(!currentContract.isComplementary()) {
-				double powerToSet = currentContract.getPower();
-				if(Math.abs(powerToSet - result.getPower()) >= 0.001) {
-					double needPower = consumerAgent.getGlobalNeed().getPower();
-					logger.error("auxCreateEvent gap between created contract and consumer need : powerToSet " + powerToSet + ", need = " + needPower
-					+ ", currentContract = " + currentContract + ", evt = " + result);
-				}
-				result.setPower(currentContract.getPower());
-				result.setPowerMin(currentContract.getPowerMin());
-				result.setPowerMax(currentContract.getPowerMax());
-			}
-		}
-		return result;
-	}
-	*/
-
 	private EnergyEvent auxCreateEvent(EventType type, Date eventDate, String comment, PowerSlot mainContractPower) throws HandlingException {
 		if(currentContract == null) {
 			throw new HandlingException("auxCreateEvent : currentContract is null");
@@ -273,9 +253,9 @@ public class ContractProcessingData {
 		}
 	}
 
-	public EnergyEvent generateStartEvent(EnergyAgent consumerAgent, PowerSlot mainContractPower) throws HandlingException {
+	public EnergyEvent generateStartEvent(EnergyAgent consumerAgent, PowerSlot mainContractPower, String log) throws HandlingException {
 		currentContract.checkDates(logger, "generateStartEvent : begin");
-		EnergyEvent startEvent = auxCreateEvent(EventType.CONTRACT_START, null, "", mainContractPower);
+		EnergyEvent startEvent = auxCreateEvent(EventType.CONTRACT_START, null, log, mainContractPower);
 		startEvent = EnergyDbHelper.registerEvent2(startEvent, currentContract, "generateStartEvent by " + consumerAgent.getAgentName());
 		currentContract.setEventId(startEvent.getId());
 		if(startEvent.isComplementary()) {
@@ -357,6 +337,10 @@ public class ContractProcessingData {
 	}
 
 	public void stopCurrentContract(EnergyAgent consumerAgent, RegulationWarning warning, String logCancel, PowerSlot mainContractPower) throws HandlingException {
+		if(logCancel.contains("switch")) {
+			// For debug
+			logger.info("stopCurrentContract " + consumerAgent.getAgentName() + " " + (this.isComplementary ? "compl." : "") + " " + logCancel + " currentContract = " + currentContract);
+		}
 		if (currentContract == null) {
 			return;
 		}
@@ -384,8 +368,73 @@ public class ContractProcessingData {
 				logger.error(e);
 			}
 		}
+		// ADD Property in confirmation table
+		sendConfirmation(consumerAgent, Boolean.FALSE, logCancel);
+
 		// TODO check if there is no bug
 		currentContract = null;
+	}
+
+	public void updateContractConfirmationProperty(EnergyAgent consumerAgent) throws HandlingException {
+		if (currentContract != null) {
+			ProtectedConfirmationTable pConfirmationTable = consumerAgent.getProtectedConfirmationTable(consumerAgent);
+			boolean toUpdate = false;
+			for (String nextProducer : currentContract.getProducerAgents()) {
+				if (currentContract.isWaitingValidation()) {
+					// should not contains a confirmation item
+					if (pConfirmationTable.hasConfirmationItem(consumerAgent, nextProducer, isComplementary, ProsumerRole.CONSUMER)) {
+						pConfirmationTable.removeConfirmation(consumerAgent, nextProducer, isComplementary, ProsumerRole.CONSUMER);
+						logger.info("updateContractConfirmationProperty " + consumerAgent.getAgentName()
+								+ " : waiting validation : remove confirmation item for " + nextProducer);
+						toUpdate = true;
+					}
+				}
+				if (currentContract.isOnGoing()) {
+					ConfirmationItem confirmationIiem = pConfirmationTable.getConfirmationItem2(consumerAgent,
+							nextProducer, isComplementary, ProsumerRole.CONSUMER);
+					// should contains a confirmation with a positive confirmation
+					if (confirmationIiem == null || !confirmationIiem.getIsOK()) {
+						pConfirmationTable.confirmAsConsumer(consumerAgent, nextProducer, isComplementary, Boolean.TRUE,
+								"contract still valid", 0);
+						logger.info("updateContractConfirmationProperty " + consumerAgent.getAgentName()
+								+ " : valid contract : set confirmation item to true for " + nextProducer);
+						toUpdate = true;
+					}
+				}
+				if (currentContract.hasDisagreement() || currentContract.hasExpired()) {
+					ConfirmationItem confirmationIiem = pConfirmationTable.getConfirmationItem2(consumerAgent,
+							nextProducer, isComplementary, ProsumerRole.CONSUMER);
+					// should contains a confirmation with a negative confirmation
+					if (confirmationIiem == null || confirmationIiem.getIsOK()) {
+						// Contract invalid
+						pConfirmationTable.confirmAsConsumer(consumerAgent, nextProducer, isComplementary, Boolean.FALSE,
+								"contract not valid anymore", 0);
+						logger.info("updateContractConfirmationProperty " + consumerAgent.getAgentName()
+								+ " : invalid contract : set confirmation item to false " + nextProducer);
+						toUpdate = true;
+					}
+				}
+			}
+			if (toUpdate) {
+				consumerAgent.replacePropertyWithName(new Property("CONTRACT_CONFIRM", pConfirmationTable));
+			}
+		}
+	}
+
+	public void sendConfirmation(EnergyAgent consumerAgent, boolean isOk, String logConfirmation) throws HandlingException  {
+		if(logConfirmation.contains("switch")) {
+			// For debug
+			logger.info("sendConfirmation " + consumerAgent.getAgentName() + " " + (this.isComplementary ? "compl." : "") + " isOk=" + isOk + " " + logConfirmation + " producers = " + currentContract.getProducerAgents());
+		}
+		ProtectedConfirmationTable pConfirmationTable = consumerAgent.getProtectedConfirmationTable(consumerAgent);
+		for(String nextProducer:currentContract.getProducerAgents()) {
+			pConfirmationTable.confirmAsConsumer(consumerAgent, nextProducer, isComplementary, Boolean.valueOf(isOk), logConfirmation, 0);
+		}
+		if(logConfirmation.contains("switch")) {
+			// For debug
+			logger.info("sendConfirmation " + consumerAgent.getAgentName() + " pConfirmationTable = " + pConfirmationTable);
+		}
+		consumerAgent.replacePropertyWithName(new Property("CONTRACT_CONFIRM", pConfirmationTable));
 	}
 
 	public void postExpiryEvent(EnergyAgent consumerAgent, PowerSlot mainContractPower) {
@@ -433,12 +482,14 @@ public class ContractProcessingData {
 						logger.info("addConfirmationItem --- validaiton of contract= " + currentContract.getConsumerAgent());
 						currentContract.checkBeginNotPassed();
 						// Add a CONTRACT_START event to indicate that the contract has been validated
-						startEvent = generateStartEvent(consumerAgent, mainContractPower);
+						String  log = currentContract.generateShortLog();
+						startEvent = generateStartEvent(consumerAgent, mainContractPower, log);
 						String sOfferIds = currentContract.getSingleOffersIdsStr();
 						// Set the ling to contract eventid in the corresponding offers
 						EnergyDbHelper.setSingleOfferLinkedToContract(currentContract, startEvent);
 						logger.info("addConfirmationItem Step2a : startEvent = " + startEvent + " current instance = " + this + " sOfferIds="
 								+ sOfferIds);
+						sendConfirmation(consumerAgent, Boolean.TRUE, "contract validated by all stackholders");
 					}
 				}
 				hasChanged = true;

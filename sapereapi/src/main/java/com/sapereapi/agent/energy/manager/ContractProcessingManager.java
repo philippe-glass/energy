@@ -7,7 +7,6 @@ import java.util.Map;
 import java.util.Set;
 
 import com.sapereapi.agent.energy.EnergyAgent;
-import com.sapereapi.agent.energy.OldConsumerAgent;
 import com.sapereapi.db.EnergyDbHelper;
 import com.sapereapi.exception.PermissionException;
 import com.sapereapi.exception.UnauthorizedModificationException;
@@ -23,6 +22,7 @@ import com.sapereapi.model.energy.PowerSlot;
 import com.sapereapi.model.energy.RegulationWarning;
 import com.sapereapi.model.protection.ProtectedConfirmationTable;
 import com.sapereapi.model.protection.ProtectedContract;
+import com.sapereapi.model.referential.ProsumerRole;
 import com.sapereapi.model.referential.WarningType;
 import com.sapereapi.util.SapereUtil;
 import com.sapereapi.util.UtilDates;
@@ -32,12 +32,9 @@ import eu.sapere.middleware.lsa.Property;
 public class ContractProcessingManager {
 	private ContractProcessingData mainProcessingData = null;
 	private ContractProcessingData secondProcessingData = null;
-	private int MAX_STOP_DECAY = 3;
 	private final static int CONTRACT_VALIDATION_DEALY_SEC = 10;
+	private final static int CONTRACT_MERGE_DELAY_SEC = 2;// 3;
 	private Date lastPostTime = null;
-
-	int stopDecay = 0;
-	int cContractDecay = 0;
 	int mergeContractsDecay = 0;
 	private long timeShiftMS = 0;
 	private static SapereLogger logger = SapereLogger.getInstance();
@@ -168,14 +165,17 @@ public class ContractProcessingManager {
 	}
 
 	public void cleanContracts(EnergyAgent consumerAgent) throws HandlingException {
+		if(mainProcessingData.getCurrentContract() == null &&
+				(secondProcessingData.isContractOnGoing() || secondProcessingData.isContractWaitingValidation())) {
+			// the secondary should not exists if the main contract does not exist
+			logger.error("cleanContracts : " + consumerAgent.getAgentName() + " : the secondary contract is still ongoing when there is no main contract. Second contract = " + secondProcessingData.getCurrentContract());
+			this.stopCurrentContract(consumerAgent, true, null, consumerAgent.getAgentName() + " : the main contract no longer exists");
+		}
 		cleanContract(consumerAgent, false);
 		cleanContract(consumerAgent, true);
 	}
 
 	public void cleanContract(EnergyAgent consumerAgent, boolean isComplementary) throws HandlingException {
-		if(consumerAgent instanceof OldConsumerAgent) {
-			consumerAgent.cleanEventProperties();	// Do not clean events another time for prosumer agent (already done in Prosumer Decay handling method)
-		}
 		Contract currentContract = getCurrentContract(isComplementary);
 		String contractPropertyTag = isComplementary? "CONTRACT2" : "CONTRACT1";
 		if (currentContract == null) {
@@ -192,7 +192,9 @@ public class ContractProcessingManager {
 				consumerAgent.getLsa().removePropertiesByName(contractPropertyTag);
 			} else if (currentContract.validationHasExpired()) {
 				// stop the contract if the validation has expired
-				this.stopCurrentContract(consumerAgent, isComplementary, null, consumerAgent.getAgentName() + " : contract validation has expired");
+				String log = "cleanContract " +  consumerAgent.getAgentName() + " : contract validation has expired";
+				logger.warning(log + ", currentContract = " + currentContract + ", aggrements = " + currentContract.getAgreements());
+				this.stopCurrentContract(consumerAgent, isComplementary, null, log);
 			}
 			if(currentContract == null && !isComplementary) {
 			}
@@ -281,11 +283,11 @@ public class ContractProcessingManager {
 				ProtectedContract protectedContract = new ProtectedContract(currentContract.clone());
 				consumerAgent.getLsa().removePropertiesByNames(new String[] { contractPropertyTag });
 				if (currentContract.hasDisagreement()) {
-					stopDecay = MAX_STOP_DECAY;
+					//stopDecay = MAX_STOP_DECAY;
 				}
 				// Add property to indicate that the contract is canceled
 				consumerAgent.replacePropertyWithName(new Property(contractPropertyTag, protectedContract));
-				cContractDecay = MAX_STOP_DECAY;
+				//cContractDecay = MAX_STOP_DECAY;
 				lastPostTime = getCurrentDate();
 			}
 		} catch (Exception e) {
@@ -362,13 +364,14 @@ public class ContractProcessingManager {
 			return mainProcessingData.needOffer();
 		}
 	}
+	/*
 	public EnergyEvent generateStartEvent(EnergyAgent consumerAgent, boolean isComplementary) throws HandlingException {
 		if(isComplementary) {
 			return secondProcessingData.generateStartEvent(consumerAgent, getMainContractPower());
 		} else {
 			return mainProcessingData.generateStartEvent(consumerAgent, null);
 		}
-	}
+	}*/
 
 	public EnergyEvent generateUpdateEvent(EnergyAgent consumerAgent, WarningType warningType, boolean isComplementary) throws HandlingException {
 		if(isComplementary) {
@@ -378,22 +381,6 @@ public class ContractProcessingManager {
 		}
 	}
 
-	/*
-	public EnergyEvent OLD_generateStopEvent(EnergyAgent consumerAgent, RegulationWarning warning, boolean isComplementary, String comment) throws HandlingException {
-		if(isComplementary) {
-			return secondProcessingData.generateStopEvent(consumerAgent, warning, comment);
-		} else {
-			return mainProcessingData.generateStopEvent(consumerAgent, warning, comment);
-		}
-	}
-
-	public EnergyEvent OLD_generateExpiryEvent(EnergyAgent consumerAgent, boolean isComplementary) throws HandlingException {
-		if(isComplementary) {
-			return secondProcessingData.generateExpiryEvent(consumerAgent);
-		} else {
-			return mainProcessingData.generateExpiryEvent(consumerAgent);
-		}
-	}*/
 
 	public void handleRequestChanges(EnergyAgent consumerAgent, String tag) throws HandlingException {
 		EnergyRequest newRequest = consumerAgent.getGlobalNeed();
@@ -490,24 +477,47 @@ public class ContractProcessingManager {
 	public void generateNewContract(EnergyAgent consumerAgent, CompositeOffer globalOffer) throws HandlingException {
 		Date validationDeadline = UtilDates.shiftDateSec(getCurrentDate(), CONTRACT_VALIDATION_DEALY_SEC);
 		Contract newContract = new Contract(globalOffer, validationDeadline);
-		logger.info("generateNewContract : contract princg table = " + newContract.getPricingTable() + ", reqEventId = " + newContract.getRequest().getEventId());
+		logger.info("generateNewContract : globalOffer = " + globalOffer + ", contract princg table = " + newContract.getPricingTable() + ", reqEventId = " + newContract.getRequest().getEventId());
 		newContract.checkDates(logger, "generateNewContract");
-		Date test = UtilDates.removeTime(new Date());
-		if(newContract.getBeginDate().after(test)) {
-			logger.info("generateNewContract : for debug ");
-		}
 		newContract.addAgreement(consumerAgent, true);
 		setCurrentContract(newContract);
 		refreshContractProperties(consumerAgent, newContract.isComplementary());
+		updateContractConfirmationProperty(consumerAgent, newContract.isComplementary());
+		//sendConfirmation(consumerAgent, newContract.isComplementary(), true, );
 		refreshLsaProperties(consumerAgent);
 		EnergyDbHelper.setSingleOfferAccepted(globalOffer);
 		logger.info(" consumer " + consumerAgent.getAgentName() + " set offer accepted : id:" + newContract.getSingleOffersIdsStr());
 	}
 
-	public void handleProducerConfirmation(EnergyAgent consumerAgent, String producer, ProtectedConfirmationTable producerConfirmTable) throws HandlingException {
+	public void updateContractConfirmationProperty(EnergyAgent consumerAgent) throws HandlingException {
+		if(mainProcessingData.getCurrentContract() != null) {
+			mainProcessingData.updateContractConfirmationProperty(consumerAgent);
+		}
+		if(secondProcessingData.getCurrentContract() != null) {
+			secondProcessingData.updateContractConfirmationProperty(consumerAgent);
+		}
+	}
+
+	public void updateContractConfirmationProperty(EnergyAgent consumerAgent, boolean isComplentary) throws HandlingException {
+		if(isComplentary) {
+			secondProcessingData.updateContractConfirmationProperty(consumerAgent);
+		} else {
+			mainProcessingData.updateContractConfirmationProperty(consumerAgent);
+		}
+	}
+
+	public void sendConfirmation(EnergyAgent consumerAgent, boolean isComplentary, boolean isOk, String logConfirmation) throws HandlingException {
+		if(isComplentary) {
+			secondProcessingData.sendConfirmation(consumerAgent, isOk, logConfirmation);
+		} else {
+			mainProcessingData.sendConfirmation(consumerAgent, isOk, logConfirmation);
+		}
+	}
+
+	public void handleProducerConfirmation(EnergyAgent consumerAgent, ProtectedConfirmationTable producerConfirmTable) throws HandlingException {
 		// handle confirmation for both main and complementary processing data
-		this.handleProducerConfirmation(consumerAgent, producer, false, producerConfirmTable);
-		this.handleProducerConfirmation(consumerAgent, producer, true, producerConfirmTable);
+		this.handleProducerConfirmation(consumerAgent, false, producerConfirmTable);
+		this.handleProducerConfirmation(consumerAgent, true, producerConfirmTable);
 	}
 
 	public boolean handleConfirmationItem(EnergyAgent consumerAgent, String producer, ConfirmationItem confirmationItem) throws HandlingException {
@@ -516,11 +526,17 @@ public class ContractProcessingManager {
 			result = secondProcessingData.addConfirmationItem(consumerAgent, producer, confirmationItem, getMainContractPower());
 			if(result && secondProcessingData.isContractOnGoing()) {
 				if(mainProcessingData.checkCanMerge(secondProcessingData.getCurrentContract())) {
-					mergeContractsDecay = 3;
+					mergeContractsDecay = CONTRACT_MERGE_DELAY_SEC;
 				}
 			}
 		} else {
 			result = mainProcessingData.addConfirmationItem(consumerAgent, producer, confirmationItem, null);
+			if(!confirmationItem.getIsOK() && (secondProcessingData.isContractOnGoing() || secondProcessingData.isContractWaitingValidation())) {
+				ConfirmationItem confirmationItem2 =  confirmationItem.clone();
+				confirmationItem2.setIsComplementary(true);
+				logger.warning("handleConfirmationItem the second contrat should also be stopped with " + confirmationItem2);
+				secondProcessingData.addConfirmationItem(consumerAgent, producer, confirmationItem2, getMainContractPower());
+			}
 		}
 		if(result) {
 			refreshContractProperties(consumerAgent, confirmationItem.isComplementary());
@@ -528,31 +544,37 @@ public class ContractProcessingManager {
 		return result;
 	}
 
-	public void handleProducerConfirmation(EnergyAgent consumerAgent, String producer, boolean isComplementary,
+	public void handleProducerConfirmation(EnergyAgent consumerAgent,  boolean isComplementary,
 			ProtectedConfirmationTable producerConfirmTable) throws HandlingException {
 		String comment = "";
+		String producer = producerConfirmTable.getIssuer(consumerAgent);
 		Contract currentContract = getCurrentContract(isComplementary);
 		String agentName = consumerAgent.getAgentName();
+		String sLogBegin = "handleProducerConfirmation " + consumerAgent.getAgentName() + " : ";
 		if (currentContract == null) {
 			// Nothing to do
 		} else if (currentContract.validationHasExpired()) {
-			logger.warning("addProducerConfirmation " + agentName  + " validationHasExpired(2) : invalidate contract");
+			logger.warning(sLogBegin  + "validationHasExpired(2) : invalidate contract");
 			comment = agentName + " : the validation has expired";
 			stopCurrentContract(consumerAgent, isComplementary, null, comment);
 		} else if (this.hasProducer(producer, isComplementary)) {
 			try {
-				if (producerConfirmTable.hasAccesAsConsumer(consumerAgent)) {
-					ConfirmationItem confirmation = producerConfirmTable.getConfirmationItem(consumerAgent, isComplementary);
+				if (producerConfirmTable.hasAccessAsStackholder(consumerAgent)) {
+					ConfirmationItem confirmation = producerConfirmTable.getConfirmationItem(consumerAgent, isComplementary, ProsumerRole.PRODUCER);
 					if(confirmation!=null) {
 						if (currentContract.isWaitingValidation()) {
-							logger.info("addProducerConfirmation " + agentName + " Current contract waiting validation " + producer);
+							logger.info(sLogBegin  + "Current contract waiting validation " + producer + " , confirmation = " + confirmation);
 						}
 						if(confirmation.isComplementary() == isComplementary) {
 							Date confirmationDate = confirmation.getDate();
 							if(confirmationDate.before(currentContract.getBeginDate())) {
-								logger.warning("addProducerConfirmation " + consumerAgent.getAgentName() + " this confirmation ["
-										+ confirmation + " at " + UtilDates.formatTimeOrDate(confirmationDate, timeShiftMS) + "] of " + producer
-										+ " is before the contract begin date : it will not be taken into account ");
+								String sContractDate = UtilDates.format_time.format(currentContract.getBeginDate());
+								logger.warning(sLogBegin + "the confirmation " + confirmation + " from " + producer
+										+ " is before the contract begin date " + sContractDate
+										+ " :  it will not be taken into account ");
+								if (confirmation.getIsOK() != null && !confirmation.getIsOK().booleanValue()) {
+									logger.warning(sLogBegin + " for debug : step 789");
+								}
 							} else {
 								comment = confirmation.getComment();
 								// Add received confirmations in memory
@@ -747,6 +769,13 @@ public class ContractProcessingManager {
 				}
 			}
 		}
+		// Update contract confirmation if needed
+		try {
+			updateContractConfirmationProperty(consumerAgent);
+		} catch (HandlingException e) {
+			logger.error(e);
+		}
+		// TODO : check contract confirmation ?
 	}
 
 	/**

@@ -8,9 +8,11 @@ import java.util.List;
 import java.util.Map;
 import java.util.TimeZone;
 
+import com.sapereapi.model.EnergyStorageSetting;
 import com.sapereapi.model.PredictionSetting;
 import com.sapereapi.model.energy.AgentForm;
 import com.sapereapi.model.energy.Device;
+import com.sapereapi.model.energy.StorageType;
 import com.sapereapi.model.energy.node.NodeContent;
 import com.sapereapi.model.energy.node.NodeTotal;
 import com.sapereapi.model.energy.pricing.PricingTable;
@@ -54,12 +56,13 @@ public class HomeSimulator extends TestSimulator {
 		Date current = getCurrentDate();
 		ProsumerRole prosumerRole = aDevice.isProducer() ? ProsumerRole.PRODUCER : ProsumerRole.CONSUMER;
 		DeviceCategory deviceCategory = aDevice.getCategory();
+		EnergyStorageSetting energyStorageSetting = null;
 		// DeviceCategory test = DeviceCategory.getByName("WASHING_DRYING");
 		Date endDate = UtilDates.shiftDateMinutes(current, duration);
 		long timeShiftMS = UtilDates.computeTimeShiftMS(datetimeShifts);
 		PricingTable pricingTable = new PricingTable(timeShiftMS);//new PricingTable(current, endDate, 0);
 		AgentInputForm result = new AgentInputForm(prosumerRole, "", aDevice.getName(), deviceCategory, aDevice.getEnvironmentalImpact(), pricingTable.getMapPrices(), power, current, endDate,
-				priority, duration, timeShiftMS);
+				priority, duration, energyStorageSetting, timeShiftMS);
 		if (existingForm != null) {
 			result.setAgentName(existingForm.getAgentName());
 			result.setId(existingForm.getId());
@@ -587,9 +590,10 @@ public class HomeSimulator extends TestSimulator {
 		format_datetime.setTimeZone(TimeZone.getTimeZone("GMT"));
 		String scenario = HomeSimulator.class.getSimpleName();
 		datetimeShifts.clear();
-		PredictionSetting nodePredicitonSetting = new PredictionSetting(Boolean.FALSE, null, LearningModelType.MARKOV_CHAINS);
-		PredictionSetting clusterPredicitonSetting = new PredictionSetting(Boolean.FALSE, null, LearningModelType.MARKOV_CHAINS);
-		InitializationForm initForm = new InitializationForm(scenario, maxTotalPower, datetimeShifts, nodePredicitonSetting, clusterPredicitonSetting);
+		EnergyStorageSetting energyStorageSetting = new EnergyStorageSetting();
+		PredictionSetting nodePredicitonSetting = new PredictionSetting(Boolean.FALSE, null, LearningModelType.MARKOV_CHAINS, 1);
+		PredictionSetting clusterPredicitonSetting = new PredictionSetting(Boolean.FALSE, null, LearningModelType.MARKOV_CHAINS, 1);
+		InitializationForm initForm = new InitializationForm(scenario, maxTotalPower, datetimeShifts, energyStorageSetting, nodePredicitonSetting, clusterPredicitonSetting);
 		//initForm.setInitialState("consumed", 7);
 		initEnergyService(defaultbaseUrl, initForm);
 		try {

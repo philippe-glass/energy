@@ -1079,22 +1079,7 @@ public class IterationMatrix implements Cloneable, java.io.Serializable {
 		 * */
 		return result;
 	}
-/*
-	public OldIterationMatrix2 generateIterationMatrix2() {
-		OldIterationMatrix2 result = new OldIterationMatrix2(rowNb, colNb);
-		Map<Integer, Double>[][] C = new Map[rowNb][colNb];
-		for (int i = 0; i < rowNb; i++) {
-			for (int j = 0; j < colNb; j++) {
-				IterationObsNb itValues = content[i][j];
-				for (Integer nextIteration : itValues.getIerations()) {
-					Double nextValue = itValues.getValue(nextIteration);
-					result.set(i, j, nextIteration, nextValue);
-				}
-			}
-		}
-		return result;
-	}
-*/
+
 
 	public List<Integer> generateIterations() {
 		List<Integer> result = new ArrayList<Integer>();

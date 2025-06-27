@@ -22,7 +22,7 @@ import eu.sapere.middleware.lsa.values.IAggregateable;
 
 public interface ILearningModel extends IAggregateable {
 
-	public static final String OP_SAMPLING_NB = "w_sampling_nb";
+	public static final String OP_SAMPLING_NB = "sampling_nb";
 	public static final String OP_POWER_LOSS = "power_loss";
 	public static final String OP_MIN_LOSS = "min_loss";
 	public static final String OP_DISTANCE_POWER_PROFILE = "dist_power_hist";
@@ -60,7 +60,7 @@ public interface ILearningModel extends IAggregateable {
 
 	public void cleanHistory(long maxHistoryDurationMS, AbstractLogger logger);
 
-	public int getNbOfObservations(String variable);
+	public int getSamplingNb(String variable);
 
 	public PredictionData computePrediction(Date initDate, List<Date> targetDates, String[] variables,
 			boolean useCorrections, AbstractLogger logger) throws HandlingException;

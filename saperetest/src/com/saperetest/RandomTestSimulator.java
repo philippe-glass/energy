@@ -4,9 +4,11 @@ import java.util.Date;
 import java.util.Random;
 import java.util.TimeZone;
 
+import com.sapereapi.model.EnergyStorageSetting;
 import com.sapereapi.model.PredictionSetting;
 import com.sapereapi.model.energy.AgentForm;
 import com.sapereapi.model.energy.Device;
+import com.sapereapi.model.energy.StorageType;
 import com.sapereapi.model.energy.node.NodeTotal;
 import com.sapereapi.model.energy.pricing.PricingTable;
 import com.sapereapi.model.energy.input.AgentInputForm;
@@ -31,9 +33,10 @@ public class RandomTestSimulator extends TestSimulator {
 			logger.error(e);
 		}
 		String scenario = RandomTestSimulator.class.getSimpleName();
-		PredictionSetting nodePredictionSetting = new PredictionSetting(false, null, LearningModelType.MARKOV_CHAINS);
-		PredictionSetting clusterPredictionSetting = new PredictionSetting(false, null, LearningModelType.MARKOV_CHAINS);
-		InitializationForm initForm = new InitializationForm(scenario, maxTotalPower, datetimeShifts, nodePredictionSetting, clusterPredictionSetting);
+		EnergyStorageSetting energyStorageSetting = new EnergyStorageSetting();
+		PredictionSetting nodePredictionSetting = new PredictionSetting(false, null, LearningModelType.MARKOV_CHAINS, 1);
+		PredictionSetting clusterPredictionSetting = new PredictionSetting(false, null, LearningModelType.MARKOV_CHAINS, 1);
+		InitializationForm initForm = new InitializationForm(scenario, maxTotalPower, datetimeShifts, energyStorageSetting, nodePredictionSetting, clusterPredictionSetting);
 		initEnergyService(defaultbaseUrl, initForm);
 
 		format_datetime.setTimeZone(TimeZone.getTimeZone("GMT"));
@@ -49,16 +52,16 @@ public class RandomTestSimulator extends TestSimulator {
 			addAgent(defaultbaseUrl,
 					new AgentInputForm(ProsumerRole.PRODUCER, "", "SIG", DeviceCategory.EXTERNAL_ENG, EnvironmentalImpact.MEDIUM, pricingTable.getMapPrices(), 31.0, current
 					,UtilDates.shiftDateMinutes(current, 24 * 60 * 365)
-					, PriorityLevel.LOW, 24. * 60 * 365, timeShiftMS));
+					, PriorityLevel.LOW, 24. * 60 * 365, energyStorageSetting, timeShiftMS));
 			addAgent(defaultbaseUrl
 					, new AgentInputForm(ProsumerRole.PRODUCER, "", "Wind Turbin-1", DeviceCategory.WIND_ENG, EnvironmentalImpact.LOW, pricingTable.getMapPrices(), 18.,current
 					,UtilDates.shiftDateMinutes(current, 60)
-					, PriorityLevel.LOW, 24. * 60 * 365, timeShiftMS));
+					, PriorityLevel.LOW, 24. * 60 * 365, energyStorageSetting, timeShiftMS));
 			// Add consumer agent
 			addAgent(defaultbaseUrl
 					, new AgentInputForm(ProsumerRole.CONSUMER, "", "Refrigerator", DeviceCategory.COLD_APPLIANCES, EnvironmentalImpact.MEDIUM, pricingTable.getMapPrices(), 23.1, current
 					,UtilDates.shiftDateMinutes(current, 24 * 60 * 365),
-					PriorityLevel.HIGH, 24. * 60 * 365, timeShiftMS));
+					PriorityLevel.HIGH, 24. * 60 * 365, energyStorageSetting, timeShiftMS));
 			/*
 			 * addAgent( new AgentForm(AgentType.CONSUMER, "", new Float(2000), current,
 			 * SapereUtil.shiftDateMinutes(current, new Float(60)) , PriorityLevel.LOW, new
