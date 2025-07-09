@@ -14,14 +14,16 @@ There are 3 different Java projects (one for each software component). They can 
 Python projects:
 
 These are two independent python projects, both of which can be imported into the PyCharm integrated development environment:
- . download_gcp_file}: This project includes scripts for importing smart-meter measurement data from the Exoscale cloud made available by the school HES-SO Geneva. This measurement data is extracted from files and stored in the database. The download_gcp_file project is independent of other projects and only imports a specific library to query the Exoscale cloud server.
- . lstm: This is the source code for the machine learning service, which currently only implements the LSTM model. This project uses the Keras and TensorFlow external libraries for machine learning and the Flask library, which defines a REST server model. The executable file (app.py) corresponds to the source of the Flask REST server.
-%
-\subsection{Angular JS projects}
-%
-% \textcolor{red}{to be completed}
-%
-This is the \textbf{sapereangular} project, which can be imported into the Visual Studio Code integrated development environment. This project contains the source code of the front web server. There is one instance of the front-end web server running per platform coordination. The project is broken down into one module per web page, which is accessed as a tab, and each web page contains 3 types of source file: the HTML template, the controller that interacts with the REST server (.ts file) and the css style sheet.
+ . download_gcp_file}: This project includes scripts for importing smart-meter measurement data from the Exoscale cloud made available by the school HES-SO Geneva.
+	This measurement data is extracted from files and stored in the database. The download_gcp_file project is independent of other projects and only imports a specific library to query the Exoscale cloud server.
+ . lstm: This is the source code for the machine learning service, which currently only implements the LSTM model. This project uses the Keras and TensorFlow external libraries for machine learning and the Flask library, which defines a REST server model. 
+	The executable file (app.py) corresponds to the source of the Flask REST server.
+
+Angular JS projects:
+
+This is the sapereangular project, which can be imported into the Visual Studio Code integrated development environment.
+This project contains the source code of the front web server. There is one instance of the front-end web server running per platform coordination.
+ The project is broken down into one module per web page, which is accessed as a tab, and each web page contains 3 types of source file: the HTML template, the controller that interacts with the REST server (.ts file) and the css style sheet.
 
 
 
