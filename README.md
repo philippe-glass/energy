@@ -1,5 +1,5 @@
-To start the project:
-$ docker-compose up
+The source code includes the various components defined in the software architecture (see figure https://github.com/philippe-glass/energy/blob/master/docs/schemas/images/architecture_with_raspberry_pi.png). 
+The coordination platform service is a Java application, while the web application uses AngularJS and the machine learning server (not shown in the figure) runs in Python.
 
 
 Java projects:
@@ -8,11 +8,11 @@ There are 3 different Java projects (one for each software component). They can 
  . sapereMiddlewareStandalone: This project contains the source code for the middleware library derived from SAPERE. It generates the SapereV1.jar library, which defines the tuple space and coordination mechanisms. This library is not directly executable.
  . sapereapi: This project contains the source code for the coordination platform service and the Digital Twins. It imports the SapereV1.jar library and generates the executable library coordination_platform.jar which corresponds to the light server (its main class is $LightServer$ class). This service can also run using a Spring server (in this case, we launch the $SapereAPIApplication$ class). For this reason, the sapereapi project is a 'Spring-boot' project and uses the Spring and Maven libraries. It should be noted that the Spring server is no longer regularly used, as the Spring server consumes more memory than the 'light' server.
  . saperetest: This project contains the test simulators: there is one main class per simulator. This project imports the coordiantion_plarform.jar library because the simulators use certain classes defined in the coordination platform, such as the structures of the various objects exchanged with the different REST services (input and output objects).
-%
+
 
 
 Python projects:
-%
+
 These are two independent python projects, both of which can be imported into the PyCharm integrated development environment:
  . download_gcp_file}: This project includes scripts for importing smart-meter measurement data from the Exoscale cloud made available by the school HES-SO Geneva. This measurement data is extracted from files and stored in the database. The download_gcp_file project is independent of other projects and only imports a specific library to query the Exoscale cloud server.
  . lstm: This is the source code for the machine learning service, which currently only implements the LSTM model. This project uses the Keras and TensorFlow external libraries for machine learning and the Flask library, which defines a REST server model. The executable file (app.py) corresponds to the source of the Flask REST server.
