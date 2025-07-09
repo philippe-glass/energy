@@ -4,7 +4,7 @@ The coordination platform service is a Java application, while the web applicati
 
 Java projects:
 There are 3 different Java projects (one for each software component). They can be easily imported into the Eclipse Integrated Development Environment.
-%
+
  . sapereMiddlewareStandalone: This project contains the source code for the middleware library derived from SAPERE. It generates the SapereV1.jar library, which defines the tuple space and coordination mechanisms. This library is not directly executable.
  . sapereapi: This project contains the source code for the coordination platform service and the Digital Twins. It imports the SapereV1.jar library and generates the executable library coordination_platform.jar which corresponds to the light server (its main class is $LightServer$ class). This service can also run using a Spring server (in this case, we launch the $SapereAPIApplication$ class). For this reason, the sapereapi project is a 'Spring-boot' project and uses the Spring and Maven libraries. It should be noted that the Spring server is no longer regularly used, as the Spring server consumes more memory than the 'light' server.
  . saperetest: This project contains the test simulators: there is one main class per simulator. This project imports the coordiantion_plarform.jar library because the simulators use certain classes defined in the coordination platform, such as the structures of the various objects exchanged with the different REST services (input and output objects).
