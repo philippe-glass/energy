@@ -12,7 +12,9 @@ import java.util.List;
 import java.util.Map;
 import java.util.Random;
 import java.util.Set;
+import java.util.SortedSet;
 import java.util.TimeZone;
+import java.util.TreeSet;
 
 import org.json.JSONObject;
 
@@ -55,6 +57,7 @@ import com.sapereapi.model.energy.input.AgentFilter;
 import com.sapereapi.model.energy.input.AgentInputForm;
 import com.sapereapi.model.energy.node.MultiNodesContent;
 import com.sapereapi.model.energy.node.NodeContent;
+import com.sapereapi.model.energy.policy.EmptyPricePolicy;
 import com.sapereapi.model.energy.policy.IConsumerPolicy;
 import com.sapereapi.model.energy.policy.IProducerPolicy;
 import com.sapereapi.model.energy.policy.LowestPricePolicy;
@@ -909,6 +912,44 @@ public class Sapere {
 		return getLsas();
 	}
 
+
+
+	public static PricingTable initTragedyOfComPricingTable(int priceDurationMinutes) {
+		Map<Integer, Double> simplePicingTable = new HashMap<Integer, Double>();
+		if (nodeContext != null) {
+			Date current = nodeContext.getCurrentDate();
+			// Date end = UtilDates.shiftDateMinutes(current, 60);
+			int time = 0;
+
+			// simplePicingTable.put(time, 10.0);
+			// time += 1;
+			// simplePicingTable.put(time, 10.0);
+			// time += 1;
+			simplePicingTable.put(time, 6.0);
+			time += priceDurationMinutes;
+			simplePicingTable.put(time, 7.0);
+			time += priceDurationMinutes;
+			simplePicingTable.put(time, 8.0);
+			time += priceDurationMinutes;
+			simplePicingTable.put(time, 9.0);
+			time += priceDurationMinutes;
+			simplePicingTable.put(time, 10.0);
+			time += 20 * priceDurationMinutes;
+			simplePicingTable.put(time, 10.0);
+			// Date lastStepDate = null;
+			PricingTable pricingTable = new PricingTable(nodeContext.getTimeShiftMS());
+			SortedSet<Integer> keys = new TreeSet<>(simplePicingTable.keySet());
+			for (int step : keys) {
+				Double rate = simplePicingTable.get(step);
+				Date nextStepDate = UtilDates.shiftDateMinutes(current, step);
+				pricingTable.putRate(nextStepDate, rate, null);
+				// lastStepDate = nextStepDate;
+			}
+			return pricingTable;
+		}
+		return new PricingTable(0);
+	}
+
 	// Tragedy of the commons
 	public List<Service> testTragedyOfTheCommons(ServerConfig serverConfig, boolean useDynamicPricingPolicy) throws HandlingException {
 		initEnergyService(serverConfig, generateDefaultInitForm("testTragedyOfTheCommons"));
@@ -917,33 +958,37 @@ public class Sapere {
 		PricingTable pricingTable = initPricingTable(minutesByStep);// new PricingTable();
 		*/
 		String policyId = useDynamicPricingPolicy? PolicyFactory.POLICY_LOWEST_DEMAND : null;
-		IProducerPolicy producerPolicy = policyFactory.initProducerPolicy(policyId, false);
+		int priceDurationMinutes = 30;// 3;
+		PricingTable pricingTable = initTragedyOfComPricingTable(priceDurationMinutes);
+		IProducerPolicy producerPolicy = policyFactory.initProducerPolicy(policyId, false, 0);
+		producerPolicy.setDefaultPricingTable(pricingTable);
 		EnergyStorageSetting energyStorageSetting = null;
 		/*
 		IProducerPolicy producerPolicy = useDynamicPricingPolicy
 				? new LowestDemandPolicy(pricingTable, IProducerPolicy.POLICY_PRIORITIZATION)
 				: policyFactory.initDefaultProducerPolicy();
 				*/
-		DeviceProperties devicePropeties1 = new DeviceProperties("SIG", DeviceCategory.EXTERNAL_ENG,
+		DeviceProperties deviceSupplier = new DeviceProperties("SIG", DeviceCategory.EXTERNAL_ENG,
 				EnvironmentalImpact.MEDIUM);
 		Date current = nodeContext.getCurrentDate(); // getCurrentMinute();
-		addServiceProducer(generateSupply(33.0, current, 60., devicePropeties1, producerPolicy.getDefaultPricingTable())
+		addServiceProducer(generateSupply(33.0, current, 180., deviceSupplier, producerPolicy.getDefaultPricingTable())
 				, energyStorageSetting, producerPolicy, policyFactory.initDefaultConsumerPolicy());
-		IConsumerPolicy lowestPricePolicy = new LowestPricePolicy();
+		IConsumerPolicy consumerPolicy = useDynamicPricingPolicy ? new LowestPricePolicy() : new EmptyPricePolicy();
 		int nbAgents = 10;
-		int priceDurationMinutes = PolicyFactory.getPriceDurationMinutes();
+		//int priceDurationMinutes = PolicyFactory.getPriceDurationMinutes();
 		//nbAgents = 1;
 		for (int i = 0; i < nbAgents; i++) {
 			Date dateBegin = UtilDates.shiftDateSec(current, 5);
 			logger.info("testTragedyOfTheCommons current = " + UtilDates.format_date_time.format(current)
 					+ ", dateBegin = " + UtilDates.format_date_time.format(dateBegin));
-			Date lastPriceDate = producerPolicy.getDefaultPricingTable().getEndDate();
-			Date dateEnd = UtilDates.shiftDateSec(lastPriceDate, priceDurationMinutes * 30);
+			//Date lastPriceDate = producerPolicy.getDefaultPricingTable().getEndDate();
+			//Date dateEnd = UtilDates.shiftDateSec(lastPriceDate, priceDurationMinutes * 30);
+			Date dateEnd = UtilDates.shiftDateSec(dateBegin, priceDurationMinutes * 60);
 			Double power = 10.0;
 			DeviceProperties devicePropeties2 = new DeviceProperties("Battery-" + (1+i), DeviceCategory.OTHER,
 					EnvironmentalImpact.MEDIUM);
 			EnergyRequest request = generateRequest(power, dateBegin, dateEnd, 120., PriorityLevel.LOW, devicePropeties2);
-			addServiceConsumer(request, energyStorageSetting, policyFactory.initDefaultProducerPolicy() , lowestPricePolicy);
+			addServiceConsumer(request, energyStorageSetting, policyFactory.initDefaultProducerPolicy() , consumerPolicy);
 		}
 		return getLsas();
 	}

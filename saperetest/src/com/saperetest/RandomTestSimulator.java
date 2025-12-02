@@ -8,7 +8,6 @@ import com.sapereapi.model.EnergyStorageSetting;
 import com.sapereapi.model.PredictionSetting;
 import com.sapereapi.model.energy.AgentForm;
 import com.sapereapi.model.energy.Device;
-import com.sapereapi.model.energy.StorageType;
 import com.sapereapi.model.energy.node.NodeTotal;
 import com.sapereapi.model.energy.pricing.PricingTable;
 import com.sapereapi.model.energy.input.AgentInputForm;

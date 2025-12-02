@@ -11,6 +11,7 @@ import com.sapereapi.model.energy.pricing.PricingTable;
 public interface IProducerPolicy extends IEnergyAgentPolicy {
 	PricingTable getDefaultPricingTable();
 	PricingTable getPricingTable(EnergyAgent producerAgent);
+	void setDefaultPricingTable(PricingTable defaultPricingTable);
 	boolean hasDefaultPrices();
 	List<EnergyRequest> sortRequests(Collection<EnergyRequest> listWaitingRequest);
 	public boolean confirmSupply(EnergyAgent produserAgent, EnergyRequest request);

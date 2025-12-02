@@ -17,7 +17,7 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 public class Latex2DocMain {
-	private static boolean readThesisResport = true;
+	private static boolean readThesisResport = false;
 	private static boolean useChapters = readThesisResport ? true : false;// true;
 	private static String sourceTexDir =readThesisResport ? "PhD-PhilippeGlass/chapters" : null;
 	private static boolean activateDebug = false;// true;
@@ -52,6 +52,7 @@ public class Latex2DocMain {
 		tagsSimpleReplace.put("\\textcolor{cyan}", "");
 		tagsSimpleReplace.put("\\textcolor{gray}", "");
 		tagsSimpleReplace.put("\\begin{scriptsize}", "");
+		tagsSimpleReplace.put("\\begin{center}", "");
 		tagsSimpleReplace.put("\\end{scriptsize}", "");
 		tagsSimpleReplace.put("\\begin{abstract}", "");
 		tagsSimpleReplace.put("\\end{abstract}", "");
@@ -61,6 +62,7 @@ public class Latex2DocMain {
 		tagsSimpleReplace.put("\\Huge", "");
 		tagsSimpleReplace.put("\\huge", "");
 		tagsSimpleReplace.put("\\normalsize", "");
+		tagsSimpleReplace.put("\\sep", ",");
 		//tagsSimpleReplace.put("\\caption{", "");
 	}
 	final static Map<String, Object> tagsReplaceBraceBlocs = new HashMap<>();
@@ -80,6 +82,7 @@ public class Latex2DocMain {
 		tagsReplaceBraceBlocs.put("\\Title", "%:");
 		tagsReplaceBraceBlocs.put("\\large", "%");
 		tagsReplaceBraceBlocs.put("\\Large", "%");
+		tagsReplaceBraceBlocs.put("\\textbf", "%");
 		tagsReplaceBraceBlocs.put("\\huge", "%");
 		tagsReplaceBraceBlocs.put("\\Huge", "%");
 		tagsReplaceBraceBlocs.put("\\textit", "%");

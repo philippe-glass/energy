@@ -13,9 +13,8 @@ public class LowestDemandPolicy extends BasicProducerPolicy {
 
 	// private Map<String, ReducedContract> _mapContracts = new HashMap<>();
 
-	public LowestDemandPolicy(NodeContext nodeContext, PricingTable defaultPricingTable, int requestSelectionPolicy, boolean useAwardCredits) {
-		super(nodeContext, defaultPricingTable, requestSelectionPolicy, useAwardCredits);
-		this.defaultPricingTable = defaultPricingTable;
+	public LowestDemandPolicy(NodeContext nodeContext, double defaultRate, int requestSelectionPolicy, boolean useAwardCredits) {
+		super(nodeContext, PricingTable.initSimplePricingTable(nodeContext, defaultRate), requestSelectionPolicy, useAwardCredits);
 	}
 
 	/*

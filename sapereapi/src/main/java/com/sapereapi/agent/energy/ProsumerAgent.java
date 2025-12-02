@@ -26,7 +26,6 @@ import com.sapereapi.model.energy.EnergyRequest;
 import com.sapereapi.model.energy.EnergyStorage;
 import com.sapereapi.model.energy.EnergySupply;
 import com.sapereapi.model.energy.EnergyWithdrawal;
-import com.sapereapi.model.energy.StorageSupply;
 import com.sapereapi.model.energy.IEnergyRequest;
 import com.sapereapi.model.energy.IEnergySupply;
 import com.sapereapi.model.energy.PowerSlot;
@@ -34,6 +33,7 @@ import com.sapereapi.model.energy.ProsumerProperties;
 import com.sapereapi.model.energy.ReducedContract;
 import com.sapereapi.model.energy.RegulationWarning;
 import com.sapereapi.model.energy.SingleOffer;
+import com.sapereapi.model.energy.StorageSupply;
 import com.sapereapi.model.energy.award.AwardItem;
 import com.sapereapi.model.energy.award.AwardsTable;
 import com.sapereapi.model.energy.policy.IConsumerPolicy;
@@ -400,9 +400,9 @@ public class ProsumerAgent extends EnergyAgent implements IEnergyAgent {
 								if(this.consumerPolicy != null) {
 									// retrieve pricing table from producers
 									Property pProd = chosenLSA.getOnePropertyByName("PROD");
-									if(pProd!=null && pProd.getValue() instanceof EnergySupply) {
-										EnergySupply supply = (EnergySupply)pProd.getValue();
-										consumerPolicy.setProducerPricingTable(supply);
+									if(pProd!=null && pProd.getValue() instanceof ProsumerEnergySupply) {
+										ProsumerEnergySupply supply = (ProsumerEnergySupply)pProd.getValue();
+										consumerPolicy.setProducerPricingTable(supply.generateSimpleSupply());
 									}
 								}
 								// Handle properties from consumer

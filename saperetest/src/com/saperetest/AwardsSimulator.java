@@ -29,6 +29,8 @@ public class AwardsSimulator extends TestSimulator {
 	static int loopIdx = 0;
 	static int powerIdx = 0;
 	static PricingTable pricingTable = null;
+	static int scenarioDurationMinutes = 20;
+	static Date endOfScenario = UtilDates.shiftDateMinutes(getCurrentDate(), scenarioDurationMinutes);
 	static {
 		mapPowers  = new TreeMap<String, List<Double>>();
 		/*
@@ -75,6 +77,7 @@ public class AwardsSimulator extends TestSimulator {
 		} catch (Exception e) {
 			logger.error(e);
 		}
+
 		String scenario = AwardsSimulator.class.getSimpleName();
 		InitializationForm initForm = new InitializationForm();
 		EnergyStorageSetting globalEnergyStorageSetting = null; //new EnergyStorageSetting(true, true, StorageType.PRIVATE, 100);
@@ -98,9 +101,13 @@ public class AwardsSimulator extends TestSimulator {
 			EnvironmentalImpact envImpact = isFreeRider ? EnvironmentalImpact.MEDIUM : EnvironmentalImpact.LOW;
 			DeviceCategory category = power > 0 ? DeviceCategory.BIOMASS_ENG : DeviceCategory.COOKING;
 			EnergyStorageSetting privateEnergyStorageSetting = new EnergyStorageSetting(true, true, StorageType.PRIVATE, 100, 0);
+			privateEnergyStorageSetting = new EnergyStorageSetting(false, false, StorageType.PRIVATE, 100, 0);
 			category = DeviceCategory.HYBRID;
 			double durantionMinutes = 60;
 			Date endDate = UtilDates.shiftDateMinutes(current, durantionMinutes);
+			if(endDate.after(endOfScenario)) {
+				endDate = endOfScenario;
+			}
 			AgentInputForm inputForm = new AgentInputForm(prosumerRole, "", agentName, category,
 					envImpact, pricingTable.getMapPrices(), Math.abs(power), current, endDate, PriorityLevel.MEDIUM,
 					durantionMinutes, privateEnergyStorageSetting, timeShiftMS);
@@ -112,7 +119,6 @@ public class AwardsSimulator extends TestSimulator {
 			inputForm.setUseAwardCredits(true);
 			addAgent(defaultbaseUrl, inputForm);
 		}
-		Date endOfScenario = UtilDates.shiftDateMinutes(current, 180 * 1);
 		int periodSeconds = 30;
 		periodSeconds = 60;
 		//periodSeconds = 20;
@@ -177,6 +183,9 @@ public class AwardsSimulator extends TestSimulator {
 					double durantionMinutes = 5; //.60;
 					Date beginDate = getCurrentDate();
 					Date endDate = UtilDates.shiftDateMinutes(beginDate, durantionMinutes);
+					if(endDate.after(endOfScenario)) {
+						endDate = endOfScenario;
+					}
 					agentInputForm.setBeginDate(beginDate);
 					agentInputForm.setEndDate(endDate);
 					//agentInputForm.setDelayToleranceRatio(1.0);

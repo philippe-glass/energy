@@ -12,6 +12,7 @@ import java.util.Map;
 import java.util.TreeMap;
 
 import com.sapereapi.log.SapereLogger;
+import com.sapereapi.model.NodeContext;
 import com.sapereapi.model.TimeSlot;
 import com.sapereapi.model.energy.Contract;
 import com.sapereapi.model.energy.EnergyRequest;
@@ -112,6 +113,8 @@ public class PricingTable implements Cloneable, Serializable {
 		} else {
 			Date dateMin = fistRateDate;
 			Date dateMax = datesIterator.next();
+			//TODO: remplace the wile condition by the folowing: while(!givenDate.before(dateMax) && datesIterator.hasNext())
+			// incase of givenDate.equals(dateMax), the while condition is false: givenDate should be strictly lower than dateMax
 			while(givenDate.after(dateMax) && datesIterator.hasNext()) {
 				dateMin = dateMax;
 				dateMax = datesIterator.next();
@@ -423,6 +426,24 @@ public class PricingTable implements Cloneable, Serializable {
 		return result;
 	}
 
+	public TimeSlot getLowestPriceTimeSlot(Date current) {
+		TimeSlot result = null;
+		Double lowestPrice = null;
+		for (TimeSlot nextSlot : getTimeSlots()) {
+			if (nextSlot.hasExpired(current)) {
+				// do nothing
+			} else {
+				Date beginTime = nextSlot.getBeginDate();
+				Double nextPrice = ratesTable.get(beginTime).getValue();
+				if (lowestPrice == null || nextPrice.doubleValue() < lowestPrice.doubleValue()) {
+					lowestPrice = nextPrice;
+					result = nextSlot;
+				}
+			}
+		}
+		return result;
+	}
+
 	public PricingTable computeRise(double riseFactor) {
 		PricingTable result = new PricingTable(timeShiftMS);
 		for (Date nextDate : ratesTable.keySet()) {
@@ -466,5 +487,12 @@ public class PricingTable implements Cloneable, Serializable {
 			result.putRate(nextDate, rate.clone());
 		}
 		return result;
+	}
+
+	public static PricingTable initSimplePricingTable(NodeContext nodeContext, Double rate) {
+		Date current = nodeContext.getCurrentDate();
+		PricingTable pricingTable = new PricingTable(nodeContext.getTimeShiftMS());
+		pricingTable.putRate(current, rate, null);
+		return pricingTable;
 	}
 }
