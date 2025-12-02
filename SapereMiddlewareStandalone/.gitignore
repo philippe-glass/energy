@@ -6,3 +6,5 @@ UML/
 .gradle
 *.class
 *.ucls
+bin
+doc

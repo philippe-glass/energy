@@ -47,3 +47,12 @@ list_free_rider1_files
 /tests/storage_comon1.htm
 /tests/storage_no.htm
 /tests/storage_comon1_200WH C.htm
+/lstm/.venv
+/tests/*.htm
+/tests/tragedy_common_dynpricing03_files
+/tests/test_overcharge2_files
+/tests/test_overcharge_files
+/tests/tragedy_common_dynpricing30_files
+/tests/tragedy_common10_files
+/tests/tragedy_common_dynpricing10_files
+/tests/tragedy_common03_files

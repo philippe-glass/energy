@@ -33,3 +33,4 @@ build/
 .vscode/
 
 log/
+jar-in-jar-loader.zip
