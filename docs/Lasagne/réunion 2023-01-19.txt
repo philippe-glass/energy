@@ -1,4 +1,0 @@
-1. Description de l’approche globale
-2. Contrats + protection + algorithme - peak shaving 
-3. Markov
-4. Gossip-based learning
