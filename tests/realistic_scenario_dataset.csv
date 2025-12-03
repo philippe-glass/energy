@@ -1,4 +1,4 @@
-﻿datetime,datetime,device_category,environmental_impact,object_type,main_category,power_demanded,power_produced
+﻿datetime,device_name,device_category,environmental_impact,object_type,main_category,power_demanded,power_produced
 01/12/2025 17:21,Halogen light bulbs 7 pc 2,LIGHTING,MEDIUM,REQUEST,START,11.7,0
 01/12/2025 17:21,Incandescent light bulb W40 3,LIGHTING,MEDIUM,REQUEST,START,9.6,0
 01/12/2025 17:21,Incandescent light bulb W100 4,LIGHTING,MEDIUM,REQUEST,START,24,0
