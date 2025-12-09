@@ -48,6 +48,7 @@ public class Latex2DocMain {
 		tagsSimpleReplace.put("\\textcolor{red}", "");
 		tagsSimpleReplace.put("\\textcolor{orange}", "");
 		tagsSimpleReplace.put("\\textcolor{Green}", "");
+		tagsSimpleReplace.put("\\textcolor{Black}", "");
 		tagsSimpleReplace.put("\\textcolor{OliveGreen}", "");
 		tagsSimpleReplace.put("\\textcolor{cyan}", "");
 		tagsSimpleReplace.put("\\textcolor{gray}", "");
